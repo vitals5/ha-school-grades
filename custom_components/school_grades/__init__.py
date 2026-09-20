@@ -412,6 +412,24 @@ def _register_services(hass: HomeAssistant) -> None:
                     hass, SIGNAL_UPDATE_GRADES.format(entry_id=storage.entry_id)
                 )
 
+    def _parse_event_datetime(d_str: str, t_str: str) -> tuple[str, str]:
+        from datetime import datetime, timedelta
+        c_date = d_str.strip()
+        if "T" in c_date:
+            c_date = c_date.split("T")[0]
+
+        c_time = (t_str or "08:00").strip()
+        if "T" in c_time:
+            c_time = c_time.split("T")[-1]
+        if len(c_time) >= 5 and ":" in c_time:
+            c_time = c_time[:5]
+        else:
+            c_time = "08:00"
+
+        start_dt = datetime.fromisoformat(f"{c_date}T{c_time}:00")
+        end_dt = start_dt + timedelta(hours=1)
+        return (start_dt.isoformat(), end_dt.isoformat())
+
     async def handle_add_calendar_event(call: ServiceCall) -> None:
         """Handle add_calendar_event action call."""
         child_name = call.data.get(CONF_CHILD_NAME)
@@ -428,24 +446,6 @@ def _register_services(hass: HomeAssistant) -> None:
         if not target_calendar:
             _LOGGER.error("No target calendar specified or assigned for child %s", child_name)
             return
-
-        def _parse_event_datetime(d_str: str, t_str: str) -> tuple[str, str]:
-            from datetime import datetime, timedelta
-            c_date = d_str.strip()
-            if "T" in c_date:
-                c_date = c_date.split("T")[0]
-
-            c_time = (t_str or "08:00").strip()
-            if "T" in c_time:
-                c_time = c_time.split("T")[-1]
-            if len(c_time) >= 5 and ":" in c_time:
-                c_time = c_time[:5]
-            else:
-                c_time = "08:00"
-
-            start_dt = datetime.fromisoformat(f"{c_date}T{c_time}:00")
-            end_dt = start_dt + timedelta(hours=1)
-            return (start_dt.isoformat(), end_dt.isoformat())
 
         try:
             start_iso, end_iso = _parse_event_datetime(date_str, start_time_str)
