@@ -749,7 +749,10 @@ class SchoolGradesPanel extends HTMLElement {
         }
         if (!endVal) endVal = evt.dtend;
 
+        const uidVal = evt.uid || evt.id || evt.event_id || '';
+
         return {
+          uid: String(uidVal),
           summary: evt.summary || evt.title || evt.message || 'Termin',
           start: startVal,
           end: endVal,
@@ -1884,7 +1887,7 @@ class SchoolGradesPanel extends HTMLElement {
         const calEntity = currentChildData ? currentChildData.calendarEntity : null;
 
         if (summary && dateVal && calEntity) {
-          const serviceName = this._editingEvent ? 'update_calendar_event' : 'add_calendar_event';
+          const serviceName = (this._editingEvent && this._editingEvent.uid) ? 'update_calendar_event' : 'add_calendar_event';
           const payload = {
             child_name: this._selectedChild,
             calendar_entity: calEntity,

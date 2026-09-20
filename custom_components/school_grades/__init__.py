@@ -499,6 +499,7 @@ def _register_services(hass: HomeAssistant) -> None:
             }
             if uid:
                 service_data["uid"] = uid
+                service_data["event_uid"] = uid
             if description:
                 service_data["description"] = description
 
@@ -514,12 +515,24 @@ def _register_services(hass: HomeAssistant) -> None:
                 if uid:
                     try:
                         await hass.services.async_call(
-                            "calendar", "delete_event", {"entity_id": target_calendar, "uid": uid}, blocking=True
+                            "calendar",
+                            "delete_event",
+                            {"entity_id": target_calendar, "uid": uid, "event_uid": uid},
+                            blocking=True,
                         )
-                    except Exception:
-                        pass
+                    except Exception as del_err:
+                        _LOGGER.debug("delete_event fallback failed: %s", del_err)
+
+                create_data = {
+                    "entity_id": target_calendar,
+                    "summary": summary,
+                    "start_date_time": start_dt.isoformat(),
+                    "end_date_time": end_dt.isoformat(),
+                }
+                if description:
+                    create_data["description"] = description
                 await hass.services.async_call(
-                    "calendar", "create_event", service_data, blocking=True
+                    "calendar", "create_event", create_data, blocking=True
                 )
 
             _LOGGER.info("Successfully updated calendar event '%s' on %s", summary, target_calendar)
