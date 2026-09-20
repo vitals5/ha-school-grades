@@ -7,7 +7,7 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.components import panel_custom
+from homeassistant.components import frontend, panel_custom
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.helpers import config_validation as cv
@@ -135,7 +135,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if not hass.data[DOMAIN]:
             _unregister_services(hass)
             if hass.data.get(f"{DOMAIN}_panel_registered"):
-                panel_custom.async_remove_panel(hass, "schulnoten")
+                try:
+                    frontend.async_remove_panel(hass, "schulnoten")
+                except Exception as err:
+                    _LOGGER.warning("Could not remove sidebar panel: %s", err)
                 hass.data.pop(f"{DOMAIN}_panel_registered", None)
 
     return unload_ok

@@ -1,59 +1,59 @@
 add_subject:
-  name: Fach hinzufügen
-  description: Fügt ein neues Schulfach zur Notenübersicht hinzu.
+  name: "Fach hinzufügen"
+  description: "Fügt ein neues Schulfach zur Notenübersicht hinzu."
   fields:
     child_name:
-      name: Name des Kindes
-      description: Name des Kindes (optional, falls nur ein Kind angelegt ist).
+      name: "Name des Kindes"
+      description: "Name des Kindes (optional, falls nur ein Kind angelegt ist)."
       example: "Max"
       selector:
         text:
     subject:
-      name: Schulfach
-      description: Name des neuen Schulfachs.
+      name: "Schulfach"
+      description: "Name des neuen Schulfachs."
       required: true
       example: "Physik"
       selector:
         text:
 
 remove_subject:
-  name: Fach löschen
-  description: Löscht ein Schulfach und alle zugehörigen Noten.
+  name: "Fach löschen"
+  description: "Löscht ein Schulfach und alle zugehörigen Noten."
   fields:
     child_name:
-      name: Name des Kindes
-      description: Name des Kindes (optional).
+      name: "Name des Kindes"
+      description: "Name des Kindes (optional)."
       example: "Max"
       selector:
         text:
     subject:
-      name: Schulfach
-      description: Name des zu löschenden Schulfachs.
+      name: "Schulfach"
+      description: "Name des zu löschenden Schulfachs."
       required: true
       example: "Physik"
       selector:
         text:
 
 add_grade:
-  name: Note hinzufügen
-  description: Trägt eine neue Schulnote mit frei wählbarer Gewichtung ein.
+  name: "Note hinzufügen"
+  description: "Trägt eine neue Schulnote mit frei wählbarer Gewichtung ein."
   fields:
     child_name:
-      name: Name des Kindes
-      description: Name des Kindes (optional).
+      name: "Name des Kindes"
+      description: "Name des Kindes (optional)."
       example: "Max"
       selector:
         text:
     subject:
-      name: Schulfach
-      description: Name des Schulfachs.
+      name: "Schulfach"
+      description: "Name des Schulfachs."
       required: true
       example: "Mathematik"
       selector:
         text:
     grade:
-      name: Note
-      description: Die Schulnote (z.B. 1.0, 1.5, 2.0, 3.0).
+      name: "Note"
+      description: "Die Schulnote (z.B. 1.0, 1.5, 2.0, 3.0)."
       required: true
       example: 2.0
       selector:
@@ -63,8 +63,8 @@ add_grade:
           step: 0.1
           mode: box
     weight:
-      name: Gewichtung
-      description: Gewichtung der Note (z.B. 1-fach, 2-fach, 3-fach, 4-fach).
+      name: "Gewichtung"
+      description: "Gewichtung der Note (z.B. 1-fach, 2-fach, 3-fach, 4-fach)."
       default: 1.0
       example: 2.0
       selector:
@@ -80,38 +80,38 @@ add_grade:
               value: 4.0
           custom_value: true
     name:
-      name: Beschreibung / Bezeichnung
-      description: Bezeichnung der Leistung (z.B. "1. Schulaufgabe", "Ex 2", "Mündlich").
+      name: "Beschreibung / Bezeichnung"
+      description: "Bezeichnung der Leistung (z.B. 1. Schulaufgabe, Ex 2, Mündlich)."
       example: "1. Schulaufgabe"
       selector:
         text:
     date:
-      name: Datum
-      description: Datum der Note im Format YYYY-MM-DD (Standard: Heutiges Datum).
+      name: "Datum"
+      description: "Datum der Note im Format YYYY-MM-DD (Standard: Heutiges Datum)."
       example: "2026-09-15"
       selector:
         date:
 
 remove_grade:
-  name: Note löschen
-  description: Löscht eine bestehende Note anhand ihrer ID.
+  name: "Note löschen"
+  description: "Löscht eine bestehende Note anhand ihrer ID."
   fields:
     child_name:
-      name: Name des Kindes
-      description: Name des Kindes (optional).
+      name: "Name des Kindes"
+      description: "Name des Kindes (optional)."
       example: "Max"
       selector:
         text:
     subject:
-      name: Schulfach
-      description: Name des Schulfachs.
+      name: "Schulfach"
+      description: "Name des Schulfachs."
       required: true
       example: "Mathematik"
       selector:
         text:
     grade_id:
-      name: Noten-ID
-      description: Eindeutige ID der zu löschenden Note (aus den Sensor-Attributen).
+      name: "Noten-ID"
+      description: "Eindeutige ID der zu löschenden Note (aus den Sensor-Attributen)."
       required: true
       example: "a1b2c3d4"
       selector:
