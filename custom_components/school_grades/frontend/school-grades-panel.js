@@ -940,7 +940,7 @@ class SchoolGradesPanel extends HTMLElement {
                 </button>
               `;
             }).join('')}
-            <button class="tab-btn settings-tab-btn" id="open-settings-header-btn" title="${this._t('settings_btn')}" style="margin-left: 8px; background: rgba(255,255,255,0.08);">
+            <button class="settings-tab-btn" id="open-settings-header-btn" title="${this._t('settings_btn')}" style="margin-left: 8px; background: rgba(255,255,255,0.08);">
               ${this._t('settings_btn')}
             </button>
           </div>
@@ -1610,11 +1610,14 @@ class SchoolGradesPanel extends HTMLElement {
     const root = this.shadowRoot;
 
     // Child Tabs
-    root.querySelectorAll('.tab-btn').forEach(btn => {
+    root.querySelectorAll('.child-tabs .tab-btn[data-child]').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        this._selectedChild = e.currentTarget.dataset.child;
-        this._fetchUpcomingCalendarEvents();
-        this.render();
+        const childName = e.currentTarget.dataset.child;
+        if (childName) {
+          this._selectedChild = childName;
+          this._fetchUpcomingCalendarEvents();
+          this.render();
+        }
       });
     });
 
@@ -2184,7 +2187,7 @@ class SchoolGradesPanel extends HTMLElement {
         gap: 8px;
       }
 
-      .tab-btn {
+      .tab-btn, .settings-tab-btn {
         background: var(--card-background-color, #1f2937);
         border: 1px solid rgba(255, 255, 255, 0.1);
         color: var(--primary-text-color, #e5e7eb);
@@ -2196,7 +2199,7 @@ class SchoolGradesPanel extends HTMLElement {
         transition: all 0.2s ease;
       }
 
-      .tab-btn:hover {
+      .tab-btn:hover, .settings-tab-btn:hover {
         border-color: #3b82f6;
         background: rgba(59, 130, 246, 0.1);
       }
