@@ -166,17 +166,30 @@ class SchoolGradesStorage:
         self.child_name = child_name
         self.data = SchoolGradesData(child_name)
         self._store: Any = None
+        try:
+            from homeassistant.helpers.storage import Store
+            self._store = Store(hass, STORAGE_VERSION, STORAGE_KEY.format(entry_id=entry_id))
+        except Exception:
+            _LOGGER.debug("Home Assistant Store not loaded in test environment")
 
     async def async_load(self) -> None:
         """Load data from Home Assistant storage file."""
-        if hasattr(self.hass, "helpers") and hasattr(self.hass.helpers, "storage"):
-            from homeassistant.helpers.storage import Store
-            self._store = Store(self.hass, STORAGE_VERSION, STORAGE_KEY.format(entry_id=self.entry_id))
+        if self._store is None:
+            return
+        try:
             raw_data = await self._store.async_load()
             if raw_data:
                 self.data = SchoolGradesData(self.child_name, raw_data)
+                _LOGGER.info("Successfully loaded school grades storage for %s", self.child_name)
+        except Exception as err:
+            _LOGGER.error("Failed to load school grades storage for %s: %s", self.child_name, err)
 
     async def async_save(self) -> None:
         """Save current data to Home Assistant storage file."""
-        if self._store:
+        if self._store is None:
+            return
+        try:
             await self._store.async_save(self.data.to_dict())
+            _LOGGER.debug("Successfully saved school grades storage for %s", self.child_name)
+        except Exception as err:
+            _LOGGER.error("Failed to save school grades storage for %s: %s", self.child_name, err)

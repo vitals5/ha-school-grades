@@ -80,7 +80,7 @@ class SchoolGradesPanel extends HTMLElement {
       return;
     }
 
-    if (!this._selectedChild || !children[this._selectedChild]) {
+    if (!this._selectedChild || !data[this._selectedChild]) {
       this._selectedChild = childNames[0];
     }
 
@@ -110,7 +110,7 @@ class SchoolGradesPanel extends HTMLElement {
         <div class="summary-banner">
           <div class="stat-card primary">
             <span class="stat-label">Gesamtdurchschnitt</span>
-            <span class="stat-value">${currentChild.totalAverage && !isNaN(currentChild.totalAverage) ? currentChild.totalAverage : '–'}</span>
+            <span class="stat-value">${currentChild && currentChild.totalAverage && !isNaN(currentChild.totalAverage) ? currentChild.totalAverage : '–'}</span>
           </div>
           <div class="stat-card">
             <span class="stat-label">Fächer</span>
