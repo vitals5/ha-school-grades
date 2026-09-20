@@ -316,6 +316,8 @@ const I18N = {
     grade_name_placeholder: "z. B. Schulaufgabe, Ex, Mündlich",
     date_label: "Datum",
     submit_add_grade: "➕ Note eintragen",
+    toggle_add_grade_btn: "➕ Neue Note eintragen",
+    close_add_grade_btn: "✖ Formular ausblenden",
     
     // Manage subjects form
     manage_subjects_title: "📘 Schulfächer verwalten",
@@ -430,6 +432,8 @@ const I18N = {
     grade_name_placeholder: "e.g. Exam, Quiz, Oral",
     date_label: "Date",
     submit_add_grade: "➕ Record Grade",
+    toggle_add_grade_btn: "➕ Record New Grade",
+    close_add_grade_btn: "✖ Hide Form",
     
     // Manage subjects form
     manage_subjects_title: "📘 Manage Subjects",
@@ -506,6 +510,7 @@ class SchoolGradesPanel extends HTMLElement {
     this._showYamlModal = false;
     this._showSettingsModal = false;
     this._settingsTab = 'general';
+    this._showAddGradeCard = false;
   }
 
   set hass(hass) {
@@ -1132,61 +1137,74 @@ class SchoolGradesPanel extends HTMLElement {
           </div>
         ` : ''}
 
-        <!-- Action Cards Grid -->
-        <div class="forms-grid" style="grid-template-columns: 1fr;">
-          <!-- Add Grade Card -->
-          <div class="card form-card">
-            <h3>${this._t('add_grade_title')}</h3>
-            <form id="add-grade-form">
-              <div class="form-group">
-                <label>${this._t('subject_label')}</label>
-                <select id="grade-subject" required>
-                  ${subjectList.map(s => `<option value="${s}">${s}</option>`).join('')}
-                </select>
-              </div>
-
-              <div class="form-group">
-                <label>${this._t('grade_label')} (${countrySys.flag} ${countrySys.scale})</label>
-                <div class="quick-pills" id="grade-pills">
-                  ${countrySys.grades.map(g => `
-                    <button type="button" class="pill-btn ${g.val === this._selectedGrade ? 'active' : ''}" data-val="${g.val}">
-                      ${g.label}
-                    </button>
-                  `).join('')}
-                </div>
-                <input type="number" id="grade-input" step="0.1" value="${this._selectedGrade}" required style="margin-top: 8px;" placeholder="${countrySys.scale}">
-              </div>
-
-              <div class="form-group">
-                <label>${this._t('weight_label')}</label>
-                <div class="quick-pills" id="weight-pills">
-                  ${[1.0, 2.0, 3.0, 4.0].map(w => `
-                    <button type="button" class="pill-btn ${w === this._selectedWeight ? 'active' : ''}" data-weight="${w}">
-                      ${this._t('weight_times', { weight: w })}
-                    </button>
-                  `).join('')}
-                </div>
-              </div>
-
-              <div class="form-row">
-                <div class="form-group half">
-                  <label>${this._t('grade_name_label')}</label>
-                  <input type="text" id="grade-name" placeholder="${this._t('grade_name_placeholder')}">
-                </div>
-                <div class="form-group half">
-                  <label>${this._t('date_label')}</label>
-                  <input type="date" id="grade-date" value="${new Date().toISOString().split('T')[0]}">
-                </div>
-              </div>
-
-              <button type="submit" class="submit-btn">${this._t('submit_add_grade')}</button>
-            </form>
-          </div>
+        <!-- Action / Toggle Button Row for Add Grade Form -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 24px; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+          ${secVis.show_overview_card ? `
+            <h2 class="section-title" style="margin: 0;">${this._t('overview_title')}</h2>
+          ` : `<div></div>`}
+          <button class="pill-btn add-grade-toggle-btn" id="toggle-add-grade-btn" style="padding: 10px 20px; font-size: 14px; font-weight: 600; background: linear-gradient(135deg, #2563eb, #7c3aed); color: #fff; border: none; border-radius: 12px; cursor: pointer; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35); transition: all 0.2s ease;">
+            ${this._showAddGradeCard ? this._t('close_add_grade_btn') : this._t('toggle_add_grade_btn')}
+          </button>
         </div>
+
+        <!-- Add Grade Card (Collapsible) -->
+        ${this._showAddGradeCard ? `
+          <div class="forms-grid" style="grid-template-columns: 1fr; margin-bottom: 24px;">
+            <div class="card form-card">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h3 style="margin: 0;">${this._t('add_grade_title')}</h3>
+                <button type="button" id="close-add-grade-x" style="background: none; border: none; color: rgba(255,255,255,0.6); cursor: pointer; font-size: 18px; padding: 4px;">✖</button>
+              </div>
+              <form id="add-grade-form">
+                <div class="form-group">
+                  <label>${this._t('subject_label')}</label>
+                  <select id="grade-subject" required>
+                    ${subjectList.map(s => `<option value="${s}">${s}</option>`).join('')}
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label>${this._t('grade_label')} (${countrySys.flag} ${countrySys.scale})</label>
+                  <div class="quick-pills" id="grade-pills">
+                    ${countrySys.grades.map(g => `
+                      <button type="button" class="pill-btn ${g.val === this._selectedGrade ? 'active' : ''}" data-val="${g.val}">
+                        ${g.label}
+                      </button>
+                    `).join('')}
+                  </div>
+                  <input type="number" id="grade-input" step="0.1" value="${this._selectedGrade}" required style="margin-top: 8px;" placeholder="${countrySys.scale}">
+                </div>
+
+                <div class="form-group">
+                  <label>${this._t('weight_label')}</label>
+                  <div class="quick-pills" id="weight-pills">
+                    ${[1.0, 2.0, 3.0, 4.0].map(w => `
+                      <button type="button" class="pill-btn ${w === this._selectedWeight ? 'active' : ''}" data-weight="${w}">
+                        ${this._t('weight_times', { weight: w })}
+                      </button>
+                    `).join('')}
+                  </div>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group half">
+                    <label>${this._t('grade_name_label')}</label>
+                    <input type="text" id="grade-name" placeholder="${this._t('grade_name_placeholder')}">
+                  </div>
+                  <div class="form-group half">
+                    <label>${this._t('date_label')}</label>
+                    <input type="date" id="grade-date" value="${new Date().toISOString().split('T')[0]}">
+                  </div>
+                </div>
+
+                <button type="submit" class="submit-btn">${this._t('submit_add_grade')}</button>
+              </form>
+            </div>
+          </div>
+        ` : ''}
 
         <!-- Subjects Grid -->
         ${secVis.show_overview_card ? `
-          <h2 class="section-title">${this._t('overview_title')}</h2>
           <div class="subjects-grid">
             ${subjectList.map(subjName => {
               const subj = subjects[subjName];
@@ -1799,6 +1817,23 @@ class SchoolGradesPanel extends HTMLElement {
       }
     }
 
+    // Toggle Add Grade Form Button
+    const toggleAddGradeBtn = root.querySelector('#toggle-add-grade-btn');
+    if (toggleAddGradeBtn) {
+      toggleAddGradeBtn.addEventListener('click', () => {
+        this._showAddGradeCard = !this._showAddGradeCard;
+        this.render();
+      });
+    }
+
+    const closeAddGradeX = root.querySelector('#close-add-grade-x');
+    if (closeAddGradeX) {
+      closeAddGradeX.addEventListener('click', () => {
+        this._showAddGradeCard = false;
+        this.render();
+      });
+    }
+
     // Grade Pills
     root.querySelectorAll('#grade-pills .pill-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -1839,6 +1874,7 @@ class SchoolGradesPanel extends HTMLElement {
         });
 
         root.querySelector('#grade-name').value = '';
+        this._showAddGradeCard = false;
         setTimeout(() => this.render(), 200);
         setTimeout(() => this.render(), 600);
       });
