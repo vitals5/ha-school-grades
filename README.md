@@ -30,15 +30,10 @@ Mit dem **integrierten Sidebar-Panel** (`/schulnoten`) verwaltest du Noten, Fäc
   - Eintragen von Noten (1.0 bis 6.0) mit frei wählbarer Gewichtung (1-fach, 2-fach, 3-fach, 4-fach).
   - Automatische Errechnung des gewichteten Fachdurchschnitts sowie des Gesamtdurchschnitts.
   - Notenhistorie mit Datum, Bezeichnung (z. B. *1. Schulaufgabe*) und Löschoption.
-- 🌍 **Länderspezifische Schulsysteme & Notenskalen (General Settings per Kind)**:
-  - Einstellungen pro Kind zur automatischen Anpassung der Notenoptionen & Farbbewertungen.
-  - Unterstützung für alle europäischen Normen (🇩🇪 DE, 🇦🇹 AT, 🇨🇭 CH, 🇫🇷 FR, 🇮🇹 IT, 🇪🇸 ES, 🇳🇱 NL, 🇵🇱 PL, 🇬🇧 UK) sowie 🇺🇸 USA (GPA 0.0-4.0), 🇷🇺 Russland (2-5) und 🇨🇳 China (0-100).
-- 👁️ **Anpassbare Panel-Bereiche (Ein/Ausblenden)**:
-  - In den Allgemeinen Einstellungen kann jeder Bereich des Panels individuell pro Kind aus- oder eingeblendet werden:
-    - Vorbereitung für den nächsten Schultag
-    - Anstehende Klausuren & Termine
-    - Wochenstundenplan
-    - Fächer & Notenübersicht
+- ⚙️ **Einstellungen-Modal mit Tabs (`⚙️ Allgemein` & `📘 Fächer verwalten`)**:
+  - **Allgemein**: Anpassung der länderspezifischen Schulsysteme (🇩🇪, 🇦🇹, 🇨🇭, 🇫🇷, 🇮🇹, 🇪🇸, 🇳🇱, 🇵🇱, 🇬🇧, 🇺🇸, 🇷🇺, 🇨🇳) sowie individuelles Aus- und Einblenden aller 4 Dashboard-Bereiche.
+  - **Fächer verwalten**: Bequemes Anlegen neuer Schulfächer sowie Löschen bestehender Fächer zentral im Einstellungen-Dialog.
+
 - 🌐 **Mehrsprachigkeit (Multi-Language i18n)**:
   - Vollständige Unterstützung für **Deutsch 🇩🇪** und **Englisch 🇬🇧**.
   - Die Benutzeroberfläche und Servicetexte passen sich automatisch der gewählten Sprache in den Home Assistant Benutzereinstellungen an.
@@ -140,15 +135,10 @@ With the **built-in Sidebar Panel** (`/schulnoten`), you can manage grades, subj
   - Record grades (1.0 to 6.0) with configurable weight (1x, 2x, 3x, 4x).
   - Automatic calculation of weighted subject average and overall GPA.
   - Grade history with date, label (e.g., *1st Exam*), and deletion option.
-- 🌍 **International Country Grading Systems (General Settings per child)**:
-  - Configure country per child instance to automatically adapt grade input options & color evaluations.
-  - Supports European standards (🇩🇪 DE, 🇦🇹 AT, 🇨🇭 CH, 🇫🇷 FR, 🇮🇹 IT, 🇪🇸 ES, 🇳🇱 NL, 🇵🇱 PL, 🇬🇧 UK), 🇺🇸 USA (GPA 0.0-4.0), 🇷🇺 Russia (2-5), and 🇨🇳 China (0-100/A-F).
-- 👁️ **Customizable Panel Sections (Show/Hide)**:
-  - In General Settings, each section of the panel can be toggled on or off per child:
-    - Preparation for next school day
-    - Upcoming exams & events
-    - Weekly timetable
-    - Subjects & grades overview
+- ⚙️ **Tabbed Settings Modal (`⚙️ General` & `📘 Manage Subjects`)**:
+  - **General**: Customize country-specific grading systems (🇩🇪, 🇦🇹, 🇨🇭, 🇫🇷, 🇮🇹, 🇪🇸, 🇳🇱, 🇵🇱, 🇬🇧, 🇺🇸, 🇷🇺, 🇨🇳) and toggle visibility of all 4 panel sections.
+  - **Manage Subjects**: Easily add new subjects or remove existing subjects directly within the Settings dialog.
+
 - 🌐 **Multi-Language Support (i18n)**:
   - Full native support for **German 🇩🇪** and **English 🇬🇧**.
   - The UI and service strings adapt automatically to your Home Assistant user language preferences.

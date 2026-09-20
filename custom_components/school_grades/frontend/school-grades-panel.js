@@ -340,7 +340,9 @@ const I18N = {
     
     // Settings
     settings_btn: "⚙️ Einstellungen",
-    settings_title: "⚙️ Allgemeine Einstellungen ({child})",
+    settings_title: "⚙️ Einstellungen ({child})",
+    settings_tab_general: "⚙️ Allgemein",
+    settings_tab_subjects: "📘 Fächer verwalten",
     country_label: "Land / Schulsystem",
     country_hint: "Bestimmt die Notenskala und Bewertung für diese Instanz.",
     section_visibility_title: "Bereiche des Panels aus/einblenden",
@@ -452,7 +454,9 @@ const I18N = {
     
     // Settings
     settings_btn: "⚙️ Settings",
-    settings_title: "⚙️ General Settings ({child})",
+    settings_title: "⚙️ Settings ({child})",
+    settings_tab_general: "⚙️ General",
+    settings_tab_subjects: "📘 Manage Subjects",
     country_label: "Country / Grading System",
     country_hint: "Determines the grading scale and evaluation system for this child.",
     section_visibility_title: "Show/hide panel sections",
@@ -501,6 +505,7 @@ class SchoolGradesPanel extends HTMLElement {
     this._editingCell = null; // { slotId, day, slotLabel, dayLabel, subject, room, teacher }
     this._showYamlModal = false;
     this._showSettingsModal = false;
+    this._settingsTab = 'general';
   }
 
   set hass(hass) {
@@ -1128,7 +1133,7 @@ class SchoolGradesPanel extends HTMLElement {
         ` : ''}
 
         <!-- Action Cards Grid -->
-        <div class="forms-grid">
+        <div class="forms-grid" style="grid-template-columns: 1fr;">
           <!-- Add Grade Card -->
           <div class="card form-card">
             <h3>${this._t('add_grade_title')}</h3>
@@ -1176,30 +1181,6 @@ class SchoolGradesPanel extends HTMLElement {
 
               <button type="submit" class="submit-btn">${this._t('submit_add_grade')}</button>
             </form>
-          </div>
-
-          <!-- Manage Subjects Card -->
-          <div class="card form-card">
-            <h3>${this._t('manage_subjects_title')}</h3>
-            <form id="add-subject-form">
-              <div class="form-group">
-                <label>${this._t('new_subject_label')}</label>
-                <input type="text" id="new-subject-name" placeholder="${this._t('new_subject_placeholder')}" required>
-              </div>
-              <button type="submit" class="submit-btn secondary">${this._t('submit_add_subject')}</button>
-            </form>
-
-            <hr style="margin: 24px 0; border: none; border-top: 1px solid var(--divider-color, rgba(255,255,255,0.1));">
-
-            <div class="form-group">
-              <label>${this._t('delete_subject_label')}</label>
-              <div class="delete-subject-row">
-                <select id="delete-subject-select">
-                  ${subjectList.map(s => `<option value="${s}">${s}</option>`).join('')}
-                </select>
-                <button type="button" id="delete-subject-btn" class="delete-btn">${this._t('delete_btn')}</button>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -1341,65 +1322,110 @@ class SchoolGradesPanel extends HTMLElement {
       <!-- General Settings Modal -->
       ${this._showSettingsModal ? `
         <div class="modal-backdrop" id="settings-modal-backdrop">
-          <div class="modal-card">
-            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <div class="modal-card" style="max-width: 520px; width: 100%;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
               <div>
                 <h3 style="margin: 0; font-size: 18px;">⚙️ ${this._t('settings_title', { child: this._selectedChild })}</h3>
-                <span class="modal-subtitle" style="display: block; margin-top: 4px; opacity: 0.7; font-size: 13px;">${this._t('country_hint')}</span>
               </div>
               <button class="icon-btn" id="settings-close-x" style="font-size: 20px; border: none; background: none; color: #fff; cursor: pointer; padding: 4px 8px;">✖</button>
             </div>
 
-            <form id="settings-form">
-              <div class="form-group" style="margin-bottom: 20px;">
-                <label style="display: block; margin-bottom: 8px; font-weight: 500;">🌍 ${this._t('country_label')}</label>
-                <select id="settings-country-select" style="width: 100%; padding: 12px 14px; border-radius: 8px; background: var(--card-background-color, rgba(0,0,0,0.25)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 14px; cursor: pointer;">
-                  ${Object.entries(COUNTRY_SYSTEMS).map(([code, sys]) => `
-                    <option value="${code}" ${code === childCountry ? 'selected' : ''}>
-                      ${sys.flag} ${sys.name} (${sys.scale})
-                    </option>
-                  `).join('')}
-                </select>
-              </div>
+            <!-- Settings Tabs Header -->
+            <div class="settings-tabs-header" style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--divider-color, rgba(255,255,255,0.1)); padding-bottom: 10px;">
+              <button class="modal-tab-btn ${this._settingsTab === 'general' ? 'active' : ''}" id="settings-tab-btn-general" style="padding: 8px 16px; border-radius: 8px; border: 1px solid ${this._settingsTab === 'general' ? 'var(--primary-color, #3b82f6)' : 'rgba(255,255,255,0.1)'}; background: ${this._settingsTab === 'general' ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.05)'}; color: #fff; cursor: pointer; font-weight: 600; font-size: 14px; transition: all 0.2s;">
+                ${this._t('settings_tab_general')}
+              </button>
+              <button class="modal-tab-btn ${this._settingsTab === 'subjects' ? 'active' : ''}" id="settings-tab-btn-subjects" style="padding: 8px 16px; border-radius: 8px; border: 1px solid ${this._settingsTab === 'subjects' ? 'var(--primary-color, #3b82f6)' : 'rgba(255,255,255,0.1)'}; background: ${this._settingsTab === 'subjects' ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.05)'}; color: #fff; cursor: pointer; font-weight: 600; font-size: 14px; transition: all 0.2s;">
+                ${this._t('settings_tab_subjects')}
+              </button>
+            </div>
 
-              <div class="form-group" style="margin-bottom: 24px;">
-                <div class="country-info-badge" style="padding: 12px 16px; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); font-size: 13px; line-height: 1.5;">
-                  <strong>${countrySys.flag} ${countrySys.name}</strong> • Skala: ${countrySys.scale} 
-                  <br><small style="opacity: 0.8;">${countrySys.lower_is_better ? '📉 1.0 = Beste Note' : '📈 Höchste Note ist am besten'}</small>
+            ${this._settingsTab === 'general' ? `
+              <!-- General Settings Tab -->
+              <form id="settings-form">
+                <div class="form-group" style="margin-bottom: 20px;">
+                  <label style="display: block; margin-bottom: 8px; font-weight: 500;">🌍 ${this._t('country_label')}</label>
+                  <select id="settings-country-select" style="width: 100%; padding: 12px 14px; border-radius: 8px; background: var(--card-background-color, rgba(0,0,0,0.25)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 14px; cursor: pointer;">
+                    ${Object.entries(COUNTRY_SYSTEMS).map(([code, sys]) => `
+                      <option value="${code}" ${code === childCountry ? 'selected' : ''}>
+                        ${sys.flag} ${sys.name} (${sys.scale})
+                      </option>
+                    `).join('')}
+                  </select>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 20px;">
+                  <div class="country-info-badge" style="padding: 12px 16px; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); font-size: 13px; line-height: 1.5;">
+                    <strong>${countrySys.flag} ${countrySys.name}</strong> • Skala: ${countrySys.scale} 
+                    <br><small style="opacity: 0.8;">${countrySys.lower_is_better ? '📉 1.0 = Beste Note' : '📈 Höchste Note ist am besten'}</small>
+                  </div>
+                </div>
+
+                <hr style="margin: 20px 0; border: none; border-top: 1px solid var(--divider-color, rgba(255,255,255,0.1));">
+
+                <div class="form-group" style="margin-bottom: 20px;">
+                  <label style="display: block; margin-bottom: 12px; font-weight: 600; font-size: 14px; color: var(--primary-text-color, #fff);">
+                    👁️ ${this._t('section_visibility_title')}
+                  </label>
+                  <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px;">
+                      <input type="checkbox" id="settings-show-prep" ${secVis.show_prep_card ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary-color, #4ea8de);">
+                      <span>${this._t('section_prep')}</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px;">
+                      <input type="checkbox" id="settings-show-calendar" ${secVis.show_calendar_card ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary-color, #4ea8de);">
+                      <span>${this._t('section_calendar')}</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px;">
+                      <input type="checkbox" id="settings-show-timetable" ${secVis.show_timetable_card ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary-color, #4ea8de);">
+                      <span>${this._t('section_timetable')}</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px;">
+                      <input type="checkbox" id="settings-show-overview" ${secVis.show_overview_card ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary-color, #4ea8de);">
+                      <span>${this._t('section_overview')}</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 12px;">
+                  <button type="button" class="submit-btn secondary" id="settings-cancel-btn">${this._t('cancel_btn')}</button>
+                  <button type="submit" class="submit-btn">${this._t('save_btn')}</button>
+                </div>
+              </form>
+            ` : `
+              <!-- Manage Subjects Tab -->
+              <div class="settings-subjects-tab">
+                <form id="settings-add-subject-form" style="margin-bottom: 24px;">
+                  <div class="form-group" style="margin-bottom: 12px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px;">
+                      ➕ ${this._t('new_subject_label')}
+                    </label>
+                    <input type="text" id="settings-new-subject-name" placeholder="${this._t('new_subject_placeholder')}" required style="width: 100%; padding: 12px 14px; border-radius: 8px; background: rgba(0,0,0,0.25); color: #fff; border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 14px; box-sizing: border-box;">
+                  </div>
+                  <button type="submit" class="submit-btn secondary" style="width: 100%;">${this._t('submit_add_subject')}</button>
+                </form>
+
+                <hr style="margin: 20px 0; border: none; border-top: 1px solid var(--divider-color, rgba(255,255,255,0.1));">
+
+                <div class="form-group" style="margin-bottom: 20px;">
+                  <label style="display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px;">
+                    🗑️ ${this._t('delete_subject_label')}
+                  </label>
+                  <div style="display: flex; gap: 10px; align-items: center;">
+                    <select id="settings-delete-subject-select" style="flex: 1; padding: 12px 14px; border-radius: 8px; background: rgba(0,0,0,0.25); color: #fff; border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 14px; cursor: pointer;">
+                      ${subjectList.map(s => `<option value="${s}">${s}</option>`).join('')}
+                    </select>
+                    <button type="button" id="settings-delete-subject-btn" class="delete-btn" style="padding: 12px 18px; white-space: nowrap;" ${subjectList.length === 0 ? 'disabled style="opacity:0.4;cursor:not-allowed;"' : ''}>
+                      ${this._t('delete_btn')}
+                    </button>
+                  </div>
+                </div>
+
+                <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+                  <button type="button" class="submit-btn secondary" id="settings-cancel-btn">${this._t('cancel_btn')}</button>
                 </div>
               </div>
-
-              <hr style="margin: 20px 0; border: none; border-top: 1px solid var(--divider-color, rgba(255,255,255,0.1));">
-
-              <div class="form-group" style="margin-bottom: 20px;">
-                <label style="display: block; margin-bottom: 12px; font-weight: 600; font-size: 14px; color: var(--primary-text-color, #fff);">
-                  👁️ ${this._t('section_visibility_title')}
-                </label>
-                <div style="display: flex; flex-direction: column; gap: 10px;">
-                  <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px;">
-                    <input type="checkbox" id="settings-show-prep" ${secVis.show_prep_card ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary-color, #4ea8de);">
-                    <span>${this._t('section_prep')}</span>
-                  </label>
-                  <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px;">
-                    <input type="checkbox" id="settings-show-calendar" ${secVis.show_calendar_card ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary-color, #4ea8de);">
-                    <span>${this._t('section_calendar')}</span>
-                  </label>
-                  <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px;">
-                    <input type="checkbox" id="settings-show-timetable" ${secVis.show_timetable_card ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary-color, #4ea8de);">
-                    <span>${this._t('section_timetable')}</span>
-                  </label>
-                  <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px;">
-                    <input type="checkbox" id="settings-show-overview" ${secVis.show_overview_card ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary-color, #4ea8de);">
-                    <span>${this._t('section_overview')}</span>
-                  </label>
-                </div>
-              </div>
-
-              <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 12px;">
-                <button type="button" class="submit-btn secondary" id="settings-cancel-btn">${this._t('cancel_btn')}</button>
-                <button type="submit" class="submit-btn">${this._t('save_btn')}</button>
-              </div>
-            </form>
+            `}
           </div>
         </div>
       ` : ''}
@@ -1497,6 +1523,7 @@ class SchoolGradesPanel extends HTMLElement {
     if (openSettingsBtn1) {
       openSettingsBtn1.addEventListener('click', () => {
         this._showSettingsModal = true;
+        this._settingsTab = 'general';
         this.render();
       });
     }
@@ -1504,6 +1531,7 @@ class SchoolGradesPanel extends HTMLElement {
     if (openSettingsBtn2) {
       openSettingsBtn2.addEventListener('click', () => {
         this._showSettingsModal = true;
+        this._settingsTab = 'general';
         this.render();
       });
     }
@@ -1534,6 +1562,23 @@ class SchoolGradesPanel extends HTMLElement {
         });
       }
 
+      // Settings Tab Switchers
+      const tabBtnGeneral = root.querySelector('#settings-tab-btn-general');
+      if (tabBtnGeneral) {
+        tabBtnGeneral.addEventListener('click', () => {
+          this._settingsTab = 'general';
+          this.render();
+        });
+      }
+
+      const tabBtnSubjects = root.querySelector('#settings-tab-btn-subjects');
+      if (tabBtnSubjects) {
+        tabBtnSubjects.addEventListener('click', () => {
+          this._settingsTab = 'subjects';
+          this.render();
+        });
+      }
+
       const settingsForm = root.querySelector('#settings-form');
       if (settingsForm) {
         settingsForm.addEventListener('submit', async (e) => {
@@ -1554,6 +1599,42 @@ class SchoolGradesPanel extends HTMLElement {
           });
           this._showSettingsModal = false;
           setTimeout(() => this.render(), 300);
+        });
+      }
+
+      // Add Subject Form Submit (Inside Settings Modal)
+      const settingsAddSubjectForm = root.querySelector('#settings-add-subject-form');
+      if (settingsAddSubjectForm) {
+        settingsAddSubjectForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const inputElem = root.querySelector('#settings-new-subject-name');
+          const newSubject = inputElem ? inputElem.value.trim() : '';
+          if (newSubject) {
+            await this._hass.callService('school_grades', 'add_subject', {
+              child_name: this._selectedChild,
+              subject: newSubject,
+            });
+            if (inputElem) inputElem.value = '';
+            setTimeout(() => this.render(), 200);
+            setTimeout(() => this.render(), 600);
+          }
+        });
+      }
+
+      // Delete Subject Button (Inside Settings Modal)
+      const settingsDeleteSubjectBtn = root.querySelector('#settings-delete-subject-btn');
+      if (settingsDeleteSubjectBtn) {
+        settingsDeleteSubjectBtn.addEventListener('click', async () => {
+          const selectElem = root.querySelector('#settings-delete-subject-select');
+          const subject = selectElem ? selectElem.value : '';
+          if (subject && confirm(this._t('delete_subject_confirm', { subject: subject }))) {
+            await this._hass.callService('school_grades', 'remove_subject', {
+              child_name: this._selectedChild,
+              subject: subject,
+            });
+            setTimeout(() => this.render(), 200);
+            setTimeout(() => this.render(), 600);
+          }
         });
       }
     }
@@ -1760,40 +1841,6 @@ class SchoolGradesPanel extends HTMLElement {
         root.querySelector('#grade-name').value = '';
         setTimeout(() => this.render(), 200);
         setTimeout(() => this.render(), 600);
-      });
-    }
-
-    // Add Subject Form Submit
-    const addSubjectForm = root.querySelector('#add-subject-form');
-    if (addSubjectForm) {
-      addSubjectForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const newSubject = root.querySelector('#new-subject-name').value.trim();
-        if (newSubject) {
-          await this._hass.callService('school_grades', 'add_subject', {
-            child_name: this._selectedChild,
-            subject: newSubject,
-          });
-          root.querySelector('#new-subject-name').value = '';
-          setTimeout(() => this.render(), 200);
-          setTimeout(() => this.render(), 600);
-        }
-      });
-    }
-
-    // Delete Subject Button
-    const deleteSubjectBtn = root.querySelector('#delete-subject-btn');
-    if (deleteSubjectBtn) {
-      deleteSubjectBtn.addEventListener('click', async () => {
-        const subject = root.querySelector('#delete-subject-select').value;
-        if (subject && confirm(this._t('delete_subject_confirm', { subject: subject }))) {
-          await this._hass.callService('school_grades', 'remove_subject', {
-            child_name: this._selectedChild,
-            subject: subject,
-          });
-          setTimeout(() => this.render(), 200);
-          setTimeout(() => this.render(), 600);
-        }
       });
     }
 
