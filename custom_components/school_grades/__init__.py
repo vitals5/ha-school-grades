@@ -147,6 +147,8 @@ SCHEMA_UPDATE_CALENDAR_EVENT = vol.Schema(
         vol.Optional(CONF_CHILD_NAME): cv.string,
         vol.Optional(CONF_CALENDAR): cv.string,
         vol.Optional("uid"): cv.string,
+        vol.Optional("original_summary"): cv.string,
+        vol.Optional("original_date"): cv.string,
         vol.Required(CONF_SUMMARY): cv.string,
         vol.Required(CONF_DATE): cv.string,
         vol.Optional(CONF_START_TIME, default="08:00"): cv.string,
@@ -159,6 +161,8 @@ SCHEMA_REMOVE_CALENDAR_EVENT = vol.Schema(
         vol.Optional(CONF_CHILD_NAME): cv.string,
         vol.Optional(CONF_CALENDAR): cv.string,
         vol.Optional("uid"): cv.string,
+        vol.Optional("original_summary"): cv.string,
+        vol.Optional("original_date"): cv.string,
         vol.Optional(CONF_SUMMARY): cv.string,
         vol.Optional(CONF_DATE): cv.string,
     }
@@ -496,6 +500,8 @@ def _register_services(hass: HomeAssistant) -> None:
         """Handle update_calendar_event action call."""
         child_name = call.data.get(CONF_CHILD_NAME)
         uid = call.data.get("uid")
+        original_summary = call.data.get("original_summary")
+        original_date = call.data.get("original_date")
         summary = call.data[CONF_SUMMARY]
         date_str = call.data[CONF_DATE]
         start_time_str = call.data.get(CONF_START_TIME, "08:00") or "08:00"
@@ -511,7 +517,7 @@ def _register_services(hass: HomeAssistant) -> None:
             return
 
         if not uid or not str(uid).strip():
-            uid = await _async_find_event_uid(target_calendar, summary, date_str)
+            uid = await _async_find_event_uid(target_calendar, original_summary or summary, original_date or date_str)
 
         try:
             from datetime import datetime, timedelta
@@ -559,29 +565,35 @@ def _register_services(hass: HomeAssistant) -> None:
                         _LOGGER.debug("update_event with uid key failed: %s", err2)
 
             if not success:
-                # Fallback: delete old event if UID known and create new event
+                # Fallback: delete old event ONLY if delete_event succeeds, then create new event
+                deleted_old = False
                 if uid:
                     try:
                         await hass.services.async_call(
                             "calendar", "delete_event", {"entity_id": target_calendar, "event_uid": uid}, blocking=True
                         )
+                        deleted_old = True
                     except Exception:
                         try:
                             await hass.services.async_call(
                                 "calendar", "delete_event", {"entity_id": target_calendar, "uid": uid}, blocking=True
                             )
-                        except Exception:
-                            pass
+                            deleted_old = True
+                        except Exception as del_err:
+                            _LOGGER.error("Fallback delete_event failed: %s", del_err)
 
-                create_data = {
-                    "entity_id": target_calendar,
-                    "summary": summary,
-                    "start_date_time": start_dt.isoformat(),
-                    "end_date_time": end_dt.isoformat(),
-                }
-                if description:
-                    create_data["description"] = description
-                await hass.services.async_call("calendar", "create_event", create_data, blocking=True)
+                if deleted_old:
+                    create_data = {
+                        "entity_id": target_calendar,
+                        "summary": summary,
+                        "start_date_time": start_dt.isoformat(),
+                        "end_date_time": end_dt.isoformat(),
+                    }
+                    if description:
+                        create_data["description"] = description
+                    await hass.services.async_call("calendar", "create_event", create_data, blocking=True)
+                else:
+                    _LOGGER.error("Could not update calendar event %s on %s", uid, target_calendar)
 
             _LOGGER.info("Successfully updated calendar event '%s' on %s", summary, target_calendar)
 
@@ -596,6 +608,8 @@ def _register_services(hass: HomeAssistant) -> None:
         """Handle remove_calendar_event action call."""
         child_name = call.data.get(CONF_CHILD_NAME)
         uid = call.data.get("uid")
+        original_summary = call.data.get("original_summary")
+        original_date = call.data.get("original_date")
         summary = call.data.get(CONF_SUMMARY)
         date_str = call.data.get(CONF_DATE)
         target_calendar = call.data.get(CONF_CALENDAR)
@@ -608,8 +622,8 @@ def _register_services(hass: HomeAssistant) -> None:
             _LOGGER.error("No target calendar specified or assigned for child %s", child_name)
             return
 
-        if (not uid or not str(uid).strip()) and summary:
-            uid = await _async_find_event_uid(target_calendar, summary, date_str)
+        if (not uid or not str(uid).strip()) and (summary or original_summary):
+            uid = await _async_find_event_uid(target_calendar, original_summary or summary, original_date or date_str)
 
         if not uid:
             _LOGGER.error("Cannot delete calendar event without UID on %s", target_calendar)

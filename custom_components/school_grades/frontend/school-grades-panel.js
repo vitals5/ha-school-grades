@@ -687,38 +687,37 @@ class SchoolGradesPanel extends HTMLElement {
 
       let rawEvents = [];
 
-      // 1. Check if backend total sensor already provided upcoming_events attribute
-      if (childData.upcomingEvents && Array.isArray(childData.upcomingEvents) && childData.upcomingEvents.length > 0) {
-        rawEvents = childData.upcomingEvents;
-      } else {
-        // 2. Try WebSocket API (with start_date_time)
-        try {
-          const wsRes = await this._hass.callWS({
-            type: 'calendar/event/list',
-            entity_id: calEntity,
-            start_date_time: startIso,
-            end_date_time: endIso,
-          });
-          if (wsRes && Array.isArray(wsRes.events)) {
-            rawEvents = wsRes.events;
-          } else if (Array.isArray(wsRes)) {
-            rawEvents = wsRes;
-          }
-        } catch (err1) {
-          // 3. Try REST API
-          try {
-            const apiRes = await this._hass.callApi(
-              'GET',
-              `calendars/${calEntity}?start=${encodeURIComponent(startIso)}&end=${encodeURIComponent(endIso)}`
-            );
-            if (Array.isArray(apiRes)) {
-              rawEvents = apiRes;
-            }
-          } catch (err2) {
-            console.warn('SchoolGrades: Could not fetch calendar events via WS or REST', err2);
-            rawEvents = [];
-          }
+      // 1. Try WebSocket API (with start_date_time)
+      try {
+        const wsRes = await this._hass.callWS({
+          type: 'calendar/event/list',
+          entity_id: calEntity,
+          start_date_time: startIso,
+          end_date_time: endIso,
+        });
+        if (wsRes && Array.isArray(wsRes.events)) {
+          rawEvents = wsRes.events;
+        } else if (Array.isArray(wsRes)) {
+          rawEvents = wsRes;
         }
+      } catch (err1) {
+        // 2. Try REST API
+        try {
+          const apiRes = await this._hass.callApi(
+            'GET',
+            `calendars/${calEntity}?start=${encodeURIComponent(startIso)}&end=${encodeURIComponent(endIso)}`
+          );
+          if (Array.isArray(apiRes)) {
+            rawEvents = apiRes;
+          }
+        } catch (err2) {
+          console.warn('SchoolGrades: Could not fetch calendar events via WS or REST', err2);
+        }
+      }
+
+      // 3. Fallback: Use backend total sensor upcoming_events attribute if available
+      if (rawEvents.length === 0 && childData.upcomingEvents && Array.isArray(childData.upcomingEvents)) {
+        rawEvents = childData.upcomingEvents;
       }
 
       // Fallback: If no events array obtained, use state attributes as last resort
@@ -1851,7 +1850,9 @@ class SchoolGradesPanel extends HTMLElement {
             calendar_entity: calEntity,
             uid: uid,
             summary: summary,
+            original_summary: summary,
             date: this._editingEvent ? this._editingEvent.date : '',
+            original_date: this._editingEvent ? this._editingEvent.date : '',
           });
           this._showAddEventCard = false;
           this._editingEvent = null;
@@ -1888,7 +1889,7 @@ class SchoolGradesPanel extends HTMLElement {
         const calEntity = currentChildData ? currentChildData.calendarEntity : null;
 
         if (summary && dateVal && calEntity) {
-          const serviceName = (this._editingEvent && this._editingEvent.uid) ? 'update_calendar_event' : 'add_calendar_event';
+          const serviceName = this._editingEvent ? 'update_calendar_event' : 'add_calendar_event';
           const payload = {
             child_name: this._selectedChild,
             calendar_entity: calEntity,
@@ -1897,8 +1898,10 @@ class SchoolGradesPanel extends HTMLElement {
             start_time: timeVal || '08:00',
             description: descVal,
           };
-          if (this._editingEvent && this._editingEvent.uid) {
-            payload.uid = this._editingEvent.uid;
+          if (this._editingEvent) {
+            if (this._editingEvent.uid) payload.uid = this._editingEvent.uid;
+            if (this._editingEvent.summary) payload.original_summary = this._editingEvent.summary;
+            if (this._editingEvent.date) payload.original_date = this._editingEvent.date;
           }
 
           await this._hass.callService('school_grades', serviceName, payload);
