@@ -538,66 +538,6 @@ def _register_services(hass: HomeAssistant) -> None:
             _LOGGER.debug("Error finding event UID for %s on %s: %s", summary, target_calendar, err)
         return None
 
-    async def handle_update_calendar_event(call: ServiceCall) -> None:
-        """Handle update_calendar_event action call."""
-        child_name = call.data.get(CONF_CHILD_NAME)
-        uid = call.data.get("uid")
-        original_summary = call.data.get("original_summary")
-        original_date = call.data.get("original_date")
-        summary = call.data[CONF_SUMMARY]
-        date_str = call.data[CONF_DATE]
-        start_time_str = call.data.get(CONF_START_TIME, "08:00") or "08:00"
-        description = call.data.get(CONF_DESCRIPTION, "")
-        target_calendar = call.data.get(CONF_CALENDAR)
-
-        storage = _get_storage(hass, child_name)
-        if storage and not target_calendar:
-            target_calendar = storage.data.calendar_entity
-
-        if not target_calendar:
-            _LOGGER.error("No target calendar specified or assigned for child %s", child_name)
-            return
-
-        if not uid or not str(uid).strip():
-            uid = await _async_find_event_uid(target_calendar, original_summary or summary, original_date or date_str)
-
-        try:
-            start_iso, end_iso = _parse_event_datetime(date_str, start_time_str)
-
-            success = False
-            domain, svc_name = _find_calendar_service("update")
-
-            if uid:
-                payload1 = {
-                    "entity_id": target_calendar,
-                    "event_uid": uid,
-                    "summary": summary,
-                    "start_date_time": start_iso,
-                    "end_date_time": end_iso,
-                }
-                if description:
-                    payload1["description"] = description
-
-                try:
-                    await hass.services.async_call(domain, svc_name, payload1, blocking=True)
-                    success = True
-                except Exception as err1:
-                    _LOGGER.debug("Update action %s.%s with event_uid failed: %s, trying uid key", domain, svc_name, err1)
-                    payload2 = {
-                        "entity_id": target_calendar,
-                        "uid": uid,
-                        "summary": summary,
-                        "start_date_time": start_iso,
-                        "end_date_time": end_iso,
-                    }
-                    if description:
-                        payload2["description"] = description
-                    try:
-                        await hass.services.async_call(domain, svc_name, payload2, blocking=True)
-                        success = True
-                    except Exception as err2:
-                        _LOGGER.debug("Update action %s.%s with uid key failed: %s", domain, svc_name, err2)
-
     async def _async_delete_calendar_event(target_calendar: str, uid: str) -> bool:
         """Helper to delete a calendar event using direct entity calls or service calls."""
         if not target_calendar or not uid:
