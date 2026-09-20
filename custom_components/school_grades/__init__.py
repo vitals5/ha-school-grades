@@ -26,10 +26,12 @@ from .const import (
     CONF_SUBJECT,
     CONF_TEACHER,
     CONF_WEIGHT,
+    CONF_YAML_CONTENT,
     DEFAULT_WEIGHT,
     DOMAIN,
     SERVICE_ADD_GRADE,
     SERVICE_ADD_SUBJECT,
+    SERVICE_IMPORT_TIMETABLE,
     SERVICE_REMOVE_GRADE,
     SERVICE_REMOVE_SUBJECT,
     SERVICE_SET_CALENDAR,
@@ -96,6 +98,15 @@ SCHEMA_UPDATE_TIMETABLE_CELL = vol.Schema(
         vol.Optional(CONF_TEACHER, default=""): cv.string,
     }
 )
+
+SCHEMA_IMPORT_TIMETABLE = vol.Schema(
+    {
+        vol.Optional(CONF_CHILD_NAME): cv.string,
+        vol.Optional(CONF_YAML_CONTENT): cv.string,
+        vol.Optional("timetable_data"): dict,
+    }
+)
+
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -278,6 +289,32 @@ def _register_services(hass: HomeAssistant) -> None:
                 hass, SIGNAL_UPDATE_GRADES.format(entry_id=storage.entry_id)
             )
 
+    async def handle_import_timetable(call: ServiceCall) -> None:
+        """Handle import_timetable action call."""
+        child_name = call.data.get(CONF_CHILD_NAME)
+        yaml_content = call.data.get(CONF_YAML_CONTENT)
+        timetable_data = call.data.get("timetable_data")
+
+        if yaml_content and isinstance(yaml_content, str):
+            try:
+                import yaml
+                timetable_data = yaml.safe_load(yaml_content)
+            except Exception as err:
+                _LOGGER.error("Failed to parse YAML content for timetable import: %s", err)
+                return
+
+        if not timetable_data or not isinstance(timetable_data, dict):
+            _LOGGER.error("Invalid timetable data supplied for import")
+            return
+
+        storage = _get_storage(hass, child_name)
+        if storage:
+            if storage.data.import_timetable_data(timetable_data):
+                await storage.async_save()
+                async_dispatcher_send(
+                    hass, SIGNAL_UPDATE_GRADES.format(entry_id=storage.entry_id)
+                )
+
     hass.services.async_register(
         DOMAIN, SERVICE_ADD_SUBJECT, handle_add_subject, schema=SCHEMA_ADD_SUBJECT
     )
@@ -296,6 +333,9 @@ def _register_services(hass: HomeAssistant) -> None:
     hass.services.async_register(
         DOMAIN, SERVICE_UPDATE_TIMETABLE_CELL, handle_update_timetable_cell, schema=SCHEMA_UPDATE_TIMETABLE_CELL
     )
+    hass.services.async_register(
+        DOMAIN, SERVICE_IMPORT_TIMETABLE, handle_import_timetable, schema=SCHEMA_IMPORT_TIMETABLE
+    )
 
 
 def _unregister_services(hass: HomeAssistant) -> None:
@@ -306,3 +346,5 @@ def _unregister_services(hass: HomeAssistant) -> None:
     hass.services.async_remove(DOMAIN, SERVICE_REMOVE_GRADE)
     hass.services.async_remove(DOMAIN, SERVICE_SET_CALENDAR)
     hass.services.async_remove(DOMAIN, SERVICE_UPDATE_TIMETABLE_CELL)
+    hass.services.async_remove(DOMAIN, SERVICE_IMPORT_TIMETABLE)
+

@@ -34,3 +34,6 @@ SERVICE_REMOVE_GRADE = "remove_grade"
 SERVICE_SET_CALENDAR = "set_calendar"
 SERVICE_UPDATE_TIMETABLE = "update_timetable"
 SERVICE_UPDATE_TIMETABLE_CELL = "update_timetable_cell"
+SERVICE_IMPORT_TIMETABLE = "import_timetable"
+CONF_YAML_CONTENT = "yaml_content"
+

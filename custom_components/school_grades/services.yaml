@@ -178,3 +178,32 @@ update_timetable_cell:
       selector:
         text:
 
+import_timetable:
+  name: "Stundenplan per YAML importieren"
+  description: "Importiert einen kompletten Stundenplan als YAML-Text oder Datenstruktur."
+  fields:
+    child_name:
+      name: "Name des Kindes"
+      description: "Name des Kindes (optional)."
+      example: "Max"
+      selector:
+        text:
+    yaml_content:
+      name: "YAML Inhalt"
+      description: "Vollständige Stundenplan-Konfiguration im YAML-Format."
+      example: |
+        slots:
+          - id: slot_1
+            label: "1. Stunde"
+            start: "08:00"
+            end: "08:45"
+        schedule:
+          slot_1:
+            monday:
+              subject: "Mathematik"
+              room: "R101"
+              teacher: "Fr. Müller"
+      selector:
+        object:
+
+

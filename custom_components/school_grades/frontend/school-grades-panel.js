@@ -33,6 +33,7 @@ class SchoolGradesPanel extends HTMLElement {
     this._selectedWeight = 1.0;
     this._calendarEvents = {}; // { childName: [events] }
     this._editingCell = null; // { slotId, day, slotLabel, dayLabel, subject, room, teacher }
+    this._showYamlModal = false;
   }
 
   set hass(hass) {
@@ -180,6 +181,36 @@ class SchoolGradesPanel extends HTMLElement {
     return dayMap[now.getDay()] === dayKey;
   }
 
+  _timetableToYaml(timetable) {
+    const slots = timetable.slots || [];
+    const schedule = timetable.schedule || {};
+
+    let yaml = "slots:\n";
+    for (const s of slots) {
+      yaml += `  - id: ${s.id}\n`;
+      if (s.type) yaml += `    type: ${s.type}\n`;
+      yaml += `    label: "${s.label || ''}"\n`;
+      yaml += `    start: "${s.start || ''}"\n`;
+      yaml += `    end: "${s.end || ''}"\n`;
+    }
+
+    yaml += "\nschedule:\n";
+    for (const [slotId, days] of Object.entries(schedule)) {
+      if (days && typeof days === 'object' && Object.keys(days).length > 0) {
+        yaml += `  ${slotId}:\n`;
+        for (const [day, info] of Object.entries(days)) {
+          if (info && info.subject) {
+            yaml += `    ${day}:\n`;
+            yaml += `      subject: "${info.subject}"\n`;
+            if (info.room) yaml += `      room: "${info.room}"\n`;
+            if (info.teacher) yaml += `      teacher: "${info.teacher}"\n`;
+          }
+        }
+      }
+    }
+    return yaml;
+  }
+
   render() {
     const data = this._getSchoolGradesData();
     const childNames = Object.keys(data);
@@ -300,11 +331,14 @@ class SchoolGradesPanel extends HTMLElement {
           <div class="timetable-header">
             <div class="title-with-badge">
               <h3>📅 Wochenstundenplan</h3>
-              <span class="timetable-subtitle">Klicke auf eine Zelle, um Fach, Raum oder Lehrer zu bearbeiten</span>
+              <span class="timetable-subtitle">Klicke auf eine Zelle zum Bearbeiten oder nutze den YAML Import/Export</span>
             </div>
-            <div class="timetable-legend">
-              <span class="legend-item"><span class="legend-dot now-dot"></span>⚡ JETZT</span>
-              <span class="legend-item"><span class="legend-dot today-dot"></span>Heute</span>
+            <div class="timetable-header-actions">
+              <button class="pill-btn yaml-btn" id="open-yaml-modal-btn">📋 YAML Import / Export</button>
+              <div class="timetable-legend">
+                <span class="legend-item"><span class="legend-dot now-dot"></span>⚡ JETZT</span>
+                <span class="legend-item"><span class="legend-dot today-dot"></span>Heute</span>
+              </div>
             </div>
           </div>
 
@@ -561,6 +595,33 @@ class SchoolGradesPanel extends HTMLElement {
           </div>
         </div>
       ` : ''}
+
+      <!-- YAML Import / Export Modal -->
+      ${this._showYamlModal ? `
+        <div class="modal-backdrop" id="yaml-modal-backdrop">
+          <div class="modal-card yaml-modal-card">
+            <div class="modal-header">
+              <h3>📋 Stundenplan YAML Import / Export</h3>
+              <span class="modal-subtitle">Füge hier deinen Stundenplan im YAML-Format ein oder kopiere die aktuelle Konfiguration</span>
+            </div>
+
+            <form id="yaml-import-form">
+              <div class="form-group">
+                <label>Stundenplan YAML-Konfiguration (${this._selectedChild})</label>
+                <textarea id="yaml-textarea" rows="14" style="font-family: monospace; font-size: 13px; line-height: 1.4; resize: vertical; tab-size: 2;">${this._timetableToYaml(timetable)}</textarea>
+              </div>
+
+              <div class="modal-actions">
+                <button type="button" class="submit-btn secondary" id="yaml-copy-btn" style="width: auto; padding: 10px 18px;">📋 Kopieren</button>
+                <div class="modal-actions-right">
+                  <button type="button" class="submit-btn secondary" id="yaml-cancel-btn">Abbrechen</button>
+                  <button type="submit" class="submit-btn">📥 YAML Importieren</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      ` : ''}
     `;
 
     this._attachEventListeners();
@@ -616,6 +677,61 @@ class SchoolGradesPanel extends HTMLElement {
       });
     }
 
+    // Open YAML Modal
+    const openYamlBtn = root.querySelector('#open-yaml-modal-btn');
+    if (openYamlBtn) {
+      openYamlBtn.addEventListener('click', () => {
+        this._showYamlModal = true;
+        this.render();
+      });
+    }
+
+    // YAML Modal Backdrop & Form
+    const yamlBackdrop = root.querySelector('#yaml-modal-backdrop');
+    if (yamlBackdrop) {
+      yamlBackdrop.addEventListener('click', (e) => {
+        if (e.target === yamlBackdrop) {
+          this._showYamlModal = false;
+          this.render();
+        }
+      });
+
+      const cancelYamlBtn = root.querySelector('#yaml-cancel-btn');
+      if (cancelYamlBtn) {
+        cancelYamlBtn.addEventListener('click', () => {
+          this._showYamlModal = false;
+          this.render();
+        });
+      }
+
+      const copyYamlBtn = root.querySelector('#yaml-copy-btn');
+      if (copyYamlBtn) {
+        copyYamlBtn.addEventListener('click', () => {
+          const textarea = root.querySelector('#yaml-textarea');
+          if (textarea) {
+            navigator.clipboard.writeText(textarea.value);
+            copyYamlBtn.textContent = '✅ Kopiert!';
+            setTimeout(() => { copyYamlBtn.textContent = '📋 Kopieren'; }, 2000);
+          }
+        });
+      }
+
+      const yamlForm = root.querySelector('#yaml-import-form');
+      if (yamlForm) {
+        yamlForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const yamlText = root.querySelector('#yaml-textarea').value;
+          await this._hass.callService('school_grades', 'import_timetable', {
+            child_name: this._selectedChild,
+            yaml_content: yamlText,
+          });
+          this._showYamlModal = false;
+          setTimeout(() => this.render(), 300);
+          setTimeout(() => this.render(), 700);
+        });
+      }
+    }
+
     // Timetable Cell Clicks
     root.querySelectorAll('.timetable-cell').forEach(cell => {
       cell.addEventListener('click', (e) => {
@@ -633,7 +749,7 @@ class SchoolGradesPanel extends HTMLElement {
       });
     });
 
-    // Timetable Modal Backdrop & Form Handling
+    // Timetable Cell Edit Modal Backdrop & Form Handling
     const modalBackdrop = root.querySelector('#timetable-modal-backdrop');
     if (modalBackdrop) {
       modalBackdrop.addEventListener('click', (e) => {
@@ -1031,6 +1147,24 @@ class SchoolGradesPanel extends HTMLElement {
         margin-top: 2px;
       }
 
+      .timetable-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+
+      .yaml-btn {
+        background: rgba(59, 130, 246, 0.15) !important;
+        border-color: rgba(59, 130, 246, 0.4) !important;
+        color: #60a5fa !important;
+      }
+
+      .yaml-btn:hover {
+        background: #2563eb !important;
+        color: #ffffff !important;
+      }
+
       .timetable-legend {
         display: flex;
         gap: 16px;
@@ -1241,6 +1375,10 @@ class SchoolGradesPanel extends HTMLElement {
         box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
       }
 
+      .yaml-modal-card {
+        max-width: 620px !important;
+      }
+
       .modal-header {
         margin-bottom: 20px;
       }
@@ -1313,6 +1451,7 @@ class SchoolGradesPanel extends HTMLElement {
       input[type="text"],
       input[type="number"],
       input[type="date"],
+      textarea,
       select {
         width: 100%;
         padding: 10px 14px;
@@ -1324,7 +1463,7 @@ class SchoolGradesPanel extends HTMLElement {
         box-sizing: border-box;
       }
 
-      input:focus, select:focus {
+      input:focus, select:focus, textarea:focus {
         outline: none;
         border-color: #3b82f6;
         box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);

@@ -97,6 +97,55 @@ class SchoolGradesData:
                 "teacher": teacher.strip(),
             }
 
+    def import_timetable_data(self, timetable_data: dict[str, Any]) -> bool:
+        """Import a full timetable configuration (parsed from YAML or dict)."""
+        if not isinstance(timetable_data, dict):
+            return False
+
+        import copy
+        new_timetable = copy.deepcopy(self.timetable)
+
+        if "slots" in timetable_data and isinstance(timetable_data["slots"], list):
+            new_timetable["slots"] = timetable_data["slots"]
+
+        if "schedule" in timetable_data and isinstance(timetable_data["schedule"], dict):
+            raw_schedule = timetable_data["schedule"]
+            normalized_schedule: dict[str, Any] = {}
+            valid_days = {"monday", "tuesday", "wednesday", "thursday", "friday"}
+
+            for key1, val1 in raw_schedule.items():
+                if not isinstance(val1, dict):
+                    continue
+                k1_lower = str(key1).lower()
+
+                if k1_lower in valid_days:
+                    # Format: schedule[monday][slot_1] = {subject: "Mathe"}
+                    day = k1_lower
+                    for slot_id, cell in val1.items():
+                        if isinstance(cell, dict):
+                            normalized_schedule.setdefault(str(slot_id), {})[day] = {
+                                "subject": str(cell.get("subject", "") or "").strip(),
+                                "room": str(cell.get("room", "") or "").strip(),
+                                "teacher": str(cell.get("teacher", "") or "").strip(),
+                            }
+                else:
+                    # Format: schedule[slot_1][monday] = {subject: "Mathe"}
+                    slot_id = str(key1)
+                    for day_key, cell in val1.items():
+                        day = str(day_key).lower()
+                        if isinstance(cell, dict) and day in valid_days:
+                            normalized_schedule.setdefault(slot_id, {})[day] = {
+                                "subject": str(cell.get("subject", "") or "").strip(),
+                                "room": str(cell.get("room", "") or "").strip(),
+                                "teacher": str(cell.get("teacher", "") or "").strip(),
+                            }
+
+            new_timetable["schedule"] = normalized_schedule
+
+        self.timetable = new_timetable
+        return True
+
+
     @property
     def subjects(self) -> list[str]:
         """Get sorted list of subject names."""
