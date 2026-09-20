@@ -10,7 +10,13 @@ from homeassistant import config_entries
 from homeassistant.data_entry_flow import FlowResult
 import homeassistant.helpers.config_validation as cv
 
-from .const import CONF_CHILD_NAME, DOMAIN
+from .const import (
+    CONF_CHILD_NAME,
+    CONF_COUNTRY,
+    COUNTRY_GRADING_SYSTEMS,
+    DEFAULT_COUNTRY,
+    DOMAIN,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -29,6 +35,7 @@ class SchoolGradesConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             child_name = user_input[CONF_CHILD_NAME].strip()
+            country = str(user_input.get(CONF_COUNTRY, DEFAULT_COUNTRY)).strip().upper()
 
             # Check for duplicate child names
             existing_entries = self._async_current_entries()
@@ -40,12 +47,21 @@ class SchoolGradesConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if not errors:
                 return self.async_create_entry(
                     title=child_name,
-                    data={CONF_CHILD_NAME: child_name},
+                    data={
+                        CONF_CHILD_NAME: child_name,
+                        CONF_COUNTRY: country,
+                    },
                 )
+
+        country_options = {
+            code: f"{sys['flag']} {sys['name']} ({sys['scale']})"
+            for code, sys in COUNTRY_GRADING_SYSTEMS.items()
+        }
 
         schema = vol.Schema(
             {
                 vol.Required(CONF_CHILD_NAME): cv.string,
+                vol.Required(CONF_COUNTRY, default=DEFAULT_COUNTRY): vol.In(country_options),
             }
         )
 

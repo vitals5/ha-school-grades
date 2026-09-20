@@ -5,7 +5,8 @@
         "title": "Add Child",
         "description": "Create a new instance to manage school grades for a child.",
         "data": {
-          "child_name": "Name of the child (e.g., Richard, Emma)"
+          "child_name": "Name of the child (e.g., Richard, Emma)",
+          "country": "Country / Grading System"
         }
       }
     },

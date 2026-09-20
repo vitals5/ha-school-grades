@@ -122,9 +122,13 @@ SCHEMA_UPDATE_SETTINGS = vol.Schema(
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Schulnoten entry from a config flow."""
     child_name = entry.data.get(CONF_CHILD_NAME, "Kind")
+    country = entry.data.get(CONF_COUNTRY)
 
     storage = SchoolGradesStorage(hass, entry.entry_id, child_name)
     await storage.async_load()
+
+    if country:
+        storage.data.set_country(country)
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = storage
 

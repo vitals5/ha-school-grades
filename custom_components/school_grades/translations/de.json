@@ -5,7 +5,8 @@
         "title": "Kind anlegen",
         "description": "Erstelle eine neue Instanz zur Verwaltung der Schulnoten für ein Kind.",
         "data": {
-          "child_name": "Name des Kindes (z.B. Richard, Emma)"
+          "child_name": "Name des Kindes (z.B. Richard, Emma)",
+          "country": "Land / Schulsystem (Notenskala)"
         }
       }
     },
