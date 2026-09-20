@@ -960,9 +960,8 @@ class SchoolGradesPanel extends HTMLElement {
             <span class="stat-label">${this._t('total_grades')}</span>
             <span class="stat-value">${Object.values(subjects).reduce((acc, s) => acc + s.grades.length, 0)}</span>
           </div>
-          <div class="stat-card action-stat-card" id="open-settings-banner-btn" style="cursor: pointer;" title="${this._t('settings_btn')}">
-            <span class="stat-label">${this._t('settings_btn')}</span>
-            <span class="stat-value" style="font-size: 15px;">${countrySys.flag} ${countrySys.name}</span>
+          <div class="stat-card action-stat-card" id="open-settings-banner-btn" style="cursor: pointer; justify-content: center;" title="${this._t('settings_btn')}">
+            <span class="stat-value" style="font-size: 16px; font-weight: 600;">${this._t('settings_btn')}</span>
           </div>
         </div>
 
