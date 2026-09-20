@@ -1,0 +1,15 @@
+# Python / Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Temporary
+scratch/
+*.log

@@ -1,0 +1,67 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Kind anlegen",
+        "description": "Erstelle eine neue Instanz zur Verwaltung der Schulnoten für ein Kind.",
+        "data": {
+          "child_name": "Name des Kindes (z.B. Max)"
+        }
+      }
+    },
+    "error": {
+      "already_configured": "Für dieses Kind wurde bereits eine Notenverwaltung eingerichtet."
+    },
+    "abort": {
+      "already_configured": "Die Notenverwaltung für dieses Kind existiert bereits."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Schulnoten verwalten",
+        "menu_options": {
+          "add_grade": "➕ Note eintragen",
+          "add_subject": "📘 Fach hinzufügen",
+          "remove_grade": "❌ Note löschen",
+          "remove_subject": "🗑️ Fach löschen"
+        }
+      },
+      "add_subject": {
+        "title": "Neues Fach hinzufügen",
+        "data": {
+          "subject": "Name des Fachs (z.B. Physik, Kunst)"
+        }
+      },
+      "remove_subject": {
+        "title": "Fach löschen",
+        "description": "Achtung: Dadurch werden auch alle eingetragenen Noten dieses Fachs gelöscht!",
+        "data": {
+          "subject": "Schulfach auswählen"
+        }
+      },
+      "add_grade": {
+        "title": "Note eintragen",
+        "data": {
+          "subject": "Schulfach",
+          "grade": "Note (1.0 bis 6.0)",
+          "weight": "Gewichtung (1x, 2x, 3x, 4x)",
+          "name": "Bezeichnung (z.B. 1. Schulaufgabe)"
+        }
+      },
+      "remove_grade": {
+        "title": "Note löschen",
+        "data": {
+          "grade_id": "Wähle die zu löschende Note"
+        }
+      }
+    },
+    "error": {
+      "subject_exists": "Dieses Schulfach existiert bereits."
+    },
+    "abort": {
+      "no_subjects": "Keine Schulfächer vorhanden. Bitte erst ein Fach anlegen.",
+      "no_grades": "Es sind noch keine Noten vorhanden, die gelöscht werden könnten."
+    }
+  }
+}

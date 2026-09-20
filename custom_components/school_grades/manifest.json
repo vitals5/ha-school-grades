@@ -1,0 +1,10 @@
+{
+  "domain": "school_grades",
+  "name": "Schulnoten",
+  "codeowners": ["@user"],
+  "config_flow": true,
+  "documentation": "https://github.com/user/school_grades",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/user/school_grades/issues",
+  "version": "1.0.0"
+}
