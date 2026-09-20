@@ -107,6 +107,7 @@ class SchoolGradeSubjectSensor(SensorEntity):
         return {
             "kind_name": self.storage.child_name,
             "country": self.storage.data.country,
+            "section_visibility": self.storage.data.section_visibility,
             "subject_name": self.subject,
             "grade_count": len(grades),
             "grades": grades,

@@ -592,10 +592,17 @@ class SchoolGradesPanel extends HTMLElement {
 
       if (attrs.section_visibility && typeof attrs.section_visibility === 'object') {
         children[kindName].sectionVisibility = {
-          show_prep_card: attrs.section_visibility.show_prep_card ?? true,
-          show_calendar_card: attrs.section_visibility.show_calendar_card ?? true,
-          show_timetable_card: attrs.section_visibility.show_timetable_card ?? true,
-          show_overview_card: attrs.section_visibility.show_overview_card ?? true,
+          show_prep_card: attrs.section_visibility.show_prep_card ?? children[kindName].sectionVisibility.show_prep_card,
+          show_calendar_card: attrs.section_visibility.show_calendar_card ?? children[kindName].sectionVisibility.show_calendar_card,
+          show_timetable_card: attrs.section_visibility.show_timetable_card ?? children[kindName].sectionVisibility.show_timetable_card,
+          show_overview_card: attrs.section_visibility.show_overview_card ?? children[kindName].sectionVisibility.show_overview_card,
+        };
+      }
+
+      if (this._localSectionVisibility && this._localSectionVisibility[kindName]) {
+        children[kindName].sectionVisibility = {
+          ...children[kindName].sectionVisibility,
+          ...this._localSectionVisibility[kindName],
         };
       }
 
@@ -1607,6 +1614,14 @@ class SchoolGradesPanel extends HTMLElement {
           const showTt = root.querySelector('#settings-show-timetable').checked;
           const showOv = root.querySelector('#settings-show-overview').checked;
 
+          if (!this._localSectionVisibility) this._localSectionVisibility = {};
+          this._localSectionVisibility[this._selectedChild] = {
+            show_prep_card: showPrep,
+            show_calendar_card: showCal,
+            show_timetable_card: showTt,
+            show_overview_card: showOv,
+          };
+
           await this._hass.callService('school_grades', 'update_settings', {
             child_name: this._selectedChild,
             country: selectedCountry,
@@ -1616,7 +1631,9 @@ class SchoolGradesPanel extends HTMLElement {
             show_overview_card: showOv,
           });
           this._showSettingsModal = false;
-          setTimeout(() => this.render(), 300);
+          this.render();
+          setTimeout(() => this.render(), 200);
+          setTimeout(() => this.render(), 600);
         });
       }
 
