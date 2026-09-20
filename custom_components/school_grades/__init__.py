@@ -23,6 +23,10 @@ from .const import (
     CONF_GRADE_ID,
     CONF_NAME,
     CONF_ROOM,
+    CONF_SHOW_CALENDAR,
+    CONF_SHOW_OVERVIEW,
+    CONF_SHOW_PREP,
+    CONF_SHOW_TIMETABLE,
     CONF_SLOT_ID,
     CONF_SUBJECT,
     CONF_TEACHER,
@@ -114,6 +118,10 @@ SCHEMA_UPDATE_SETTINGS = vol.Schema(
         vol.Optional(CONF_CHILD_NAME): cv.string,
         vol.Optional(CONF_COUNTRY): cv.string,
         vol.Optional(CONF_CALENDAR): cv.string,
+        vol.Optional(CONF_SHOW_PREP): cv.boolean,
+        vol.Optional(CONF_SHOW_CALENDAR): cv.boolean,
+        vol.Optional(CONF_SHOW_TIMETABLE): cv.boolean,
+        vol.Optional(CONF_SHOW_OVERVIEW): cv.boolean,
     }
 )
 
@@ -343,6 +351,12 @@ def _register_services(hass: HomeAssistant) -> None:
                     updated = True
             if CONF_CALENDAR in call.data:
                 storage.data.set_calendar_entity(calendar_entity)
+                updated = True
+
+            vis_keys = [CONF_SHOW_PREP, CONF_SHOW_CALENDAR, CONF_SHOW_TIMETABLE, CONF_SHOW_OVERVIEW]
+            vis_updates = {k: call.data[k] for k in vis_keys if k in call.data}
+            if vis_updates:
+                storage.data.set_section_visibility(vis_updates)
                 updated = True
 
             if updated:

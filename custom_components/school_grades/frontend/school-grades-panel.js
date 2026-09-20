@@ -343,6 +343,11 @@ const I18N = {
     settings_title: "⚙️ Allgemeine Einstellungen ({child})",
     country_label: "Land / Schulsystem",
     country_hint: "Bestimmt die Notenskala und Bewertung für diese Instanz.",
+    section_visibility_title: "Bereiche des Panels aus/einblenden",
+    section_prep: "Vorbereitung für den nächsten Schultag",
+    section_calendar: "Anstehende Klausuren Termine",
+    section_timetable: "Wochenstundenplan",
+    section_overview: "Fächer Notenübersicht",
 
     // Modals
     modal_cell_title: "✏️ Stundenplan bearbeiten",
@@ -450,6 +455,11 @@ const I18N = {
     settings_title: "⚙️ General Settings ({child})",
     country_label: "Country / Grading System",
     country_hint: "Determines the grading scale and evaluation system for this child.",
+    section_visibility_title: "Show/hide panel sections",
+    section_prep: "Preparation for next school day",
+    section_calendar: "Upcoming exams & events",
+    section_timetable: "Weekly timetable",
+    section_overview: "Subjects & grades overview",
 
     // Modals
     modal_cell_title: "✏️ Edit Timetable Cell",
@@ -557,11 +567,26 @@ class SchoolGradesPanel extends HTMLElement {
           calendarEntity: null,
           timetable: null,
           subjects: {},
+          sectionVisibility: {
+            show_prep_card: true,
+            show_calendar_card: true,
+            show_timetable_card: true,
+            show_overview_card: true,
+          },
         };
       }
 
       if (attrs.country) {
         children[kindName].country = String(attrs.country).toUpperCase();
+      }
+
+      if (attrs.section_visibility && typeof attrs.section_visibility === 'object') {
+        children[kindName].sectionVisibility = {
+          show_prep_card: attrs.section_visibility.show_prep_card ?? true,
+          show_calendar_card: attrs.section_visibility.show_calendar_card ?? true,
+          show_timetable_card: attrs.section_visibility.show_timetable_card ?? true,
+          show_overview_card: attrs.section_visibility.show_overview_card ?? true,
+        };
       }
 
       if (attrs.subject_name) {
@@ -839,6 +864,12 @@ class SchoolGradesPanel extends HTMLElement {
     const currentChild = data[this._selectedChild];
     const childCountry = (currentChild && currentChild.country) || 'DE';
     const countrySys = COUNTRY_SYSTEMS[childCountry] || COUNTRY_SYSTEMS.DE;
+    const secVis = (currentChild && currentChild.sectionVisibility) || {
+      show_prep_card: true,
+      show_calendar_card: true,
+      show_timetable_card: true,
+      show_overview_card: true,
+    };
     const subjects = currentChild ? currentChild.subjects : {};
     const subjectList = Object.keys(subjects).sort();
     const upcomingEvents = this._calendarEvents[this._selectedChild] || [];
@@ -893,7 +924,7 @@ class SchoolGradesPanel extends HTMLElement {
         </div>
 
         <!-- Preparation Card for Next School Day -->
-        ${(() => {
+        ${secVis.show_prep_card ? (() => {
           const nextDay = this._getNextSchoolDayInfo(timetable, upcomingEvents);
           return `
             <div class="card prep-card" style="margin-bottom: 24px;">
@@ -951,146 +982,150 @@ class SchoolGradesPanel extends HTMLElement {
               </div>
             </div>
           `;
-        })()}
+        })() : ''}
 
         <!-- Upcoming Calendar Events Card -->
-        <div class="card calendar-card" style="margin-bottom: 24px;">
-          <div class="calendar-header">
-            <h3>${this._t('calendar_title', { count: upcomingEvents.length })}</h3>
-            <div class="calendar-select-group">
-              <label>${this._t('calendar_select_label', { child: this._selectedChild })}</label>
-              <select id="calendar-select">
-                <option value="">${this._t('no_calendar_assigned')}</option>
-                ${availableCalendars.map(c => `
-                  <option value="${c.entityId}" ${currentChild && currentChild.calendarEntity === c.entityId ? 'selected' : ''}>
-                    📅 ${c.name} (${c.entityId})
-                  </option>
-                `).join('')}
-              </select>
+        ${secVis.show_calendar_card ? `
+          <div class="card calendar-card" style="margin-bottom: 24px;">
+            <div class="calendar-header">
+              <h3>${this._t('calendar_title', { count: upcomingEvents.length })}</h3>
+              <div class="calendar-select-group">
+                <label>${this._t('calendar_select_label', { child: this._selectedChild })}</label>
+                <select id="calendar-select">
+                  <option value="">${this._t('no_calendar_assigned')}</option>
+                  ${availableCalendars.map(c => `
+                    <option value="${c.entityId}" ${currentChild && currentChild.calendarEntity === c.entityId ? 'selected' : ''}>
+                      📅 ${c.name} (${c.entityId})
+                    </option>
+                  `).join('')}
+                </select>
+              </div>
+            </div>
+
+            <div class="events-list">
+              ${!currentChild || !currentChild.calendarEntity ? `
+                <div class="empty-events">
+                  ${this._t('calendar_hint')}
+                </div>
+              ` : upcomingEvents.length === 0 ? `
+                <div class="empty-events">
+                  ${this._t('no_events')}
+                </div>
+              ` : `
+                <div class="events-grid">
+                  ${upcomingEvents.map(evt => {
+                    const startDate = new Date(evt.start);
+                    const formattedDate = startDate.toLocaleDateString(this._getLocale(), { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+                    const formattedTime = startDate.toLocaleTimeString(this._getLocale(), { hour: '2-digit', minute: '2-digit' });
+                    const isAllDay = (typeof evt.start === 'string' && evt.start.length === 10) || formattedTime === '00:00';
+                    const countdownText = this._getCountdownBadge(startDate);
+                    return `
+                      <div class="event-item">
+                        <div class="event-badge-row">
+                          <span class="event-countdown ${countdownText.cls}">${countdownText.text}</span>
+                          <span class="event-time">${formattedDate} ${!isAllDay ? this._t('time_at', { time: formattedTime }) : this._t('all_day')}</span>
+                        </div>
+                        <h4 class="event-title">${evt.summary}</h4>
+                        ${evt.location ? `<div class="event-detail">📍 ${evt.location}</div>` : ''}
+                        ${evt.description ? `<div class="event-detail desc">📝 ${evt.description}</div>` : ''}
+                      </div>
+                    `;
+                  }).join('')}
+                </div>
+              `}
             </div>
           </div>
-
-          <div class="events-list">
-            ${!currentChild || !currentChild.calendarEntity ? `
-              <div class="empty-events">
-                ${this._t('calendar_hint')}
-              </div>
-            ` : upcomingEvents.length === 0 ? `
-              <div class="empty-events">
-                ${this._t('no_events')}
-              </div>
-            ` : `
-              <div class="events-grid">
-                ${upcomingEvents.map(evt => {
-                  const startDate = new Date(evt.start);
-                  const formattedDate = startDate.toLocaleDateString(this._getLocale(), { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
-                  const formattedTime = startDate.toLocaleTimeString(this._getLocale(), { hour: '2-digit', minute: '2-digit' });
-                  const isAllDay = (typeof evt.start === 'string' && evt.start.length === 10) || formattedTime === '00:00';
-                  const countdownText = this._getCountdownBadge(startDate);
-                  return `
-                    <div class="event-item">
-                      <div class="event-badge-row">
-                        <span class="event-countdown ${countdownText.cls}">${countdownText.text}</span>
-                        <span class="event-time">${formattedDate} ${!isAllDay ? this._t('time_at', { time: formattedTime }) : this._t('all_day')}</span>
-                      </div>
-                      <h4 class="event-title">${evt.summary}</h4>
-                      ${evt.location ? `<div class="event-detail">📍 ${evt.location}</div>` : ''}
-                      ${evt.description ? `<div class="event-detail desc">📝 ${evt.description}</div>` : ''}
-                    </div>
-                  `;
-                }).join('')}
-              </div>
-            `}
-          </div>
-        </div>
+        ` : ''}
 
         <!-- Timetable Card -->
-        <div class="card timetable-card" style="margin-bottom: 24px;">
-          <div class="timetable-header">
-            <div class="title-with-badge">
-              <h3>${this._t('timetable_title')}</h3>
-              <span class="timetable-subtitle">${this._t('timetable_subtitle')}</span>
-            </div>
-            <div class="timetable-header-actions">
-              <button class="pill-btn yaml-btn" id="open-yaml-modal-btn">${this._t('yaml_button')}</button>
-              <div class="timetable-legend">
-                <span class="legend-item"><span class="legend-dot now-dot"></span>${this._t('legend_now')}</span>
-                <span class="legend-item"><span class="legend-dot today-dot"></span>${this._t('legend_today')}</span>
+        ${secVis.show_timetable_card ? `
+          <div class="card timetable-card" style="margin-bottom: 24px;">
+            <div class="timetable-header">
+              <div class="title-with-badge">
+                <h3>${this._t('timetable_title')}</h3>
+                <span class="timetable-subtitle">${this._t('timetable_subtitle')}</span>
+              </div>
+              <div class="timetable-header-actions">
+                <button class="pill-btn yaml-btn" id="open-yaml-modal-btn">${this._t('yaml_button')}</button>
+                <div class="timetable-legend">
+                  <span class="legend-item"><span class="legend-dot now-dot"></span>${this._t('legend_now')}</span>
+                  <span class="legend-item"><span class="legend-dot today-dot"></span>${this._t('legend_today')}</span>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div class="timetable-table-container">
-            <table class="timetable-table">
-              <thead>
-                <tr>
-                  <th class="time-col">${this._t('time_hour_col')}</th>
-                  ${DAYS.map(d => `
-                    <th class="day-col ${this._isToday(d.key) ? 'today-header' : ''}">
-                      ${dayNames[d.key] || d.key}
-                      ${this._isToday(d.key) ? `<span class="today-badge">${this._t('today_badge')}</span>` : ''}
-                    </th>
-                  `).join('')}
-                </tr>
-              </thead>
-              <tbody>
-                ${slots.map(slot => {
-                  if (slot.type === 'break') {
+            <div class="timetable-table-container">
+              <table class="timetable-table">
+                <thead>
+                  <tr>
+                    <th class="time-col">${this._t('time_hour_col')}</th>
+                    ${DAYS.map(d => `
+                      <th class="day-col ${this._isToday(d.key) ? 'today-header' : ''}">
+                        ${dayNames[d.key] || d.key}
+                        ${this._isToday(d.key) ? `<span class="today-badge">${this._t('today_badge')}</span>` : ''}
+                      </th>
+                    `).join('')}
+                  </tr>
+                </thead>
+                <tbody>
+                  ${slots.map(slot => {
+                    if (slot.type === 'break') {
+                      return `
+                        <tr class="break-row">
+                          <td class="time-cell break-cell-title">
+                            <span class="break-icon">☕</span> ${slot.label} <span class="slot-time">(${slot.start} - ${slot.end})</span>
+                          </td>
+                          <td colspan="5" class="break-cell-content">
+                            ${this._t('break_label')}
+                          </td>
+                        </tr>
+                      `;
+                    }
+
                     return `
-                      <tr class="break-row">
-                        <td class="time-cell break-cell-title">
-                          <span class="break-icon">☕</span> ${slot.label} <span class="slot-time">(${slot.start} - ${slot.end})</span>
+                      <tr>
+                        <td class="time-cell">
+                          <div class="slot-num">${slot.label}</div>
+                          <div class="slot-time">${slot.start} - ${slot.end}</div>
                         </td>
-                        <td colspan="5" class="break-cell-content">
-                          ${this._t('break_label')}
-                        </td>
+                        ${DAYS.map(d => {
+                          const cellData = (schedule[slot.id] && schedule[slot.id][d.key]) || {};
+                          const isNow = this._isNowInSlot(slot.start, slot.end, d.key);
+                          const isToday = this._isToday(d.key);
+                          const hasSubject = !!cellData.subject;
+
+                          return `
+                            <td class="timetable-cell ${isToday ? 'today-col' : ''} ${isNow ? 'now-cell' : ''} ${hasSubject ? 'has-subject' : 'empty-cell'}"
+                                data-slot-id="${slot.id}"
+                                data-day="${d.key}"
+                                data-slot-label="${slot.label} (${slot.start}-${slot.end})"
+                                data-day-label="${dayNames[d.key] || d.key}"
+                                data-subject="${cellData.subject || ''}"
+                                data-room="${cellData.room || ''}"
+                                data-teacher="${cellData.teacher || ''}">
+                              ${isNow ? `<div class="now-badge">${this._t('now_badge')}</div>` : ''}
+                              ${hasSubject ? `
+                                <div class="cell-subject">${cellData.subject}</div>
+                                <div class="cell-details">
+                                  ${cellData.room ? `<span class="cell-room">📍 ${cellData.room}</span>` : ''}
+                                  ${cellData.teacher ? `<span class="cell-teacher">👨‍🏫 ${cellData.teacher}</span>` : ''}
+                                </div>
+                              ` : `
+                                <div class="cell-empty-trigger">
+                                  <span class="add-icon">+</span>
+                                </div>
+                              `}
+                            </td>
+                          `;
+                        }).join('')}
                       </tr>
                     `;
-                  }
-
-                  return `
-                    <tr>
-                      <td class="time-cell">
-                        <div class="slot-num">${slot.label}</div>
-                        <div class="slot-time">${slot.start} - ${slot.end}</div>
-                      </td>
-                      ${DAYS.map(d => {
-                        const cellData = (schedule[slot.id] && schedule[slot.id][d.key]) || {};
-                        const isNow = this._isNowInSlot(slot.start, slot.end, d.key);
-                        const isToday = this._isToday(d.key);
-                        const hasSubject = !!cellData.subject;
-
-                        return `
-                          <td class="timetable-cell ${isToday ? 'today-col' : ''} ${isNow ? 'now-cell' : ''} ${hasSubject ? 'has-subject' : 'empty-cell'}"
-                              data-slot-id="${slot.id}"
-                              data-day="${d.key}"
-                              data-slot-label="${slot.label} (${slot.start}-${slot.end})"
-                              data-day-label="${dayNames[d.key] || d.key}"
-                              data-subject="${cellData.subject || ''}"
-                              data-room="${cellData.room || ''}"
-                              data-teacher="${cellData.teacher || ''}">
-                            ${isNow ? `<div class="now-badge">${this._t('now_badge')}</div>` : ''}
-                            ${hasSubject ? `
-                              <div class="cell-subject">${cellData.subject}</div>
-                              <div class="cell-details">
-                                ${cellData.room ? `<span class="cell-room">📍 ${cellData.room}</span>` : ''}
-                                ${cellData.teacher ? `<span class="cell-teacher">👨‍🏫 ${cellData.teacher}</span>` : ''}
-                              </div>
-                            ` : `
-                              <div class="cell-empty-trigger">
-                                <span class="add-icon">+</span>
-                              </div>
-                            `}
-                          </td>
-                        `;
-                      }).join('')}
-                    </tr>
-                  `;
-                }).join('')}
-              </tbody>
-            </table>
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        ` : ''}
 
         <!-- Action Cards Grid -->
         <div class="forms-grid">
@@ -1169,61 +1204,63 @@ class SchoolGradesPanel extends HTMLElement {
         </div>
 
         <!-- Subjects Grid -->
-        <h2 class="section-title">${this._t('overview_title')}</h2>
-        <div class="subjects-grid">
-          ${subjectList.map(subjName => {
-            const subj = subjects[subjName];
-            const avg = subj.average && !isNaN(subj.average) ? subj.average : '–';
-            return `
-              <div class="card subject-card">
-                <div class="subject-header">
-                  <div class="subject-title">
-                    <h3>${subjName}</h3>
-                    <span class="badge avg-badge ${this._getGradeColorClass(avg, childCountry)}">${this._t('avg_label')}: ${avg}</span>
+        ${secVis.show_overview_card ? `
+          <h2 class="section-title">${this._t('overview_title')}</h2>
+          <div class="subjects-grid">
+            ${subjectList.map(subjName => {
+              const subj = subjects[subjName];
+              const avg = subj.average && !isNaN(subj.average) ? subj.average : '–';
+              return `
+                <div class="card subject-card">
+                  <div class="subject-header">
+                    <div class="subject-title">
+                      <h3>${subjName}</h3>
+                      <span class="badge avg-badge ${this._getGradeColorClass(avg, childCountry)}">${this._t('avg_label')}: ${avg}</span>
+                    </div>
+                    <span class="count-tag">${this._t('grades_tag', { count: subj.grades.length })}</span>
                   </div>
-                  <span class="count-tag">${this._t('grades_tag', { count: subj.grades.length })}</span>
-                </div>
 
-                <div class="grades-list">
-                  ${subj.grades.length === 0 ? `
-                    <div class="empty-grades">${this._t('no_grades_yet')}</div>
-                  ` : `
-                    <table class="grades-table">
-                      <thead>
-                        <tr>
-                          <th>${this._t('table_grade')}</th>
-                          <th>${this._t('table_weight')}</th>
-                          <th>${this._t('table_date')}</th>
-                          <th>${this._t('table_name')}</th>
-                          <th>${this._t('table_action')}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        ${subj.grades.map(g => `
+                  <div class="grades-list">
+                    ${subj.grades.length === 0 ? `
+                      <div class="empty-grades">${this._t('no_grades_yet')}</div>
+                    ` : `
+                      <table class="grades-table">
+                        <thead>
                           <tr>
-                            <td>
-                              <span class="grade-pill ${this._getGradeColorClass(g.grade, childCountry)}">
-                                ${parseFloat(g.grade).toFixed(1)}
-                              </span>
-                            </td>
-                            <td><span class="weight-badge">${this._t('weight_times', { weight: g.weight })}</span></td>
-                            <td class="date-cell">${g.date}</td>
-                            <td class="name-cell">${g.name || '–'}</td>
-                            <td>
-                              <button class="icon-btn delete-grade-btn" data-subject="${subjName}" data-id="${g.id}" title="${this._t('delete_btn')}">
-                                🗑️
-                              </button>
-                            </td>
+                            <th>${this._t('table_grade')}</th>
+                            <th>${this._t('table_weight')}</th>
+                            <th>${this._t('table_date')}</th>
+                            <th>${this._t('table_name')}</th>
+                            <th>${this._t('table_action')}</th>
                           </tr>
-                        `).join('')}
-                      </tbody>
-                    </table>
-                  `}
+                        </thead>
+                        <tbody>
+                          ${subj.grades.map(g => `
+                            <tr>
+                              <td>
+                                <span class="grade-pill ${this._getGradeColorClass(g.grade, childCountry)}">
+                                  ${parseFloat(g.grade).toFixed(1)}
+                                </span>
+                              </td>
+                              <td><span class="weight-badge">${this._t('weight_times', { weight: g.weight })}</span></td>
+                              <td class="date-cell">${g.date}</td>
+                              <td class="name-cell">${g.name || '–'}</td>
+                              <td>
+                                <button class="icon-btn delete-grade-btn" data-subject="${subjName}" data-id="${g.id}" title="${this._t('delete_btn')}">
+                                  🗑️
+                                </button>
+                              </td>
+                            </tr>
+                          `).join('')}
+                        </tbody>
+                      </table>
+                    `}
+                  </div>
                 </div>
-              </div>
-            `;
-          }).join('')}
-        </div>
+              `;
+            }).join('')}
+          </div>
+        ` : ''}
       </div>
 
       <!-- Timetable Edit Modal -->
@@ -1329,6 +1366,32 @@ class SchoolGradesPanel extends HTMLElement {
                 <div class="country-info-badge" style="padding: 12px 16px; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); font-size: 13px; line-height: 1.5;">
                   <strong>${countrySys.flag} ${countrySys.name}</strong> • Skala: ${countrySys.scale} 
                   <br><small style="opacity: 0.8;">${countrySys.lower_is_better ? '📉 1.0 = Beste Note' : '📈 Höchste Note ist am besten'}</small>
+                </div>
+              </div>
+
+              <hr style="margin: 20px 0; border: none; border-top: 1px solid var(--divider-color, rgba(255,255,255,0.1));">
+
+              <div class="form-group" style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 12px; font-weight: 600; font-size: 14px; color: var(--primary-text-color, #fff);">
+                  👁️ ${this._t('section_visibility_title')}
+                </label>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                  <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px;">
+                    <input type="checkbox" id="settings-show-prep" ${secVis.show_prep_card ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary-color, #4ea8de);">
+                    <span>${this._t('section_prep')}</span>
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px;">
+                    <input type="checkbox" id="settings-show-calendar" ${secVis.show_calendar_card ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary-color, #4ea8de);">
+                    <span>${this._t('section_calendar')}</span>
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px;">
+                    <input type="checkbox" id="settings-show-timetable" ${secVis.show_timetable_card ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary-color, #4ea8de);">
+                    <span>${this._t('section_timetable')}</span>
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px;">
+                    <input type="checkbox" id="settings-show-overview" ${secVis.show_overview_card ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary-color, #4ea8de);">
+                    <span>${this._t('section_overview')}</span>
+                  </label>
                 </div>
               </div>
 
@@ -1476,9 +1539,18 @@ class SchoolGradesPanel extends HTMLElement {
         settingsForm.addEventListener('submit', async (e) => {
           e.preventDefault();
           const selectedCountry = root.querySelector('#settings-country-select').value;
+          const showPrep = root.querySelector('#settings-show-prep').checked;
+          const showCal = root.querySelector('#settings-show-calendar').checked;
+          const showTt = root.querySelector('#settings-show-timetable').checked;
+          const showOv = root.querySelector('#settings-show-overview').checked;
+
           await this._hass.callService('school_grades', 'update_settings', {
             child_name: this._selectedChild,
             country: selectedCountry,
+            show_prep_card: showPrep,
+            show_calendar_card: showCal,
+            show_timetable_card: showTt,
+            show_overview_card: showOv,
           });
           this._showSettingsModal = false;
           setTimeout(() => this.render(), 300);

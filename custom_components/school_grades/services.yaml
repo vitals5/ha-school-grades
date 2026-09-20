@@ -254,6 +254,31 @@ update_settings:
       selector:
         entity:
           domain: calendar
+    show_prep_card:
+      name: "Vorbereitung für den nächsten Schultag anzeigen"
+      description: "Zeigt den Bereich Vorbereitung für den nächsten Schultag im Dashboard an."
+      example: true
+      selector:
+        boolean:
+    show_calendar_card:
+      name: "Anstehende Klausuren Termine anzeigen"
+      description: "Zeigt den Bereich Anstehende Klausuren & Termine im Dashboard an."
+      example: true
+      selector:
+        boolean:
+    show_timetable_card:
+      name: "Wochenstundenplan anzeigen"
+      description: "Zeigt den Bereich Wochenstundenplan im Dashboard an."
+      example: true
+      selector:
+        boolean:
+    show_overview_card:
+      name: "Fächer Notenübersicht anzeigen"
+      description: "Zeigt den Bereich Fächer & Notenübersicht im Dashboard an."
+      example: true
+      selector:
+        boolean:
+
 
 
 

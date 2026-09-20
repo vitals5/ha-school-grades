@@ -212,6 +212,7 @@ class SchoolGradeNextDayExamsBinarySensor(BinarySensorEntity):
         self._attributes = {
             "kind_name": self.storage.child_name,
             "country": self.storage.data.country,
+            "section_visibility": self.storage.data.section_visibility,
             "calendar_entity": cal_entity,
             "target_date": primary_target_date.isoformat(),
             "target_day_name": day_name,

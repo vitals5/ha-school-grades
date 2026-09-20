@@ -6,7 +6,12 @@ import uuid
 from datetime import date as dt_date
 from typing import Any
 
-from .const import COUNTRY_GRADING_SYSTEMS, DEFAULT_COUNTRY, DEFAULT_SUBJECTS
+from .const import (
+    COUNTRY_GRADING_SYSTEMS,
+    DEFAULT_COUNTRY,
+    DEFAULT_SECTION_VISIBILITY,
+    DEFAULT_SUBJECTS,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -31,6 +36,8 @@ class SchoolGradesData:
     def __init__(self, child_name: str, data: dict[str, Any] | None = None) -> None:
         """Initialize data manager."""
         self.child_name = child_name
+        self.section_visibility: dict[str, bool] = dict(DEFAULT_SECTION_VISIBILITY)
+
         if data is None:
             self.country: str = DEFAULT_COUNTRY
             self.calendar_entity: str | None = None
@@ -47,6 +54,8 @@ class SchoolGradesData:
             self.country = str(data.get("country", DEFAULT_COUNTRY)).upper()
             if self.country not in COUNTRY_GRADING_SYSTEMS:
                 self.country = DEFAULT_COUNTRY
+            if "section_visibility" in data and isinstance(data["section_visibility"], dict):
+                self.section_visibility.update(data["section_visibility"])
             self.calendar_entity = data.get("calendar_entity")
             self._subjects = data.get("subjects", list(DEFAULT_SUBJECTS))
             self._grades = data.get("grades", {})
@@ -64,11 +73,18 @@ class SchoolGradesData:
         return {
             "child_name": self.child_name,
             "country": self.country,
+            "section_visibility": self.section_visibility,
             "calendar_entity": self.calendar_entity,
             "subjects": self._subjects,
             "grades": self._grades,
             "timetable": self.timetable,
         }
+
+    def set_section_visibility(self, visibility_dict: dict[str, Any]) -> None:
+        """Update section visibility toggles."""
+        for k, v in visibility_dict.items():
+            if k in self.section_visibility:
+                self.section_visibility[k] = bool(v)
 
     def set_country(self, country_code: str) -> bool:
         """Set or update country code."""

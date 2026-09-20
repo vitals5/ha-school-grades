@@ -33,6 +33,12 @@ Mit dem **integrierten Sidebar-Panel** (`/schulnoten`) verwaltest du Noten, Fäc
 - 🌍 **Länderspezifische Schulsysteme & Notenskalen (General Settings per Kind)**:
   - Einstellungen pro Kind zur automatischen Anpassung der Notenoptionen & Farbbewertungen.
   - Unterstützung für alle europäischen Normen (🇩🇪 DE, 🇦🇹 AT, 🇨🇭 CH, 🇫🇷 FR, 🇮🇹 IT, 🇪🇸 ES, 🇳🇱 NL, 🇵🇱 PL, 🇬🇧 UK) sowie 🇺🇸 USA (GPA 0.0-4.0), 🇷🇺 Russland (2-5) und 🇨🇳 China (0-100).
+- 👁️ **Anpassbare Panel-Bereiche (Ein/Ausblenden)**:
+  - In den Allgemeinen Einstellungen kann jeder Bereich des Panels individuell pro Kind aus- oder eingeblendet werden:
+    - Vorbereitung für den nächsten Schultag
+    - Anstehende Klausuren & Termine
+    - Wochenstundenplan
+    - Fächer & Notenübersicht
 - 🌐 **Mehrsprachigkeit (Multi-Language i18n)**:
   - Vollständige Unterstützung für **Deutsch 🇩🇪** und **Englisch 🇬🇧**.
   - Die Benutzeroberfläche und Servicetexte passen sich automatisch der gewählten Sprache in den Home Assistant Benutzereinstellungen an.
@@ -66,7 +72,8 @@ Die Integration stellt folgende Aktionen (Services) für Automatisierungen oder 
 | `school_grades.set_calendar` | Kalender zuweisen | `child_name`, `calendar_entity` |
 | `school_grades.update_timetable_cell` | Stundenplan-Zelle bearbeiten | `child_name`, `slot_id`, `day`, `subject`, `room`, `teacher` |
 | `school_grades.import_timetable` | Stundenplan per YAML importieren | `child_name`, `yaml_content` |
-| `school_grades.update_settings` | Land & Einstellungen aktualisieren | `child_name`, `country`, `calendar_entity` |
+| `school_grades.update_settings` | Land & Einstellungen aktualisieren | `child_name`, `country`, `calendar_entity`, `show_prep_card`, `show_calendar_card`, `show_timetable_card`, `show_overview_card` |
+
 
 ### 🔔 Binary Sensor für Sprachansagen & Benachrichtigungen
 
@@ -136,6 +143,12 @@ With the **built-in Sidebar Panel** (`/schulnoten`), you can manage grades, subj
 - 🌍 **International Country Grading Systems (General Settings per child)**:
   - Configure country per child instance to automatically adapt grade input options & color evaluations.
   - Supports European standards (🇩🇪 DE, 🇦🇹 AT, 🇨🇭 CH, 🇫🇷 FR, 🇮🇹 IT, 🇪🇸 ES, 🇳🇱 NL, 🇵🇱 PL, 🇬🇧 UK), 🇺🇸 USA (GPA 0.0-4.0), 🇷🇺 Russia (2-5), and 🇨🇳 China (0-100/A-F).
+- 👁️ **Customizable Panel Sections (Show/Hide)**:
+  - In General Settings, each section of the panel can be toggled on or off per child:
+    - Preparation for next school day
+    - Upcoming exams & events
+    - Weekly timetable
+    - Subjects & grades overview
 - 🌐 **Multi-Language Support (i18n)**:
   - Full native support for **German 🇩🇪** and **English 🇬🇧**.
   - The UI and service strings adapt automatically to your Home Assistant user language preferences.
@@ -169,7 +182,8 @@ The integration provides the following actions (services) for automations and sc
 | `school_grades.set_calendar` | Assign calendar | `child_name`, `calendar_entity` |
 | `school_grades.update_timetable_cell` | Edit timetable slot | `child_name`, `slot_id`, `day`, `subject`, `room`, `teacher` |
 | `school_grades.import_timetable` | Import timetable via YAML | `child_name`, `yaml_content` |
-| `school_grades.update_settings` | Update country & settings | `child_name`, `country`, `calendar_entity` |
+| `school_grades.update_settings` | Update country & settings | `child_name`, `country`, `calendar_entity`, `show_prep_card`, `show_calendar_card`, `show_timetable_card`, `show_overview_card` |
+
 
 ### 🔔 Binary Sensor for Voice Announcements & Notifications
 

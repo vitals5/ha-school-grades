@@ -20,11 +20,21 @@ CONF_ROOM = "room"
 CONF_TEACHER = "teacher"
 
 CONF_COUNTRY = "country"
+CONF_SHOW_PREP = "show_prep_card"
+CONF_SHOW_CALENDAR = "show_calendar_card"
+CONF_SHOW_TIMETABLE = "show_timetable_card"
+CONF_SHOW_OVERVIEW = "show_overview_card"
 
 # Defaults
 DEFAULT_WEIGHT = 1
 DEFAULT_SUBJECTS = ["Mathematik", "Deutsch", "Englisch"]
 DEFAULT_COUNTRY = "DE"
+DEFAULT_SECTION_VISIBILITY = {
+    "show_prep_card": True,
+    "show_calendar_card": True,
+    "show_timetable_card": True,
+    "show_overview_card": True,
+}
 
 # Country grading systems specification
 COUNTRY_GRADING_SYSTEMS = {
