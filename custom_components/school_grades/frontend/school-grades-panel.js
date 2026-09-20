@@ -339,6 +339,7 @@ const I18N = {
     delete_grade_confirm: "Möchtest du diese Note wirklich löschen?",
     
     // Settings
+    settings_btn: "⚙️ Einstellungen",
     settings_title: "⚙️ Allgemeine Einstellungen ({child})",
     country_label: "Land / Schulsystem",
     country_hint: "Bestimmt die Notenskala und Bewertung für diese Instanz.",
@@ -445,6 +446,7 @@ const I18N = {
     delete_grade_confirm: "Are you sure you want to delete this grade?",
     
     // Settings
+    settings_btn: "⚙️ Settings",
     settings_title: "⚙️ General Settings ({child})",
     country_label: "Country / Grading System",
     country_hint: "Determines the grading scale and evaluation system for this child.",
@@ -488,6 +490,7 @@ class SchoolGradesPanel extends HTMLElement {
     this._calendarEvents = {}; // { childName: [events] }
     this._editingCell = null; // { slotId, day, slotLabel, dayLabel, subject, room, teacher }
     this._showYamlModal = false;
+    this._showSettingsModal = false;
   }
 
   set hass(hass) {
@@ -863,6 +866,9 @@ class SchoolGradesPanel extends HTMLElement {
                 </button>
               `;
             }).join('')}
+            <button class="tab-btn settings-tab-btn" id="open-settings-header-btn" title="${this._t('settings_btn')}" style="margin-left: 8px; background: rgba(255,255,255,0.08);">
+              ${this._t('settings_btn')}
+            </button>
           </div>
         </header>
 
@@ -880,33 +886,9 @@ class SchoolGradesPanel extends HTMLElement {
             <span class="stat-label">${this._t('total_grades')}</span>
             <span class="stat-value">${Object.values(subjects).reduce((acc, s) => acc + s.grades.length, 0)}</span>
           </div>
-        </div>
-
-        <!-- General Settings Card -->
-        <div class="card settings-card" style="margin-bottom: 24px;">
-          <div class="settings-header" style="display: flex; justify-content: space-between; align-items: center;">
-            <div class="title-with-badge">
-              <h3 style="margin: 0; font-size: 16px;">⚙️ ${this._t('settings_title', { child: this._selectedChild })}</h3>
-              <span class="timetable-subtitle" style="display: block; margin-top: 4px; font-size: 12px; opacity: 0.7;">${this._t('country_hint')}</span>
-            </div>
-          </div>
-          <div class="settings-body" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-top: 14px;">
-            <div class="form-group" style="margin: 0;">
-              <label style="display: block; margin-bottom: 6px; font-weight: 500; font-size: 13px;">🌍 ${this._t('country_label')}</label>
-              <select id="settings-country-select" style="width: 100%; padding: 10px 14px; border-radius: 8px; background: var(--card-background-color, rgba(0,0,0,0.2)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 14px; cursor: pointer;">
-                ${Object.entries(COUNTRY_SYSTEMS).map(([code, sys]) => `
-                  <option value="${code}" ${code === childCountry ? 'selected' : ''}>
-                    ${sys.flag} ${sys.name} (${sys.scale})
-                  </option>
-                `).join('')}
-              </select>
-            </div>
-            <div class="form-group" style="margin: 0; display: flex; align-items: flex-end;">
-              <div class="country-info-badge" style="padding: 10px 16px; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); width: 100%; font-size: 13px;">
-                <strong>${countrySys.flag} ${countrySys.name}</strong> • Skala: ${countrySys.scale} 
-                <br><small style="opacity: 0.8;">${countrySys.lower_is_better ? '📉 1.0 = Beste Note' : '📈 Höchste Note ist am besten'}</small>
-              </div>
-            </div>
+          <div class="stat-card action-stat-card" id="open-settings-banner-btn" style="cursor: pointer;" title="${this._t('settings_btn')}">
+            <span class="stat-label">${this._t('settings_btn')}</span>
+            <span class="stat-value" style="font-size: 15px;">${countrySys.flag} ${countrySys.name}</span>
           </div>
         </div>
 
@@ -1318,6 +1300,46 @@ class SchoolGradesPanel extends HTMLElement {
           </div>
         </div>
       ` : ''}
+
+      <!-- General Settings Modal -->
+      ${this._showSettingsModal ? `
+        <div class="modal-backdrop" id="settings-modal-backdrop">
+          <div class="modal-card">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+              <div>
+                <h3 style="margin: 0; font-size: 18px;">⚙️ ${this._t('settings_title', { child: this._selectedChild })}</h3>
+                <span class="modal-subtitle" style="display: block; margin-top: 4px; opacity: 0.7; font-size: 13px;">${this._t('country_hint')}</span>
+              </div>
+              <button class="icon-btn" id="settings-close-x" style="font-size: 20px; border: none; background: none; color: #fff; cursor: pointer; padding: 4px 8px;">✖</button>
+            </div>
+
+            <form id="settings-form">
+              <div class="form-group" style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 500;">🌍 ${this._t('country_label')}</label>
+                <select id="settings-country-select" style="width: 100%; padding: 12px 14px; border-radius: 8px; background: var(--card-background-color, rgba(0,0,0,0.25)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 14px; cursor: pointer;">
+                  ${Object.entries(COUNTRY_SYSTEMS).map(([code, sys]) => `
+                    <option value="${code}" ${code === childCountry ? 'selected' : ''}>
+                      ${sys.flag} ${sys.name} (${sys.scale})
+                    </option>
+                  `).join('')}
+                </select>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 24px;">
+                <div class="country-info-badge" style="padding: 12px 16px; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); font-size: 13px; line-height: 1.5;">
+                  <strong>${countrySys.flag} ${countrySys.name}</strong> • Skala: ${countrySys.scale} 
+                  <br><small style="opacity: 0.8;">${countrySys.lower_is_better ? '📉 1.0 = Beste Note' : '📈 Höchste Note ist am besten'}</small>
+                </div>
+              </div>
+
+              <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 12px;">
+                <button type="button" class="submit-btn secondary" id="settings-cancel-btn">${this._t('cancel_btn')}</button>
+                <button type="submit" class="submit-btn">${this._t('save_btn')}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ` : ''}
     `;
 
     this._attachEventListeners();
@@ -1407,17 +1429,61 @@ class SchoolGradesPanel extends HTMLElement {
       });
     });
 
-    // Country Select
-    const countrySelect = root.querySelector('#settings-country-select');
-    if (countrySelect) {
-      countrySelect.addEventListener('change', async (e) => {
-        const newCountry = e.target.value;
-        await this._hass.callService('school_grades', 'update_settings', {
-          child_name: this._selectedChild,
-          country: newCountry,
-        });
-        setTimeout(() => this.render(), 300);
+    // Open Settings Modal
+    const openSettingsBtn1 = root.querySelector('#open-settings-banner-btn');
+    if (openSettingsBtn1) {
+      openSettingsBtn1.addEventListener('click', () => {
+        this._showSettingsModal = true;
+        this.render();
       });
+    }
+    const openSettingsBtn2 = root.querySelector('#open-settings-header-btn');
+    if (openSettingsBtn2) {
+      openSettingsBtn2.addEventListener('click', () => {
+        this._showSettingsModal = true;
+        this.render();
+      });
+    }
+
+    // Settings Modal Backdrop & Form
+    const settingsBackdrop = root.querySelector('#settings-modal-backdrop');
+    if (settingsBackdrop) {
+      settingsBackdrop.addEventListener('click', (e) => {
+        if (e.target === settingsBackdrop) {
+          this._showSettingsModal = false;
+          this.render();
+        }
+      });
+
+      const closeX = root.querySelector('#settings-close-x');
+      if (closeX) {
+        closeX.addEventListener('click', () => {
+          this._showSettingsModal = false;
+          this.render();
+        });
+      }
+
+      const cancelSettingsBtn = root.querySelector('#settings-cancel-btn');
+      if (cancelSettingsBtn) {
+        cancelSettingsBtn.addEventListener('click', () => {
+          this._showSettingsModal = false;
+          this.render();
+        });
+      }
+
+      const settingsForm = root.querySelector('#settings-form');
+      if (settingsForm) {
+        settingsForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const selectedCountry = root.querySelector('#settings-country-select').value;
+          await this._hass.callService('school_grades', 'update_settings', {
+            child_name: this._selectedChild,
+            country: selectedCountry,
+          });
+          this._showSettingsModal = false;
+          setTimeout(() => this.render(), 300);
+        });
+      }
     }
 
     // Calendar Select
