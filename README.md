@@ -7,6 +7,7 @@ Eine elegante Home Assistant Custom Integration zur einfachen Verwaltung von Sch
 ## 🌟 Features
 
 - 👨‍👩‍👧‍👦 **Mehrere Kinder (Multi-Instance)**: Jede Instanz steht für ein Kind (z. B. Max, Emma).
+- 📱 **Eigene Sidebar-Konfigurationsseite (Seitenleiste)**: Erscheint automatisch als **🎓 Schulnoten** in der linken Home Assistant Menüleiste. Dort können Fächer und Noten mit Schnellauswahl-Buttons, Gewichtungs-Chips und Mülleimer-Icons extrem komfortabel verwaltet werden.
 - 📚 **Fächerverwaltung**: Fächer können dynamisch hinzugefügt oder gelöscht werden (z. B. Mathematik, Deutsch, Englisch, Physik).
 - ⚖️ **Gewichtete Noten**: Unterlaufene Noten können mit Faktoren wie 1-fach, 2-fach, 3-fach, 4-fach gewichtet werden.
 - 📊 **Durchschnittssensoren**:

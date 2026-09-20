@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
 import voluptuous as vol
 
+from homeassistant.components import panel_custom
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.helpers import config_validation as cv
@@ -32,6 +34,9 @@ from .storage import SchoolGradesStorage
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = ["sensor"]
+
+FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "frontend")
+URL_BASE = "/school_grades_ui"
 
 # Voluptuous Schemas for Action/Service Calls
 SCHEMA_ADD_SUBJECT = vol.Schema(
@@ -82,10 +87,37 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Listen for config entry options updates
     entry.async_on_unload(entry.add_update_listener(async_update_options_listener))
 
+    # Setup custom sidebar panel & static HTTP assets
+    await _async_setup_frontend(hass)
+
     # Register services once if first entry
     _register_services(hass)
 
     return True
+
+
+async def _async_setup_frontend(hass: HomeAssistant) -> None:
+    """Register HTTP static path and custom sidebar panel."""
+    if hasattr(hass.http, "async_register_static_paths"):
+        from homeassistant.components.http import StaticPathConfig
+        await hass.http.async_register_static_paths([
+            StaticPathConfig(URL_BASE, FRONTEND_DIR, cache_headers=False)
+        ])
+    else:
+        hass.http.register_static_path(URL_BASE, FRONTEND_DIR, cache_headers=False)
+
+    if not hass.data.get(f"{DOMAIN}_panel_registered"):
+        hass.data[f"{DOMAIN}_panel_registered"] = True
+        await panel_custom.async_register_panel(
+            hass=hass,
+            webcomponent_name="school-grades-panel",
+            sidebar_title="Schulnoten",
+            sidebar_icon="mdi:school",
+            url_path="schulnoten",
+            module_url=f"{URL_BASE}/school-grades-panel.js",
+            embed_iframe=False,
+            require_admin=False,
+        )
 
 
 async def async_update_options_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
@@ -102,6 +134,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data[DOMAIN].pop(entry.entry_id, None)
         if not hass.data[DOMAIN]:
             _unregister_services(hass)
+            if hass.data.get(f"{DOMAIN}_panel_registered"):
+                panel_custom.async_remove_panel(hass, "schulnoten")
+                hass.data.pop(f"{DOMAIN}_panel_registered", None)
 
     return unload_ok
 
