@@ -174,7 +174,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     storage = SchoolGradesStorage(hass, entry.entry_id, child_name)
     await storage.async_load()
 
-    if country:
+    if country and not storage.data.country:
         storage.data.set_country(country)
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = storage
@@ -388,6 +388,10 @@ def _register_services(hass: HomeAssistant) -> None:
             if country:
                 if storage.data.set_country(country):
                     updated = True
+                    entry = hass.config_entries.async_get_entry(storage.entry_id)
+                    if entry:
+                        new_data = {**entry.data, CONF_COUNTRY: country}
+                        hass.config_entries.async_update_entry(entry, data=new_data)
             if CONF_CALENDAR in call.data:
                 storage.data.set_calendar_entity(calendar_entity)
                 updated = True

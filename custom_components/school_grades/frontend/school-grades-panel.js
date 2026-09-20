@@ -614,6 +614,27 @@ class SchoolGradesPanel extends HTMLElement {
         };
       }
 
+      if (attrs.country) {
+        children[kindName].country = String(attrs.country).toUpperCase();
+      }
+      if (attrs.calendar_entity !== undefined) {
+        children[kindName].calendarEntity = attrs.calendar_entity;
+      }
+      if (attrs.timetable) {
+        children[kindName].timetable = attrs.timetable;
+      }
+      if (attrs.upcoming_events) {
+        children[kindName].upcomingEvents = attrs.upcoming_events;
+      }
+      if (attrs.section_visibility && typeof attrs.section_visibility === 'object') {
+        children[kindName].sectionVisibility = {
+          show_prep_card: attrs.section_visibility.show_prep_card ?? true,
+          show_calendar_card: attrs.section_visibility.show_calendar_card ?? true,
+          show_timetable_card: attrs.section_visibility.show_timetable_card ?? true,
+          show_overview_card: attrs.section_visibility.show_overview_card ?? true,
+        };
+      }
+
       if (attrs.subject_name) {
         children[kindName].subjects[attrs.subject_name] = {
           entityId: entityId,
@@ -622,28 +643,8 @@ class SchoolGradesPanel extends HTMLElement {
           grades: attrs.grades || [],
           count: attrs.grade_count || 0,
         };
-      } else if (attrs.subjects_summary) {
+      } else if (attrs.subjects_summary !== undefined) {
         children[kindName].totalAverage = stateObj.state;
-        if (attrs.country) {
-          children[kindName].country = String(attrs.country).toUpperCase();
-        }
-        if (attrs.calendar_entity) {
-          children[kindName].calendarEntity = attrs.calendar_entity;
-        }
-        if (attrs.timetable) {
-          children[kindName].timetable = attrs.timetable;
-        }
-        if (attrs.upcoming_events) {
-          children[kindName].upcomingEvents = attrs.upcoming_events;
-        }
-        if (attrs.section_visibility && typeof attrs.section_visibility === 'object') {
-          children[kindName].sectionVisibility = {
-            show_prep_card: attrs.section_visibility.show_prep_card ?? true,
-            show_calendar_card: attrs.section_visibility.show_calendar_card ?? true,
-            show_timetable_card: attrs.section_visibility.show_timetable_card ?? true,
-            show_overview_card: attrs.section_visibility.show_overview_card ?? true,
-          };
-        }
       }
 
       if (this._localSectionVisibility && this._localSectionVisibility[kindName]) {
