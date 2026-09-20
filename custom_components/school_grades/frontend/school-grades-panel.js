@@ -8,12 +8,14 @@ class SchoolGradesPanel extends HTMLElement {
     this._selectedChild = null;
     this._selectedGrade = 2.0;
     this._selectedWeight = 1.0;
+    this._calendarEvents = {}; // { childName: [events] }
   }
 
   set hass(hass) {
     const oldHass = this._hass;
     this._hass = hass;
     if (!oldHass || this._hasGradesDataChanged(oldHass, hass)) {
+      this._fetchUpcomingCalendarEvents();
       this.render();
     }
   }
@@ -26,6 +28,9 @@ class SchoolGradesPanel extends HTMLElement {
         const newState = newHass.states[key];
         if (!oldState || oldState !== newState) {
           if (newState.attributes && newState.attributes.kind_name) {
+            return true;
+          }
+          if (key.startsWith('calendar.')) {
             return true;
           }
         }
@@ -48,6 +53,7 @@ class SchoolGradesPanel extends HTMLElement {
         children[kindName] = {
           name: kindName,
           totalAverage: null,
+          calendarEntity: null,
           subjects: {},
         };
       }
@@ -62,15 +68,72 @@ class SchoolGradesPanel extends HTMLElement {
         };
       } else if (attrs.subjects_summary) {
         children[kindName].totalAverage = stateObj.state;
+        if (attrs.calendar_entity) {
+          children[kindName].calendarEntity = attrs.calendar_entity;
+        }
       }
     }
 
     return children;
   }
 
+  _getAvailableCalendars() {
+    if (!this._hass) return [];
+    return Object.keys(this._hass.states)
+      .filter(id => id.startsWith('calendar.'))
+      .map(id => ({
+        entityId: id,
+        name: this._hass.states[id].attributes.friendly_name || id,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  async _fetchUpcomingCalendarEvents() {
+    const data = this._getSchoolGradesData();
+    const now = new Date();
+    const startIso = now.toISOString();
+    const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const endIso = in30Days.toISOString();
+
+    for (const [childName, childData] of Object.entries(data)) {
+      const calEntity = childData.calendarEntity;
+      if (!calEntity || !this._hass.states[calEntity]) {
+        this._calendarEvents[childName] = [];
+        continue;
+      }
+
+      try {
+        const events = await this._hass.callWS({
+          type: 'calendar/event/list',
+          entity_id: calEntity,
+          start_time: startIso,
+          end_time: endIso,
+        });
+
+        this._calendarEvents[childName] = events || [];
+        this.render();
+      } catch (err) {
+        // Fallback to single state attribute if WS call unsupported
+        const stateObj = this._hass.states[calEntity];
+        if (stateObj && stateObj.attributes.start_time) {
+          this._calendarEvents[childName] = [{
+            summary: stateObj.attributes.message || stateObj.state,
+            start: stateObj.attributes.start_time,
+            end: stateObj.attributes.end_time,
+            description: stateObj.attributes.description || '',
+            location: stateObj.attributes.location || '',
+          }];
+        } else {
+          this._calendarEvents[childName] = [];
+        }
+      }
+    }
+  }
+
   render() {
     const data = this._getSchoolGradesData();
     const childNames = Object.keys(data);
+    const availableCalendars = this._getAvailableCalendars();
 
     if (childNames.length === 0) {
       this.shadowRoot.innerHTML = `
@@ -93,6 +156,7 @@ class SchoolGradesPanel extends HTMLElement {
     const currentChild = data[this._selectedChild];
     const subjects = currentChild ? currentChild.subjects : {};
     const subjectList = Object.keys(subjects).sort();
+    const upcomingEvents = this._calendarEvents[this._selectedChild] || [];
 
     this.shadowRoot.innerHTML = `
       <style>${this._getStyles()}</style>
@@ -101,7 +165,7 @@ class SchoolGradesPanel extends HTMLElement {
         <header class="header">
           <div class="title-section">
             <h1>🎓 Schulnoten Übersicht</h1>
-            <p class="subtitle">Verwaltung & Notenspiegel für deine Kinder</p>
+            <p class="subtitle">Verwaltung, Notenspiegel & Klausurenkalender für deine Kinder</p>
           </div>
           <div class="child-tabs">
             ${childNames.map(name => `
@@ -125,6 +189,60 @@ class SchoolGradesPanel extends HTMLElement {
           <div class="stat-card">
             <span class="stat-label">Gesamte Noten</span>
             <span class="stat-value">${Object.values(subjects).reduce((acc, s) => acc + s.grades.length, 0)}</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Anstehende Klausuren</span>
+            <span class="stat-value">${upcomingEvents.length}</span>
+          </div>
+        </div>
+
+        <!-- Upcoming Calendar Events Card -->
+        <div class="card calendar-card" style="margin-bottom: 24px;">
+          <div class="calendar-header">
+            <h3>📅 Anstehende Klausuren & Termine</h3>
+            <div class="calendar-select-group">
+              <label>Kalender für ${this._selectedChild}:</label>
+              <select id="calendar-select">
+                <option value="">-- Kein Kalender zugewiesen --</option>
+                ${availableCalendars.map(c => `
+                  <option value="${c.entityId}" ${currentChild && currentChild.calendarEntity === c.entityId ? 'selected' : ''}>
+                    📅 ${c.name} (${c.entityId})
+                  </option>
+                `).join('')}
+              </select>
+            </div>
+          </div>
+
+          <div class="events-list">
+            ${!currentChild || !currentChild.calendarEntity ? `
+              <div class="empty-events">
+                💡 Wähle oben einen Schul-Kalender (z. B. Google Kalender, Local HA Calendar, CalDAV), um anstehende Klausuren und Termine anzuzeigen.
+              </div>
+            ` : upcomingEvents.length === 0 ? `
+              <div class="empty-events">
+                🎉 Keine anstehenden Klausuren in den nächsten 30 Tagen eingetragen!
+              </div>
+            ` : `
+              <div class="events-grid">
+                ${upcomingEvents.map(evt => {
+                  const startDate = new Date(evt.start || evt.dtstart);
+                  const formattedDate = startDate.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+                  const formattedTime = startDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+                  const countdownText = this._getCountdownBadge(startDate);
+                  return `
+                    <div class="event-item">
+                      <div class="event-badge-row">
+                        <span class="event-countdown ${countdownText.cls}">${countdownText.text}</span>
+                        <span class="event-time">${formattedDate} ${formattedTime !== '00:00' ? 'um ' + formattedTime + ' Uhr' : ''}</span>
+                      </div>
+                      <h4 class="event-title">${evt.summary}</h4>
+                      ${evt.location ? `<div class="event-detail">📍 ${evt.location}</div>` : ''}
+                      ${evt.description ? `<div class="event-detail desc">📝 ${evt.description}</div>` : ''}
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            `}
           </div>
         </div>
 
@@ -266,6 +384,21 @@ class SchoolGradesPanel extends HTMLElement {
     this._attachEventListeners();
   }
 
+  _getCountdownBadge(targetDate) {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const target = new Date(targetDate);
+    target.setHours(0, 0, 0, 0);
+
+    const diffDays = Math.round((target - now) / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) return { text: 'Vergangen', cls: 'past' };
+    if (diffDays === 0) return { text: '⚡ HEUTE', cls: 'today' };
+    if (diffDays === 1) return { text: '⚠️ Morgen', cls: 'tomorrow' };
+    if (diffDays <= 7) return { text: `In ${diffDays} Tagen`, cls: 'soon' };
+    return { text: `In ${diffDays} Tagen`, cls: 'later' };
+  }
+
   _getGradeColorClass(gradeVal) {
     const num = parseFloat(gradeVal);
     if (isNaN(num)) return 'grade-neutral';
@@ -283,9 +416,23 @@ class SchoolGradesPanel extends HTMLElement {
     root.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         this._selectedChild = e.currentTarget.dataset.child;
+        this._fetchUpcomingCalendarEvents();
         this.render();
       });
     });
+
+    // Calendar Select
+    const calSelect = root.querySelector('#calendar-select');
+    if (calSelect) {
+      calSelect.addEventListener('change', async (e) => {
+        const calEntity = e.target.value;
+        await this._hass.callService('school_grades', 'set_calendar', {
+          child_name: this._selectedChild,
+          calendar_entity: calEntity,
+        });
+        setTimeout(() => this._fetchUpcomingCalendarEvents(), 300);
+      });
+    }
 
     // Grade Pills
     root.querySelectorAll('#grade-pills .pill-btn').forEach(btn => {
@@ -456,7 +603,7 @@ class SchoolGradesPanel extends HTMLElement {
 
       .summary-banner {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
         gap: 16px;
         margin-bottom: 24px;
       }
@@ -490,6 +637,101 @@ class SchoolGradesPanel extends HTMLElement {
         font-weight: 800;
         margin-top: 4px;
         color: var(--primary-text-color, #ffffff);
+      }
+
+      /* Calendar Section */
+      .calendar-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        margin-bottom: 16px;
+      }
+
+      .calendar-header h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 700;
+      }
+
+      .calendar-select-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .calendar-select-group label {
+        font-size: 13px;
+        color: var(--secondary-text-color, #9ca3af);
+      }
+
+      .calendar-select-group select {
+        width: auto;
+        min-width: 220px;
+      }
+
+      .empty-events {
+        padding: 20px;
+        text-align: center;
+        color: var(--secondary-text-color, #9ca3af);
+        font-size: 14px;
+        line-height: 1.5;
+        background: rgba(255, 255, 255, 0.02);
+        border-radius: 12px;
+      }
+
+      .events-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 14px;
+      }
+
+      .event-item {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 14px;
+      }
+
+      .event-badge-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 6px;
+      }
+
+      .event-countdown {
+        font-size: 11px;
+        font-weight: 800;
+        padding: 3px 8px;
+        border-radius: 6px;
+        text-transform: uppercase;
+      }
+
+      .event-countdown.today { background: rgba(239, 68, 68, 0.25); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.4); }
+      .event-countdown.tomorrow { background: rgba(245, 158, 11, 0.25); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.4); }
+      .event-countdown.soon { background: rgba(59, 130, 246, 0.25); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.4); }
+      .event-countdown.later { background: rgba(156, 163, 175, 0.2); color: #9ca3af; }
+      .event-countdown.past { background: rgba(107, 114, 128, 0.2); color: #6b7280; }
+
+      .event-time {
+        font-size: 12px;
+        color: var(--secondary-text-color, #9ca3af);
+      }
+
+      .event-title {
+        margin: 4px 0;
+        font-size: 15px;
+        font-weight: 700;
+      }
+
+      .event-detail {
+        font-size: 13px;
+        color: var(--secondary-text-color, #9ca3af);
+        margin-top: 4px;
       }
 
       .forms-grid {

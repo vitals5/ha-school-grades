@@ -116,3 +116,21 @@ remove_grade:
       example: "a1b2c3d4"
       selector:
         text:
+
+set_calendar:
+  name: "Kalender zuweisen"
+  description: "Verknüpft einen Home Assistant Kalender mit einem Kind für anstehende Klausuren."
+  fields:
+    child_name:
+      name: "Name des Kindes"
+      description: "Name des Kindes (optional)."
+      example: "Max"
+      selector:
+        text:
+    calendar_entity:
+      name: "Kalender-Entität"
+      description: "Die Kalender-Entität (z. B. calendar.richard_klausuren)."
+      example: "calendar.richard_klausuren"
+      selector:
+        entity:
+          domain: calendar

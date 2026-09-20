@@ -14,6 +14,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from .const import (
+    CONF_CALENDAR,
     CONF_CHILD_NAME,
     CONF_DATE,
     CONF_GRADE,
@@ -27,6 +28,7 @@ from .const import (
     SERVICE_ADD_SUBJECT,
     SERVICE_REMOVE_GRADE,
     SERVICE_REMOVE_SUBJECT,
+    SERVICE_SET_CALENDAR,
     SIGNAL_UPDATE_GRADES,
 )
 from .storage import SchoolGradesStorage
@@ -69,6 +71,13 @@ SCHEMA_REMOVE_GRADE = vol.Schema(
         vol.Optional(CONF_CHILD_NAME): cv.string,
         vol.Required(CONF_SUBJECT): cv.string,
         vol.Required(CONF_GRADE_ID): cv.string,
+    }
+)
+
+SCHEMA_SET_CALENDAR = vol.Schema(
+    {
+        vol.Optional(CONF_CHILD_NAME): cv.string,
+        vol.Optional(CONF_CALENDAR): cv.string,
     }
 )
 
@@ -221,6 +230,19 @@ def _register_services(hass: HomeAssistant) -> None:
                     hass, SIGNAL_UPDATE_GRADES.format(entry_id=storage.entry_id)
                 )
 
+    async def handle_set_calendar(call: ServiceCall) -> None:
+        """Handle set_calendar action call."""
+        child_name = call.data.get(CONF_CHILD_NAME)
+        calendar_entity = call.data.get(CONF_CALENDAR)
+
+        storage = _get_storage(hass, child_name)
+        if storage:
+            storage.data.set_calendar_entity(calendar_entity)
+            await storage.async_save()
+            async_dispatcher_send(
+                hass, SIGNAL_UPDATE_GRADES.format(entry_id=storage.entry_id)
+            )
+
     hass.services.async_register(
         DOMAIN, SERVICE_ADD_SUBJECT, handle_add_subject, schema=SCHEMA_ADD_SUBJECT
     )
@@ -233,6 +255,9 @@ def _register_services(hass: HomeAssistant) -> None:
     hass.services.async_register(
         DOMAIN, SERVICE_REMOVE_GRADE, handle_remove_grade, schema=SCHEMA_REMOVE_GRADE
     )
+    hass.services.async_register(
+        DOMAIN, SERVICE_SET_CALENDAR, handle_set_calendar, schema=SCHEMA_SET_CALENDAR
+    )
 
 
 def _unregister_services(hass: HomeAssistant) -> None:
@@ -241,3 +266,4 @@ def _unregister_services(hass: HomeAssistant) -> None:
     hass.services.async_remove(DOMAIN, SERVICE_REMOVE_SUBJECT)
     hass.services.async_remove(DOMAIN, SERVICE_ADD_GRADE)
     hass.services.async_remove(DOMAIN, SERVICE_REMOVE_GRADE)
+    hass.services.async_remove(DOMAIN, SERVICE_SET_CALENDAR)

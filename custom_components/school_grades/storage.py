@@ -21,12 +21,14 @@ class SchoolGradesData:
         """Initialize data manager."""
         self.child_name = child_name
         if data is None:
+            self.calendar_entity: str | None = None
             self._subjects: list[str] = list(DEFAULT_SUBJECTS)
             self._grades: dict[str, list[dict[str, Any]]] = {
                 subj: [] for subj in self._subjects
             }
         else:
             self.child_name = data.get("child_name", child_name)
+            self.calendar_entity = data.get("calendar_entity")
             self._subjects = data.get("subjects", list(DEFAULT_SUBJECTS))
             self._grades = data.get("grades", {})
             # Ensure all subjects have an entry in grades dict
@@ -38,9 +40,18 @@ class SchoolGradesData:
         """Convert data to dictionary for JSON persistence."""
         return {
             "child_name": self.child_name,
+            "calendar_entity": self.calendar_entity,
             "subjects": self._subjects,
             "grades": self._grades,
         }
+
+    def set_calendar_entity(self, calendar_entity: str | None) -> None:
+        """Set or update assigned calendar entity."""
+        if calendar_entity:
+            clean_cal = str(calendar_entity).strip()
+            self.calendar_entity = clean_cal if clean_cal else None
+        else:
+            self.calendar_entity = None
 
     @property
     def subjects(self) -> list[str]:

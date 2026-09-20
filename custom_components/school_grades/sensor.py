@@ -161,9 +161,10 @@ class SchoolGradeTotalSensor(SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return summary of all subject averages."""
+        """Return summary of all subject averages and assigned calendar entity."""
         return {
             "kind_name": self.storage.child_name,
+            "calendar_entity": self.storage.data.calendar_entity,
             "subjects_summary": {
                 subj: self.storage.data.calculate_subject_average(subj)
                 for subj in self.storage.data.subjects
