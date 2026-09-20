@@ -134,3 +134,47 @@ set_calendar:
       selector:
         entity:
           domain: calendar
+
+update_timetable_cell:
+  name: "Stundenplan-Eintrag aktualisieren"
+  description: "Aktualisiert ein Fach, Raum und Lehrer für einen bestimmten Zeitslot und Tag."
+  fields:
+    child_name:
+      name: "Name des Kindes"
+      description: "Name des Kindes (optional)."
+      example: "Max"
+      selector:
+        text:
+    slot_id:
+      name: "Slot ID"
+      description: "ID des Zeitslots (z. B. slot_1, slot_2, break_1)."
+      required: true
+      example: "slot_1"
+      selector:
+        text:
+    day:
+      name: "Wochentag"
+      description: "Wochentag (monday, tuesday, wednesday, thursday, friday)."
+      required: true
+      example: "monday"
+      selector:
+        text:
+    subject:
+      name: "Schulfach"
+      description: "Name des Schulfachs oder leer zum Löschen."
+      example: "Mathematik"
+      selector:
+        text:
+    room:
+      name: "Raum"
+      description: "Raumnummer / Raumbezeichnung (optional)."
+      example: "R102"
+      selector:
+        text:
+    teacher:
+      name: "Lehrkraft"
+      description: "Name / Kürzel der Lehrkraft (optional)."
+      example: "Fr. Schmidt"
+      selector:
+        text:
+

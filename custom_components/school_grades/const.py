@@ -13,6 +13,12 @@ CONF_DATE = "date"
 CONF_GRADE_ID = "grade_id"
 CONF_CALENDAR = "calendar_entity"
 
+CONF_TIMETABLE = "timetable"
+CONF_SLOT_ID = "slot_id"
+CONF_DAY = "day"
+CONF_ROOM = "room"
+CONF_TEACHER = "teacher"
+
 # Defaults
 DEFAULT_WEIGHT = 1
 DEFAULT_SUBJECTS = ["Mathematik", "Deutsch", "Englisch"]
@@ -26,3 +32,5 @@ SERVICE_REMOVE_SUBJECT = "remove_subject"
 SERVICE_ADD_GRADE = "add_grade"
 SERVICE_REMOVE_GRADE = "remove_grade"
 SERVICE_SET_CALENDAR = "set_calendar"
+SERVICE_UPDATE_TIMETABLE = "update_timetable"
+SERVICE_UPDATE_TIMETABLE_CELL = "update_timetable_cell"

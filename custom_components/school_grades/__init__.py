@@ -17,10 +17,14 @@ from .const import (
     CONF_CALENDAR,
     CONF_CHILD_NAME,
     CONF_DATE,
+    CONF_DAY,
     CONF_GRADE,
     CONF_GRADE_ID,
     CONF_NAME,
+    CONF_ROOM,
+    CONF_SLOT_ID,
     CONF_SUBJECT,
+    CONF_TEACHER,
     CONF_WEIGHT,
     DEFAULT_WEIGHT,
     DOMAIN,
@@ -29,6 +33,7 @@ from .const import (
     SERVICE_REMOVE_GRADE,
     SERVICE_REMOVE_SUBJECT,
     SERVICE_SET_CALENDAR,
+    SERVICE_UPDATE_TIMETABLE_CELL,
     SIGNAL_UPDATE_GRADES,
 )
 from .storage import SchoolGradesStorage
@@ -78,6 +83,17 @@ SCHEMA_SET_CALENDAR = vol.Schema(
     {
         vol.Optional(CONF_CHILD_NAME): cv.string,
         vol.Optional(CONF_CALENDAR): cv.string,
+    }
+)
+
+SCHEMA_UPDATE_TIMETABLE_CELL = vol.Schema(
+    {
+        vol.Optional(CONF_CHILD_NAME): cv.string,
+        vol.Required(CONF_SLOT_ID): cv.string,
+        vol.Required(CONF_DAY): cv.string,
+        vol.Optional(CONF_SUBJECT, default=""): cv.string,
+        vol.Optional(CONF_ROOM, default=""): cv.string,
+        vol.Optional(CONF_TEACHER, default=""): cv.string,
     }
 )
 
@@ -243,6 +259,25 @@ def _register_services(hass: HomeAssistant) -> None:
                 hass, SIGNAL_UPDATE_GRADES.format(entry_id=storage.entry_id)
             )
 
+    async def handle_update_timetable_cell(call: ServiceCall) -> None:
+        """Handle update_timetable_cell action call."""
+        child_name = call.data.get(CONF_CHILD_NAME)
+        slot_id = call.data[CONF_SLOT_ID]
+        day = call.data[CONF_DAY]
+        subject = call.data.get(CONF_SUBJECT, "")
+        room = call.data.get(CONF_ROOM, "")
+        teacher = call.data.get(CONF_TEACHER, "")
+
+        storage = _get_storage(hass, child_name)
+        if storage:
+            storage.data.update_timetable_cell(
+                slot_id=slot_id, day=day, subject=subject, room=room, teacher=teacher
+            )
+            await storage.async_save()
+            async_dispatcher_send(
+                hass, SIGNAL_UPDATE_GRADES.format(entry_id=storage.entry_id)
+            )
+
     hass.services.async_register(
         DOMAIN, SERVICE_ADD_SUBJECT, handle_add_subject, schema=SCHEMA_ADD_SUBJECT
     )
@@ -258,6 +293,9 @@ def _register_services(hass: HomeAssistant) -> None:
     hass.services.async_register(
         DOMAIN, SERVICE_SET_CALENDAR, handle_set_calendar, schema=SCHEMA_SET_CALENDAR
     )
+    hass.services.async_register(
+        DOMAIN, SERVICE_UPDATE_TIMETABLE_CELL, handle_update_timetable_cell, schema=SCHEMA_UPDATE_TIMETABLE_CELL
+    )
 
 
 def _unregister_services(hass: HomeAssistant) -> None:
@@ -267,3 +305,4 @@ def _unregister_services(hass: HomeAssistant) -> None:
     hass.services.async_remove(DOMAIN, SERVICE_ADD_GRADE)
     hass.services.async_remove(DOMAIN, SERVICE_REMOVE_GRADE)
     hass.services.async_remove(DOMAIN, SERVICE_SET_CALENDAR)
+    hass.services.async_remove(DOMAIN, SERVICE_UPDATE_TIMETABLE_CELL)

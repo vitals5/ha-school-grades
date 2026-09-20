@@ -13,6 +13,17 @@ _LOGGER = logging.getLogger(__name__)
 STORAGE_VERSION = 1
 STORAGE_KEY = "school_grades.{entry_id}"
 
+DEFAULT_TIMETABLE_SLOTS = [
+    {"id": "s1", "type": "lesson", "number": 1, "start": "08:00", "end": "08:45"},
+    {"id": "s2", "type": "lesson", "number": 2, "start": "08:45", "end": "09:30"},
+    {"id": "b1", "type": "break", "label": "1. Pause", "start": "09:30", "end": "09:50"},
+    {"id": "s3", "type": "lesson", "number": 3, "start": "09:50", "end": "10:35"},
+    {"id": "s4", "type": "lesson", "number": 4, "start": "10:35", "end": "11:20"},
+    {"id": "b2", "type": "break", "label": "2. Pause", "start": "11:20", "end": "11:40"},
+    {"id": "s5", "type": "lesson", "number": 5, "start": "11:40", "end": "12:25"},
+    {"id": "s6", "type": "lesson", "number": 6, "start": "12:25", "end": "13:10"},
+]
+
 
 class SchoolGradesData:
     """Class to manage school grades data structure and weighted calculations."""
@@ -26,11 +37,19 @@ class SchoolGradesData:
             self._grades: dict[str, list[dict[str, Any]]] = {
                 subj: [] for subj in self._subjects
             }
+            self.timetable: dict[str, Any] = {
+                "slots": list(DEFAULT_TIMETABLE_SLOTS),
+                "schedule": {},
+            }
         else:
             self.child_name = data.get("child_name", child_name)
             self.calendar_entity = data.get("calendar_entity")
             self._subjects = data.get("subjects", list(DEFAULT_SUBJECTS))
             self._grades = data.get("grades", {})
+            self.timetable = data.get(
+                "timetable",
+                {"slots": list(DEFAULT_TIMETABLE_SLOTS), "schedule": {}},
+            )
             # Ensure all subjects have an entry in grades dict
             for subj in self._subjects:
                 if subj not in self._grades:
@@ -43,6 +62,7 @@ class SchoolGradesData:
             "calendar_entity": self.calendar_entity,
             "subjects": self._subjects,
             "grades": self._grades,
+            "timetable": self.timetable,
         }
 
     def set_calendar_entity(self, calendar_entity: str | None) -> None:
@@ -52,6 +72,30 @@ class SchoolGradesData:
             self.calendar_entity = clean_cal if clean_cal else None
         else:
             self.calendar_entity = None
+
+    def update_timetable(self, timetable_data: dict[str, Any]) -> None:
+        """Update timetable slots and schedule data."""
+        if isinstance(timetable_data, dict):
+            self.timetable = timetable_data
+
+    def update_timetable_cell(
+        self, slot_id: str, day: str, subject: str, room: str = "", teacher: str = ""
+    ) -> None:
+        """Update or clear a single cell in the timetable matrix."""
+        if "schedule" not in self.timetable or not isinstance(self.timetable["schedule"], dict):
+            self.timetable["schedule"] = {}
+        if slot_id not in self.timetable["schedule"]:
+            self.timetable["schedule"][slot_id] = {}
+
+        clean_subj = subject.strip()
+        if not clean_subj:
+            self.timetable["schedule"][slot_id].pop(day, None)
+        else:
+            self.timetable["schedule"][slot_id][day] = {
+                "subject": clean_subj,
+                "room": room.strip(),
+                "teacher": teacher.strip(),
+            }
 
     @property
     def subjects(self) -> list[str]:
