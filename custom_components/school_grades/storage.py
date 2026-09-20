@@ -105,8 +105,9 @@ class SchoolGradesData:
         return len(self._grades[clean_subj]) < initial_len
 
     def get_grades(self, subject: str) -> list[dict[str, Any]]:
-        """Get grade history for a subject."""
-        return self._grades.get(subject.strip(), [])
+        """Get grade history for a subject as a fresh copy to trigger HA state change detection."""
+        grades = self._grades.get(subject.strip(), [])
+        return [dict(g) for g in grades]
 
     def calculate_subject_average(self, subject: str) -> float | None:
         """Calculate weighted arithmetic mean for a single subject.
