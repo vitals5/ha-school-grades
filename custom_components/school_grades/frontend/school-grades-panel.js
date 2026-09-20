@@ -605,26 +605,6 @@ class SchoolGradesPanel extends HTMLElement {
         };
       }
 
-      if (attrs.country) {
-        children[kindName].country = String(attrs.country).toUpperCase();
-      }
-
-      if (attrs.section_visibility && typeof attrs.section_visibility === 'object') {
-        children[kindName].sectionVisibility = {
-          show_prep_card: attrs.section_visibility.show_prep_card ?? children[kindName].sectionVisibility.show_prep_card,
-          show_calendar_card: attrs.section_visibility.show_calendar_card ?? children[kindName].sectionVisibility.show_calendar_card,
-          show_timetable_card: attrs.section_visibility.show_timetable_card ?? children[kindName].sectionVisibility.show_timetable_card,
-          show_overview_card: attrs.section_visibility.show_overview_card ?? children[kindName].sectionVisibility.show_overview_card,
-        };
-      }
-
-      if (this._localSectionVisibility && this._localSectionVisibility[kindName]) {
-        children[kindName].sectionVisibility = {
-          ...children[kindName].sectionVisibility,
-          ...this._localSectionVisibility[kindName],
-        };
-      }
-
       if (attrs.subject_name) {
         children[kindName].subjects[attrs.subject_name] = {
           entityId: entityId,
@@ -635,6 +615,9 @@ class SchoolGradesPanel extends HTMLElement {
         };
       } else if (attrs.subjects_summary) {
         children[kindName].totalAverage = stateObj.state;
+        if (attrs.country) {
+          children[kindName].country = String(attrs.country).toUpperCase();
+        }
         if (attrs.calendar_entity) {
           children[kindName].calendarEntity = attrs.calendar_entity;
         }
@@ -644,6 +627,21 @@ class SchoolGradesPanel extends HTMLElement {
         if (attrs.upcoming_events) {
           children[kindName].upcomingEvents = attrs.upcoming_events;
         }
+        if (attrs.section_visibility && typeof attrs.section_visibility === 'object') {
+          children[kindName].sectionVisibility = {
+            show_prep_card: attrs.section_visibility.show_prep_card ?? true,
+            show_calendar_card: attrs.section_visibility.show_calendar_card ?? true,
+            show_timetable_card: attrs.section_visibility.show_timetable_card ?? true,
+            show_overview_card: attrs.section_visibility.show_overview_card ?? true,
+          };
+        }
+      }
+
+      if (this._localSectionVisibility && this._localSectionVisibility[kindName]) {
+        children[kindName].sectionVisibility = {
+          ...children[kindName].sectionVisibility,
+          ...this._localSectionVisibility[kindName],
+        };
       }
     }
 
