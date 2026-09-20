@@ -127,36 +127,83 @@ class SchoolGradesPanel extends HTMLElement {
 
     for (const [childName, childData] of Object.entries(data)) {
       const calEntity = childData.calendarEntity;
-      if (!calEntity || !this._hass.states[calEntity]) {
+      if (!calEntity || !this._hass || !this._hass.states[calEntity]) {
         this._calendarEvents[childName] = [];
         continue;
       }
 
+      let rawEvents = [];
       try {
-        const events = await this._hass.callWS({
-          type: 'calendar/event/list',
-          entity_id: calEntity,
-          start_time: startIso,
-          end_time: endIso,
-        });
-
-        this._calendarEvents[childName] = events || [];
-        this.render();
-      } catch (err) {
-        const stateObj = this._hass.states[calEntity];
-        if (stateObj && stateObj.attributes.start_time) {
-          this._calendarEvents[childName] = [{
-            summary: stateObj.attributes.message || stateObj.state,
-            start: stateObj.attributes.start_time,
-            end: stateObj.attributes.end_time,
-            description: stateObj.attributes.description || '',
-            location: stateObj.attributes.location || '',
-          }];
-        } else {
-          this._calendarEvents[childName] = [];
+        // Try HA REST API for calendars first (fetches all upcoming events in date range)
+        rawEvents = await this._hass.callApi(
+          'GET',
+          `calendars/${calEntity}?start=${encodeURIComponent(startIso)}&end=${encodeURIComponent(endIso)}`
+        );
+      } catch (err1) {
+        try {
+          // WS fallback 1
+          const res = await this._hass.callWS({
+            type: 'calendar/event/list',
+            entity_id: calEntity,
+            start_date_time: startIso,
+            end_date_time: endIso,
+          });
+          rawEvents = res ? (res.events || res) : [];
+        } catch (err2) {
+          try {
+            // WS fallback 2
+            const res = await this._hass.callWS({
+              type: 'calendar/event/list',
+              entity_id: calEntity,
+              start_time: startIso,
+              end_time: endIso,
+            });
+            rawEvents = res ? (res.events || res) : [];
+          } catch (err3) {
+            console.warn('SchoolGrades: Could not fetch calendar events via API or WS', err3);
+            rawEvents = [];
+          }
         }
       }
+
+      if (!Array.isArray(rawEvents)) {
+        if (rawEvents && Array.isArray(rawEvents.events)) {
+          rawEvents = rawEvents.events;
+        } else {
+          rawEvents = [];
+        }
+      }
+
+      // Format & normalize all events
+      const parsedEvents = rawEvents.map(evt => {
+        let startVal = evt.start;
+        if (startVal && typeof startVal === 'object') {
+          startVal = startVal.dateTime || startVal.date;
+        }
+        if (!startVal) startVal = evt.dtstart;
+
+        let endVal = evt.end;
+        if (endVal && typeof endVal === 'object') {
+          endVal = endVal.dateTime || endVal.date;
+        }
+        if (!endVal) endVal = evt.dtend;
+
+        return {
+          summary: evt.summary || evt.title || evt.message || 'Termin',
+          start: startVal,
+          end: endVal,
+          description: evt.description || '',
+          location: evt.location || '',
+        };
+      }).filter(evt => evt.start);
+
+      // Sort chronologically by start date
+      parsedEvents.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+
+      this._calendarEvents[childName] = parsedEvents;
     }
+
+    this.render();
   }
 
   _isNowInSlot(slotStart, slotEnd, dayKey) {
@@ -296,7 +343,7 @@ class SchoolGradesPanel extends HTMLElement {
           <div class="events-list">
             ${!currentChild || !currentChild.calendarEntity ? `
               <div class="empty-events">
-                💡 Wähle oben einen Schul-Kalender (z. B. Google Kalender, Local HA Calendar, CalDAV), um anstehende Klausuren und Termine anzuzeigen.
+                💡 Wähle oben einen Schul-Kalender (z. B. Google Kalender, Local HA Calendar, CalDAV), um anstehende Klausuren und Termine einzublenden.
               </div>
             ` : upcomingEvents.length === 0 ? `
               <div class="empty-events">
@@ -305,15 +352,16 @@ class SchoolGradesPanel extends HTMLElement {
             ` : `
               <div class="events-grid">
                 ${upcomingEvents.map(evt => {
-                  const startDate = new Date(evt.start || evt.dtstart);
+                  const startDate = new Date(evt.start);
                   const formattedDate = startDate.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
                   const formattedTime = startDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+                  const isAllDay = (typeof evt.start === 'string' && evt.start.length === 10) || formattedTime === '00:00';
                   const countdownText = this._getCountdownBadge(startDate);
                   return `
                     <div class="event-item">
                       <div class="event-badge-row">
                         <span class="event-countdown ${countdownText.cls}">${countdownText.text}</span>
-                        <span class="event-time">${formattedDate} ${formattedTime !== '00:00' ? 'um ' + formattedTime + ' Uhr' : ''}</span>
+                        <span class="event-time">${formattedDate} ${!isAllDay ? 'um ' + formattedTime + ' Uhr' : '(Ganztägig)'}</span>
                       </div>
                       <h4 class="event-title">${evt.summary}</h4>
                       ${evt.location ? `<div class="event-detail">📍 ${evt.location}</div>` : ''}
