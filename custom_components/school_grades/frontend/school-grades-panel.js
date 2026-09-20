@@ -91,9 +91,11 @@ class SchoolGradesPanel extends HTMLElement {
   async _fetchUpcomingCalendarEvents() {
     const data = this._getSchoolGradesData();
     const now = new Date();
+    now.setHours(0, 0, 0, 0);
     const startIso = now.toISOString();
-    const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-    const endIso = in30Days.toISOString();
+    // Query all available events for the next 365 days (full school year)
+    const in1Year = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+    const endIso = in1Year.toISOString();
 
     for (const [childName, childData] of Object.entries(data)) {
       const calEntity = childData.calendarEntity;
@@ -190,16 +192,12 @@ class SchoolGradesPanel extends HTMLElement {
             <span class="stat-label">Gesamte Noten</span>
             <span class="stat-value">${Object.values(subjects).reduce((acc, s) => acc + s.grades.length, 0)}</span>
           </div>
-          <div class="stat-card">
-            <span class="stat-label">Anstehende Klausuren</span>
-            <span class="stat-value">${upcomingEvents.length}</span>
-          </div>
         </div>
 
         <!-- Upcoming Calendar Events Card -->
         <div class="card calendar-card" style="margin-bottom: 24px;">
           <div class="calendar-header">
-            <h3>📅 Anstehende Klausuren & Termine</h3>
+            <h3>📅 Anstehende Klausuren & Termine (${upcomingEvents.length})</h3>
             <div class="calendar-select-group">
               <label>Kalender für ${this._selectedChild}:</label>
               <select id="calendar-select">
@@ -220,7 +218,7 @@ class SchoolGradesPanel extends HTMLElement {
               </div>
             ` : upcomingEvents.length === 0 ? `
               <div class="empty-events">
-                🎉 Keine anstehenden Klausuren in den nächsten 30 Tagen eingetragen!
+                🎉 Keine anstehenden Klausuren oder Termine im Kalender eingetragen!
               </div>
             ` : `
               <div class="events-grid">
@@ -603,7 +601,7 @@ class SchoolGradesPanel extends HTMLElement {
 
       .summary-banner {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
         gap: 16px;
         margin-bottom: 24px;
       }
