@@ -218,6 +218,71 @@ class SchoolGradesPanel extends HTMLElement {
     this.render();
   }
 
+  _getNextSchoolDayInfo(timetable, calendarEvents) {
+    const now = new Date();
+    const currentDay = now.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+
+    let daysToAdd = 1;
+    let targetDayKey = '';
+    let targetDayName = '';
+
+    if (currentDay === 5) { // Friday -> prepare for Monday
+      daysToAdd = 3;
+      targetDayKey = 'monday';
+      targetDayName = 'Montag';
+    } else if (currentDay === 6) { // Saturday -> prepare for Monday
+      daysToAdd = 2;
+      targetDayKey = 'monday';
+      targetDayName = 'Montag';
+    } else if (currentDay === 0) { // Sunday -> prepare for Monday
+      daysToAdd = 1;
+      targetDayKey = 'monday';
+      targetDayName = 'Montag';
+    } else {
+      const dayKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      const dayNames = { monday: 'Montag', tuesday: 'Dienstag', wednesday: 'Mittwoch', thursday: 'Donnerstag', friday: 'Freitag' };
+      targetDayKey = dayKeys[currentDay + 1];
+      targetDayName = dayNames[targetDayKey] || 'Morgen';
+      daysToAdd = 1;
+    }
+
+    const targetDate = new Date(now.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
+    const dateFormatted = targetDate.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit' });
+
+    const slots = (timetable && timetable.slots) || [];
+    const schedule = (timetable && timetable.schedule) || {};
+
+    const lessons = [];
+    for (const slot of slots) {
+      if (slot.type === 'break') continue;
+      const cell = schedule[slot.id] && schedule[slot.id][targetDayKey];
+      if (cell && cell.subject) {
+        lessons.push({
+          slotLabel: slot.label,
+          slotTime: `${slot.start} - ${slot.end}`,
+          subject: cell.subject,
+          room: cell.room || '',
+          teacher: cell.teacher || '',
+        });
+      }
+    }
+
+    const targetDateIso = targetDate.toISOString().split('T')[0];
+    const matchingExams = (calendarEvents || []).filter(evt => {
+      if (!evt.start) return false;
+      const evtDateIso = new Date(evt.start).toISOString().split('T')[0];
+      return evtDateIso === targetDateIso;
+    });
+
+    return {
+      dayKey: targetDayKey,
+      dayName: targetDayName,
+      dateFormatted: dateFormatted,
+      lessons: lessons,
+      exams: matchingExams,
+      isWeekend: currentDay === 5 || currentDay === 6 || currentDay === 0,
+    };
+  }
 
   _isNowInSlot(slotStart, slotEnd, dayKey) {
     if (!slotStart || !slotEnd) return false;
@@ -335,6 +400,67 @@ class SchoolGradesPanel extends HTMLElement {
             <span class="stat-value">${Object.values(subjects).reduce((acc, s) => acc + s.grades.length, 0)}</span>
           </div>
         </div>
+
+        <!-- Preparation Card for Next School Day -->
+        ${(() => {
+          const nextDay = this._getNextSchoolDayInfo(timetable, upcomingEvents);
+          return `
+            <div class="card prep-card" style="margin-bottom: 24px;">
+              <div class="prep-header">
+                <div class="prep-title-group">
+                  <h3>🎒 Vorbereitung für den nächsten Schultag</h3>
+                  <span class="prep-subtitle">${nextDay.dateFormatted}</span>
+                </div>
+                <span class="prep-badge ${nextDay.isWeekend ? 'weekend' : 'weekday'}">
+                  ${nextDay.isWeekend ? '📅 Wochenend-Vorbereitung' : '⏰ Morgen auf dem Stundenplan'}
+                </span>
+              </div>
+
+              ${nextDay.exams.length > 0 ? `
+                <div class="prep-exam-alert">
+                  <span class="exam-alert-icon">⚠️</span>
+                  <div class="exam-alert-content">
+                    <strong>Achtung! Prüfungen / Klausuren an diesem Tag:</strong>
+                    <div class="exam-alert-list">
+                      ${nextDay.exams.map(e => `• <b>${e.summary}</b> ${e.location ? ' (📍 ' + e.location + ')' : ''}`).join(' ')}
+                    </div>
+                  </div>
+                </div>
+              ` : ''}
+
+              <div class="prep-body">
+                ${nextDay.lessons.length === 0 ? `
+                  <div class="empty-events">
+                    🎉 Am ${nextDay.dayName} stehen laut Stundenplan keine Unterrichtsfächer an!
+                  </div>
+                ` : `
+                  <div class="prep-grid">
+                    ${nextDay.lessons.map(l => {
+                      const isExamSubject = nextDay.exams.some(e =>
+                        e.summary.toLowerCase().includes(l.subject.toLowerCase()) ||
+                        l.subject.toLowerCase().includes(e.summary.toLowerCase())
+                      );
+                      return `
+                        <div class="prep-item ${isExamSubject ? 'has-exam' : ''}">
+                          <div class="prep-item-top">
+                            <span class="prep-slot-badge">${l.slotLabel}</span>
+                            <span class="prep-slot-time">${l.slotTime}</span>
+                          </div>
+                          <div class="prep-subject-name">${l.subject}</div>
+                          <div class="prep-meta">
+                            ${l.room ? `<span class="prep-meta-tag">📍 ${l.room}</span>` : ''}
+                            ${l.teacher ? `<span class="prep-meta-tag">👨‍🏫 ${l.teacher}</span>` : ''}
+                          </div>
+                          ${isExamSubject ? `<div class="prep-exam-badge">⚠️ KLAUSUR / TEST</div>` : ''}
+                        </div>
+                      `;
+                    }).join('')}
+                  </div>
+                `}
+              </div>
+            </div>
+          `;
+        })()}
 
         <!-- Upcoming Calendar Events Card -->
         <div class="card calendar-card" style="margin-bottom: 24px;">
@@ -1088,6 +1214,163 @@ class SchoolGradesPanel extends HTMLElement {
         font-weight: 800;
         margin-top: 4px;
         color: var(--primary-text-color, #ffffff);
+      }
+
+      /* Preparation Card Styles */
+      .prep-card {
+        background: linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(124, 58, 237, 0.08));
+        border: 1px solid rgba(99, 102, 241, 0.25);
+      }
+
+      .prep-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        margin-bottom: 16px;
+      }
+
+      .prep-title-group h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 700;
+        background: linear-gradient(135deg, #60a5fa, #a78bfa);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .prep-subtitle {
+        font-size: 13px;
+        color: var(--secondary-text-color, #9ca3af);
+        display: block;
+        margin-top: 2px;
+      }
+
+      .prep-badge {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 8px;
+        text-transform: uppercase;
+      }
+
+      .prep-badge.weekday {
+        background: rgba(59, 130, 246, 0.2);
+        color: #60a5fa;
+        border: 1px solid rgba(59, 130, 246, 0.3);
+      }
+
+      .prep-badge.weekend {
+        background: rgba(139, 92, 246, 0.2);
+        color: #c084fc;
+        border: 1px solid rgba(139, 92, 246, 0.3);
+      }
+
+      .prep-exam-alert {
+        background: rgba(239, 68, 68, 0.15);
+        border: 1px solid rgba(239, 68, 68, 0.35);
+        border-radius: 12px;
+        padding: 12px 16px;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .exam-alert-icon {
+        font-size: 22px;
+      }
+
+      .exam-alert-content {
+        font-size: 13px;
+        color: #fca5a5;
+      }
+
+      .exam-alert-list {
+        margin-top: 4px;
+        font-size: 14px;
+        color: #ffffff;
+      }
+
+      .prep-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 12px;
+      }
+
+      .prep-item {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 12px;
+        transition: all 0.2s ease;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+
+      .prep-item:hover {
+        transform: translateY(-2px);
+        background: rgba(59, 130, 246, 0.1);
+        border-color: rgba(59, 130, 246, 0.3);
+      }
+
+      .prep-item.has-exam {
+        background: rgba(239, 68, 68, 0.12) !important;
+        border-color: rgba(239, 68, 68, 0.4) !important;
+      }
+
+      .prep-item-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 6px;
+      }
+
+      .prep-slot-badge {
+        font-size: 11px;
+        font-weight: 700;
+        color: #60a5fa;
+      }
+
+      .prep-slot-time {
+        font-size: 10px;
+        color: var(--secondary-text-color, #9ca3af);
+      }
+
+      .prep-subject-name {
+        font-size: 16px;
+        font-weight: 800;
+        color: #ffffff;
+        margin-bottom: 6px;
+      }
+
+      .prep-meta {
+        display: flex;
+        gap: 8px;
+        font-size: 11px;
+        color: var(--secondary-text-color, #9ca3af);
+        flex-wrap: wrap;
+      }
+
+      .prep-meta-tag {
+        background: rgba(255, 255, 255, 0.05);
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+
+      .prep-exam-badge {
+        margin-top: 8px;
+        background: #ef4444;
+        color: white;
+        font-size: 9px;
+        font-weight: 800;
+        padding: 3px 6px;
+        border-radius: 4px;
+        text-align: center;
       }
 
       /* Calendar Section */
