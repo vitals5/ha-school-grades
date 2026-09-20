@@ -943,9 +943,6 @@ class SchoolGradesPanel extends HTMLElement {
                 </button>
               `;
             }).join('')}
-            <button class="settings-tab-btn" id="open-settings-header-btn" title="${this._t('settings_btn')}" style="margin-left: 8px; background: rgba(255,255,255,0.08);">
-              ${this._t('settings_btn')}
-            </button>
           </div>
         </header>
 
@@ -1625,17 +1622,9 @@ class SchoolGradesPanel extends HTMLElement {
     });
 
     // Open Settings Modal
-    const openSettingsBtn1 = root.querySelector('#open-settings-banner-btn');
-    if (openSettingsBtn1) {
-      openSettingsBtn1.addEventListener('click', () => {
-        this._showSettingsModal = true;
-        this._settingsTab = 'general';
-        this.render();
-      });
-    }
-    const openSettingsBtn2 = root.querySelector('#open-settings-header-btn');
-    if (openSettingsBtn2) {
-      openSettingsBtn2.addEventListener('click', () => {
+    const openSettingsBtn = root.querySelector('#open-settings-banner-btn');
+    if (openSettingsBtn) {
+      openSettingsBtn.addEventListener('click', () => {
         this._showSettingsModal = true;
         this._settingsTab = 'general';
         this.render();
