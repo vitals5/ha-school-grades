@@ -1,13 +1,14 @@
 /**
  * Schulnoten Custom Sidebar Panel for Home Assistant
+ * Multi-Language (i18n) Support: German (de) & English (en)
  */
 
 const DAYS = [
-  { key: 'monday', label: 'Montag', short: 'Mo' },
-  { key: 'tuesday', label: 'Dienstag', short: 'Di' },
-  { key: 'wednesday', label: 'Mittwoch', short: 'Mi' },
-  { key: 'thursday', label: 'Donnerstag', short: 'Do' },
-  { key: 'friday', label: 'Freitag', short: 'Fr' },
+  { key: 'monday', short: 'Mo' },
+  { key: 'tuesday', short: 'Di' },
+  { key: 'wednesday', short: 'Mi' },
+  { key: 'thursday', short: 'Do' },
+  { key: 'friday', short: 'Fr' },
 ];
 
 const DEFAULT_TIMETABLE = {
@@ -22,6 +23,211 @@ const DEFAULT_TIMETABLE = {
     { id: 'slot_6', type: 'lesson', number: '6', label: '6. Stunde', start: '12:15', end: '13:00' },
   ],
   schedule: {},
+};
+
+const I18N = {
+  de: {
+    panel_title: "🎓 Schulnoten & Stundenplan",
+    panel_subtitle: "Notenübersicht, Klausurenkalender & Stundenplan für deine Kinder",
+    no_children_title: "🎓 Schulnoten & Stundenplan Verwaltung",
+    no_children_text1: "Es wurden noch keine Kinder-Instanzen in Home Assistant konfiguriert.",
+    no_children_text2: "Bitte gehe zu Einstellungen ➔ Geräte & Dienste ➔ Integration hinzufügen ➔ Schulnoten.",
+    total_avg: "Gesamtdurchschnitt",
+    subjects_count: "Fächer",
+    total_grades: "Gesamte Noten",
+    
+    // Prep card
+    prep_title: "🎒 Vorbereitung für den nächsten Schultag",
+    prep_badge_weekday: "⏰ Morgen auf dem Stundenplan",
+    prep_badge_weekend: "📅 Wochenend-Vorbereitung",
+    prep_exam_alert: "Achtung! Prüfungen / Klausuren an diesem Tag:",
+    prep_empty: "Am {day} stehen laut Stundenplan keine Unterrichtsfächer an!",
+    exam_badge: "⚠️ KLAUSUR / TEST",
+    
+    // Calendar card
+    calendar_title: "📅 Anstehende Klausuren & Termine ({count})",
+    calendar_select_label: "Kalender für {child}:",
+    no_calendar_assigned: "-- Kein Kalender zugewiesen --",
+    calendar_hint: "💡 Wähle oben einen Schul-Kalender (z. B. Google Kalender, Local HA Calendar, CalDAV), um anstehende Klausuren und Termine einzublenden.",
+    no_events: "🎉 Keine anstehenden Klausuren oder Termine im Kalender eingetragen!",
+    time_at: "um {time} Uhr",
+    all_day: "(Ganztägig)",
+    countdown_past: "Vergangen",
+    countdown_today: "⚡ HEUTE",
+    countdown_tomorrow: "⚠️ Morgen",
+    countdown_days: "In {days} Tagen",
+    
+    // Timetable card
+    timetable_title: "📅 Wochenstundenplan",
+    timetable_subtitle: "Klicke auf eine Zelle zum Bearbeiten oder nutze den YAML Import/Export",
+    yaml_button: "📋 YAML Import / Export",
+    legend_now: "⚡ JETZT",
+    legend_today: "Heute",
+    time_hour_col: "Zeit / Stunde",
+    break_label: "Pause",
+    today_badge: "HEUTE",
+    now_badge: "⚡ JETZT",
+    
+    // Add grade form
+    add_grade_title: "➕ Neue Note eintragen",
+    subject_label: "Schulfach",
+    grade_label: "Note (1.0 bis 6.0)",
+    weight_label: "Gewichtung",
+    weight_times: "{weight}-fach",
+    grade_name_label: "Bezeichnung (z. B. 1. Schulaufgabe)",
+    grade_name_placeholder: "z. B. Schulaufgabe, Ex, Mündlich",
+    date_label: "Datum",
+    submit_add_grade: "➕ Note eintragen",
+    
+    // Manage subjects form
+    manage_subjects_title: "📘 Schulfächer verwalten",
+    new_subject_label: "Neues Schulfach hinzufügen",
+    new_subject_placeholder: "z. B. Physik, Kunst, Musik",
+    submit_add_subject: "➕ Fach anlegen",
+    delete_subject_label: "Bestehendes Fach löschen",
+    delete_btn: "🗑️ Löschen",
+    delete_subject_confirm: "Möchtest du das Fach \"{subject}\" wirklich inklusive aller Noten löschen?",
+    
+    // Subjects overview
+    overview_title: "📘 Fächer & Notenübersicht",
+    avg_label: "Schnitt",
+    grades_tag: "{count} Noten",
+    no_grades_yet: "Noch keine Noten eingetragen",
+    table_grade: "Note",
+    table_weight: "Gewichtung",
+    table_date: "Datum",
+    table_name: "Bezeichnung",
+    table_action: "Aktion",
+    delete_grade_confirm: "Möchtest du diese Note wirklich löschen?",
+    
+    // Modals
+    modal_cell_title: "✏️ Stundenplan bearbeiten",
+    no_subject_free: "-- Kein Fach (Freistunde) --",
+    custom_subject_opt: "➕ Neues / Anderes Fach eingeben...",
+    custom_subject_placeholder: "Eigenes Fach eingeben",
+    room_label: "Raum (optional)",
+    room_placeholder: "z. B. R102",
+    teacher_label: "Lehrkraft (optional)",
+    teacher_placeholder: "z. B. Fr. Schmidt",
+    cancel_btn: "Abbrechen",
+    save_btn: "💾 Speichern",
+    
+    yaml_modal_title: "📋 Stundenplan YAML Import / Export",
+    yaml_modal_subtitle: "Füge hier deinen Stundenplan im YAML-Format ein oder kopiere die aktuelle Konfiguration",
+    yaml_textarea_label: "Stundenplan YAML-Konfiguration ({child})",
+    copy_btn: "📋 Kopieren",
+    copied_btn: "✅ Kopiert!",
+    import_btn: "📥 YAML Importieren",
+
+    days: {
+      monday: "Montag",
+      tuesday: "Dienstag",
+      wednesday: "Mittwoch",
+      thursday: "Donnerstag",
+      friday: "Freitag"
+    }
+  },
+  en: {
+    panel_title: "🎓 School Grades & Timetable",
+    panel_subtitle: "Grade overview, exam calendar & timetable for your children",
+    no_children_title: "🎓 School Grades & Timetable Management",
+    no_children_text1: "No child instances have been configured in Home Assistant yet.",
+    no_children_text2: "Please go to Settings ➔ Devices & Services ➔ Add Integration ➔ Schulnoten.",
+    total_avg: "Overall Average",
+    subjects_count: "Subjects",
+    total_grades: "Total Grades",
+    
+    // Prep card
+    prep_title: "🎒 Preparation for the Next School Day",
+    prep_badge_weekday: "⏰ Tomorrow's Schedule",
+    prep_badge_weekend: "📅 Weekend Preparation",
+    prep_exam_alert: "Warning! Upcoming exams on this day:",
+    prep_empty: "No subjects scheduled for {day} according to the timetable!",
+    exam_badge: "⚠️ EXAM / TEST",
+    
+    // Calendar card
+    calendar_title: "📅 Upcoming Exams & Events ({count})",
+    calendar_select_label: "Calendar for {child}:",
+    no_calendar_assigned: "-- No calendar assigned --",
+    calendar_hint: "💡 Select a school calendar above (e.g., Google Calendar, Local HA Calendar, CalDAV) to display upcoming exams and events.",
+    no_events: "🎉 No upcoming exams or events recorded in the calendar!",
+    time_at: "at {time}",
+    all_day: "(All day)",
+    countdown_past: "Past",
+    countdown_today: "⚡ TODAY",
+    countdown_tomorrow: "⚠️ Tomorrow",
+    countdown_days: "In {days} days",
+    
+    // Timetable card
+    timetable_title: "📅 Weekly Timetable",
+    timetable_subtitle: "Click a cell to edit or use YAML Import/Export",
+    yaml_button: "📋 YAML Import / Export",
+    legend_now: "⚡ NOW",
+    legend_today: "Today",
+    time_hour_col: "Time / Slot",
+    break_label: "Break",
+    today_badge: "TODAY",
+    now_badge: "⚡ NOW",
+    
+    // Add grade form
+    add_grade_title: "➕ Record New Grade",
+    subject_label: "Subject",
+    grade_label: "Grade (1.0 to 6.0)",
+    weight_label: "Weight",
+    weight_times: "{weight}x",
+    grade_name_label: "Label (e.g. 1st Exam)",
+    grade_name_placeholder: "e.g. Exam, Quiz, Oral",
+    date_label: "Date",
+    submit_add_grade: "➕ Record Grade",
+    
+    // Manage subjects form
+    manage_subjects_title: "📘 Manage Subjects",
+    new_subject_label: "Add New Subject",
+    new_subject_placeholder: "e.g. Physics, Art, Music",
+    submit_add_subject: "➕ Create Subject",
+    delete_subject_label: "Delete Existing Subject",
+    delete_btn: "🗑️ Delete",
+    delete_subject_confirm: "Are you sure you want to delete the subject \"{subject}\" and all associated grades?",
+    
+    // Subjects overview
+    overview_title: "📘 Subjects & Grades Overview",
+    avg_label: "Avg",
+    grades_tag: "{count} grades",
+    no_grades_yet: "No grades recorded yet",
+    table_grade: "Grade",
+    table_weight: "Weight",
+    table_date: "Date",
+    table_name: "Description",
+    table_action: "Action",
+    delete_grade_confirm: "Are you sure you want to delete this grade?",
+    
+    // Modals
+    modal_cell_title: "✏️ Edit Timetable Cell",
+    no_subject_free: "-- No subject (Free period) --",
+    custom_subject_opt: "➕ Enter custom subject...",
+    custom_subject_placeholder: "Enter custom subject",
+    room_label: "Room (optional)",
+    room_placeholder: "e.g. R102",
+    teacher_label: "Teacher (optional)",
+    teacher_placeholder: "e.g. Mrs. Smith",
+    cancel_btn: "Cancel",
+    save_btn: "💾 Save",
+    
+    yaml_modal_title: "📋 Timetable YAML Import / Export",
+    yaml_modal_subtitle: "Paste your timetable in YAML format here or copy the current configuration",
+    yaml_textarea_label: "Timetable YAML Configuration ({child})",
+    copy_btn: "📋 Copy",
+    copied_btn: "✅ Copied!",
+    import_btn: "📥 Import YAML",
+
+    days: {
+      monday: "Monday",
+      tuesday: "Tuesday",
+      wednesday: "Wednesday",
+      thursday: "Thursday",
+      friday: "Friday"
+    }
+  }
 };
 
 class SchoolGradesPanel extends HTMLElement {
@@ -43,6 +249,24 @@ class SchoolGradesPanel extends HTMLElement {
       this._fetchUpcomingCalendarEvents();
       this.render();
     }
+  }
+
+  _t(key, params = {}) {
+    const lang = (this._hass && (this._hass.language || (this._hass.locale && this._hass.locale.language))) || 'de';
+    const dict = String(lang).toLowerCase().startsWith('en') ? I18N.en : I18N.de;
+
+    let text = dict[key] || I18N.de[key] || key;
+    if (typeof text === 'string') {
+      for (const [pKey, pVal] of Object.entries(params)) {
+        text = text.replace(new RegExp(`\\{${pKey}\\}`, 'g'), pVal);
+      }
+    }
+    return text;
+  }
+
+  _getLocale() {
+    const lang = (this._hass && (this._hass.language || (this._hass.locale && this._hass.locale.language))) || 'de';
+    return String(lang).toLowerCase().startsWith('en') ? 'en-US' : 'de-DE';
   }
 
   _hasGradesDataChanged(oldHass, newHass) {
@@ -224,30 +448,27 @@ class SchoolGradesPanel extends HTMLElement {
 
     let daysToAdd = 1;
     let targetDayKey = '';
-    let targetDayName = '';
 
     if (currentDay === 5) { // Friday -> prepare for Monday
       daysToAdd = 3;
       targetDayKey = 'monday';
-      targetDayName = 'Montag';
     } else if (currentDay === 6) { // Saturday -> prepare for Monday
       daysToAdd = 2;
       targetDayKey = 'monday';
-      targetDayName = 'Montag';
     } else if (currentDay === 0) { // Sunday -> prepare for Monday
       daysToAdd = 1;
       targetDayKey = 'monday';
-      targetDayName = 'Montag';
     } else {
       const dayKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-      const dayNames = { monday: 'Montag', tuesday: 'Dienstag', wednesday: 'Mittwoch', thursday: 'Donnerstag', friday: 'Freitag' };
       targetDayKey = dayKeys[currentDay + 1];
-      targetDayName = dayNames[targetDayKey] || 'Morgen';
       daysToAdd = 1;
     }
 
+    const dayNames = this._t('days');
+    const targetDayName = dayNames[targetDayKey] || 'Morgen';
+
     const targetDate = new Date(now.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
-    const dateFormatted = targetDate.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit' });
+    const dateFormatted = targetDate.toLocaleDateString(this._getLocale(), { weekday: 'long', day: '2-digit', month: '2-digit' });
 
     const slots = (timetable && timetable.slots) || [];
     const schedule = (timetable && timetable.schedule) || {};
@@ -346,9 +567,9 @@ class SchoolGradesPanel extends HTMLElement {
         <style>${this._getStyles()}</style>
         <div class="container">
           <div class="card empty-card">
-            <h2>🎓 Schulnoten & Stundenplan Verwaltung</h2>
-            <p>Es wurden noch keine Kinder-Instanzen in Home Assistant konfiguriert.</p>
-            <p>Bitte gehe zu <b>Einstellungen ➔ Geräte & Dienste ➔ Integration hinzufügen ➔ Schulnoten</b>.</p>
+            <h2>${this._t('no_children_title')}</h2>
+            <p>${this._t('no_children_text1')}</p>
+            <p>${this._t('no_children_text2')}</p>
           </div>
         </div>
       `;
@@ -366,6 +587,7 @@ class SchoolGradesPanel extends HTMLElement {
     const timetable = (currentChild && currentChild.timetable) ? currentChild.timetable : DEFAULT_TIMETABLE;
     const slots = timetable.slots || DEFAULT_TIMETABLE.slots;
     const schedule = timetable.schedule || {};
+    const dayNames = this._t('days');
 
     this.shadowRoot.innerHTML = `
       <style>${this._getStyles()}</style>
@@ -373,8 +595,8 @@ class SchoolGradesPanel extends HTMLElement {
         <!-- Header & Child Selector -->
         <header class="header">
           <div class="title-section">
-            <h1>🎓 Schulnoten & Stundenplan</h1>
-            <p class="subtitle">Notenübersicht, Klausurenkalender & Stundenplan für deine Kinder</p>
+            <h1>${this._t('panel_title')}</h1>
+            <p class="subtitle">${this._t('panel_subtitle')}</p>
           </div>
           <div class="child-tabs">
             ${childNames.map(name => `
@@ -388,15 +610,15 @@ class SchoolGradesPanel extends HTMLElement {
         <!-- Summary Banner -->
         <div class="summary-banner">
           <div class="stat-card primary">
-            <span class="stat-label">Gesamtdurchschnitt</span>
+            <span class="stat-label">${this._t('total_avg')}</span>
             <span class="stat-value">${currentChild && currentChild.totalAverage && !isNaN(currentChild.totalAverage) ? currentChild.totalAverage : '–'}</span>
           </div>
           <div class="stat-card">
-            <span class="stat-label">Fächer</span>
+            <span class="stat-label">${this._t('subjects_count')}</span>
             <span class="stat-value">${subjectList.length}</span>
           </div>
           <div class="stat-card">
-            <span class="stat-label">Gesamte Noten</span>
+            <span class="stat-label">${this._t('total_grades')}</span>
             <span class="stat-value">${Object.values(subjects).reduce((acc, s) => acc + s.grades.length, 0)}</span>
           </div>
         </div>
@@ -408,11 +630,11 @@ class SchoolGradesPanel extends HTMLElement {
             <div class="card prep-card" style="margin-bottom: 24px;">
               <div class="prep-header">
                 <div class="prep-title-group">
-                  <h3>🎒 Vorbereitung für den nächsten Schultag</h3>
+                  <h3>${this._t('prep_title')}</h3>
                   <span class="prep-subtitle">${nextDay.dateFormatted}</span>
                 </div>
                 <span class="prep-badge ${nextDay.isWeekend ? 'weekend' : 'weekday'}">
-                  ${nextDay.isWeekend ? '📅 Wochenend-Vorbereitung' : '⏰ Morgen auf dem Stundenplan'}
+                  ${nextDay.isWeekend ? this._t('prep_badge_weekend') : this._t('prep_badge_weekday')}
                 </span>
               </div>
 
@@ -420,7 +642,7 @@ class SchoolGradesPanel extends HTMLElement {
                 <div class="prep-exam-alert">
                   <span class="exam-alert-icon">⚠️</span>
                   <div class="exam-alert-content">
-                    <strong>Achtung! Prüfungen / Klausuren an diesem Tag:</strong>
+                    <strong>${this._t('prep_exam_alert')}</strong>
                     <div class="exam-alert-list">
                       ${nextDay.exams.map(e => `• <b>${e.summary}</b> ${e.location ? ' (📍 ' + e.location + ')' : ''}`).join(' ')}
                     </div>
@@ -431,7 +653,7 @@ class SchoolGradesPanel extends HTMLElement {
               <div class="prep-body">
                 ${nextDay.lessons.length === 0 ? `
                   <div class="empty-events">
-                    🎉 Am ${nextDay.dayName} stehen laut Stundenplan keine Unterrichtsfächer an!
+                    ${this._t('prep_empty', { day: nextDay.dayName })}
                   </div>
                 ` : `
                   <div class="prep-grid">
@@ -451,7 +673,7 @@ class SchoolGradesPanel extends HTMLElement {
                             ${l.room ? `<span class="prep-meta-tag">📍 ${l.room}</span>` : ''}
                             ${l.teacher ? `<span class="prep-meta-tag">👨‍🏫 ${l.teacher}</span>` : ''}
                           </div>
-                          ${isExamSubject ? `<div class="prep-exam-badge">⚠️ KLAUSUR / TEST</div>` : ''}
+                          ${isExamSubject ? `<div class="prep-exam-badge">${this._t('exam_badge')}</div>` : ''}
                         </div>
                       `;
                     }).join('')}
@@ -465,11 +687,11 @@ class SchoolGradesPanel extends HTMLElement {
         <!-- Upcoming Calendar Events Card -->
         <div class="card calendar-card" style="margin-bottom: 24px;">
           <div class="calendar-header">
-            <h3>📅 Anstehende Klausuren & Termine (${upcomingEvents.length})</h3>
+            <h3>${this._t('calendar_title', { count: upcomingEvents.length })}</h3>
             <div class="calendar-select-group">
-              <label>Kalender für ${this._selectedChild}:</label>
+              <label>${this._t('calendar_select_label', { child: this._selectedChild })}</label>
               <select id="calendar-select">
-                <option value="">-- Kein Kalender zugewiesen --</option>
+                <option value="">${this._t('no_calendar_assigned')}</option>
                 ${availableCalendars.map(c => `
                   <option value="${c.entityId}" ${currentChild && currentChild.calendarEntity === c.entityId ? 'selected' : ''}>
                     📅 ${c.name} (${c.entityId})
@@ -482,25 +704,25 @@ class SchoolGradesPanel extends HTMLElement {
           <div class="events-list">
             ${!currentChild || !currentChild.calendarEntity ? `
               <div class="empty-events">
-                💡 Wähle oben einen Schul-Kalender (z. B. Google Kalender, Local HA Calendar, CalDAV), um anstehende Klausuren und Termine einzublenden.
+                ${this._t('calendar_hint')}
               </div>
             ` : upcomingEvents.length === 0 ? `
               <div class="empty-events">
-                🎉 Keine anstehenden Klausuren oder Termine im Kalender eingetragen!
+                ${this._t('no_events')}
               </div>
             ` : `
               <div class="events-grid">
                 ${upcomingEvents.map(evt => {
                   const startDate = new Date(evt.start);
-                  const formattedDate = startDate.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
-                  const formattedTime = startDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+                  const formattedDate = startDate.toLocaleDateString(this._getLocale(), { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+                  const formattedTime = startDate.toLocaleTimeString(this._getLocale(), { hour: '2-digit', minute: '2-digit' });
                   const isAllDay = (typeof evt.start === 'string' && evt.start.length === 10) || formattedTime === '00:00';
                   const countdownText = this._getCountdownBadge(startDate);
                   return `
                     <div class="event-item">
                       <div class="event-badge-row">
                         <span class="event-countdown ${countdownText.cls}">${countdownText.text}</span>
-                        <span class="event-time">${formattedDate} ${!isAllDay ? 'um ' + formattedTime + ' Uhr' : '(Ganztägig)'}</span>
+                        <span class="event-time">${formattedDate} ${!isAllDay ? this._t('time_at', { time: formattedTime }) : this._t('all_day')}</span>
                       </div>
                       <h4 class="event-title">${evt.summary}</h4>
                       ${evt.location ? `<div class="event-detail">📍 ${evt.location}</div>` : ''}
@@ -517,14 +739,14 @@ class SchoolGradesPanel extends HTMLElement {
         <div class="card timetable-card" style="margin-bottom: 24px;">
           <div class="timetable-header">
             <div class="title-with-badge">
-              <h3>📅 Wochenstundenplan</h3>
-              <span class="timetable-subtitle">Klicke auf eine Zelle zum Bearbeiten oder nutze den YAML Import/Export</span>
+              <h3>${this._t('timetable_title')}</h3>
+              <span class="timetable-subtitle">${this._t('timetable_subtitle')}</span>
             </div>
             <div class="timetable-header-actions">
-              <button class="pill-btn yaml-btn" id="open-yaml-modal-btn">📋 YAML Import / Export</button>
+              <button class="pill-btn yaml-btn" id="open-yaml-modal-btn">${this._t('yaml_button')}</button>
               <div class="timetable-legend">
-                <span class="legend-item"><span class="legend-dot now-dot"></span>⚡ JETZT</span>
-                <span class="legend-item"><span class="legend-dot today-dot"></span>Heute</span>
+                <span class="legend-item"><span class="legend-dot now-dot"></span>${this._t('legend_now')}</span>
+                <span class="legend-item"><span class="legend-dot today-dot"></span>${this._t('legend_today')}</span>
               </div>
             </div>
           </div>
@@ -533,11 +755,11 @@ class SchoolGradesPanel extends HTMLElement {
             <table class="timetable-table">
               <thead>
                 <tr>
-                  <th class="time-col">Zeit / Stunde</th>
+                  <th class="time-col">${this._t('time_hour_col')}</th>
                   ${DAYS.map(d => `
                     <th class="day-col ${this._isToday(d.key) ? 'today-header' : ''}">
-                      ${d.label}
-                      ${this._isToday(d.key) ? '<span class="today-badge">HEUTE</span>' : ''}
+                      ${dayNames[d.key] || d.key}
+                      ${this._isToday(d.key) ? `<span class="today-badge">${this._t('today_badge')}</span>` : ''}
                     </th>
                   `).join('')}
                 </tr>
@@ -551,7 +773,7 @@ class SchoolGradesPanel extends HTMLElement {
                           <span class="break-icon">☕</span> ${slot.label} <span class="slot-time">(${slot.start} - ${slot.end})</span>
                         </td>
                         <td colspan="5" class="break-cell-content">
-                          Pause
+                          ${this._t('break_label')}
                         </td>
                       </tr>
                     `;
@@ -574,11 +796,11 @@ class SchoolGradesPanel extends HTMLElement {
                               data-slot-id="${slot.id}"
                               data-day="${d.key}"
                               data-slot-label="${slot.label} (${slot.start}-${slot.end})"
-                              data-day-label="${d.label}"
+                              data-day-label="${dayNames[d.key] || d.key}"
                               data-subject="${cellData.subject || ''}"
                               data-room="${cellData.room || ''}"
                               data-teacher="${cellData.teacher || ''}">
-                            ${isNow ? '<div class="now-badge">⚡ JETZT</div>' : ''}
+                            ${isNow ? `<div class="now-badge">${this._t('now_badge')}</div>` : ''}
                             ${hasSubject ? `
                               <div class="cell-subject">${cellData.subject}</div>
                               <div class="cell-details">
@@ -605,17 +827,17 @@ class SchoolGradesPanel extends HTMLElement {
         <div class="forms-grid">
           <!-- Add Grade Card -->
           <div class="card form-card">
-            <h3>➕ Neue Note eintragen</h3>
+            <h3>${this._t('add_grade_title')}</h3>
             <form id="add-grade-form">
               <div class="form-group">
-                <label>Schulfach</label>
+                <label>${this._t('subject_label')}</label>
                 <select id="grade-subject" required>
                   ${subjectList.map(s => `<option value="${s}">${s}</option>`).join('')}
                 </select>
               </div>
 
               <div class="form-group">
-                <label>Note (1.0 bis 6.0)</label>
+                <label>${this._t('grade_label')}</label>
                 <div class="quick-pills" id="grade-pills">
                   ${[1.0, 1.3, 1.5, 2.0, 2.3, 2.5, 3.0, 3.3, 3.5, 4.0, 5.0, 6.0].map(val => `
                     <button type="button" class="pill-btn ${val === this._selectedGrade ? 'active' : ''}" data-val="${val}">
@@ -627,11 +849,11 @@ class SchoolGradesPanel extends HTMLElement {
               </div>
 
               <div class="form-group">
-                <label>Gewichtung</label>
+                <label>${this._t('weight_label')}</label>
                 <div class="quick-pills" id="weight-pills">
                   ${[1.0, 2.0, 3.0, 4.0].map(w => `
                     <button type="button" class="pill-btn ${w === this._selectedWeight ? 'active' : ''}" data-weight="${w}">
-                      ${w}-fach
+                      ${this._t('weight_times', { weight: w })}
                     </button>
                   `).join('')}
                 </div>
@@ -639,46 +861,46 @@ class SchoolGradesPanel extends HTMLElement {
 
               <div class="form-row">
                 <div class="form-group half">
-                  <label>Bezeichnung (z. B. 1. Schulaufgabe)</label>
-                  <input type="text" id="grade-name" placeholder="z. B. Schulaufgabe, Ex, Mündlich">
+                  <label>${this._t('grade_name_label')}</label>
+                  <input type="text" id="grade-name" placeholder="${this._t('grade_name_placeholder')}">
                 </div>
                 <div class="form-group half">
-                  <label>Datum</label>
+                  <label>${this._t('date_label')}</label>
                   <input type="date" id="grade-date" value="${new Date().toISOString().split('T')[0]}">
                 </div>
               </div>
 
-              <button type="submit" class="submit-btn">➕ Note eintragen</button>
+              <button type="submit" class="submit-btn">${this._t('submit_add_grade')}</button>
             </form>
           </div>
 
           <!-- Manage Subjects Card -->
           <div class="card form-card">
-            <h3>📘 Schulfächer verwalten</h3>
+            <h3>${this._t('manage_subjects_title')}</h3>
             <form id="add-subject-form">
               <div class="form-group">
-                <label>Neues Schulfach hinzufügen</label>
-                <input type="text" id="new-subject-name" placeholder="z. B. Physik, Kunst, Musik" required>
+                <label>${this._t('new_subject_label')}</label>
+                <input type="text" id="new-subject-name" placeholder="${this._t('new_subject_placeholder')}" required>
               </div>
-              <button type="submit" class="submit-btn secondary">➕ Fach anlegen</button>
+              <button type="submit" class="submit-btn secondary">${this._t('submit_add_subject')}</button>
             </form>
 
             <hr style="margin: 24px 0; border: none; border-top: 1px solid var(--divider-color, rgba(255,255,255,0.1));">
 
             <div class="form-group">
-              <label>Bestehendes Fach löschen</label>
+              <label>${this._t('delete_subject_label')}</label>
               <div class="delete-subject-row">
                 <select id="delete-subject-select">
                   ${subjectList.map(s => `<option value="${s}">${s}</option>`).join('')}
                 </select>
-                <button type="button" id="delete-subject-btn" class="delete-btn">🗑️ Löschen</button>
+                <button type="button" id="delete-subject-btn" class="delete-btn">${this._t('delete_btn')}</button>
               </div>
             </div>
           </div>
         </div>
 
         <!-- Subjects Grid -->
-        <h2 class="section-title">📘 Fächer & Notenübersicht</h2>
+        <h2 class="section-title">${this._t('overview_title')}</h2>
         <div class="subjects-grid">
           ${subjectList.map(subjName => {
             const subj = subjects[subjName];
@@ -688,23 +910,23 @@ class SchoolGradesPanel extends HTMLElement {
                 <div class="subject-header">
                   <div class="subject-title">
                     <h3>${subjName}</h3>
-                    <span class="badge avg-badge ${this._getGradeColorClass(avg)}">Schnitt: ${avg}</span>
+                    <span class="badge avg-badge ${this._getGradeColorClass(avg)}">${this._t('avg_label')}: ${avg}</span>
                   </div>
-                  <span class="count-tag">${subj.grades.length} Noten</span>
+                  <span class="count-tag">${this._t('grades_tag', { count: subj.grades.length })}</span>
                 </div>
 
                 <div class="grades-list">
                   ${subj.grades.length === 0 ? `
-                    <div class="empty-grades">Noch keine Noten eingetragen</div>
+                    <div class="empty-grades">${this._t('no_grades_yet')}</div>
                   ` : `
                     <table class="grades-table">
                       <thead>
                         <tr>
-                          <th>Note</th>
-                          <th>Gewichtung</th>
-                          <th>Datum</th>
-                          <th>Bezeichnung</th>
-                          <th>Aktion</th>
+                          <th>${this._t('table_grade')}</th>
+                          <th>${this._t('table_weight')}</th>
+                          <th>${this._t('table_date')}</th>
+                          <th>${this._t('table_name')}</th>
+                          <th>${this._t('table_action')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -715,11 +937,11 @@ class SchoolGradesPanel extends HTMLElement {
                                 ${parseFloat(g.grade).toFixed(1)}
                               </span>
                             </td>
-                            <td><span class="weight-badge">${g.weight}-fach</span></td>
+                            <td><span class="weight-badge">${this._t('weight_times', { weight: g.weight })}</span></td>
                             <td class="date-cell">${g.date}</td>
                             <td class="name-cell">${g.name || '–'}</td>
                             <td>
-                              <button class="icon-btn delete-grade-btn" data-subject="${subjName}" data-id="${g.id}" title="Note löschen">
+                              <button class="icon-btn delete-grade-btn" data-subject="${subjName}" data-id="${g.id}" title="${this._t('delete_btn')}">
                                 🗑️
                               </button>
                             </td>
@@ -740,42 +962,42 @@ class SchoolGradesPanel extends HTMLElement {
         <div class="modal-backdrop" id="timetable-modal-backdrop">
           <div class="modal-card">
             <div class="modal-header">
-              <h3>✏️ Stundenplan bearbeiten</h3>
+              <h3>${this._t('modal_cell_title')}</h3>
               <span class="modal-subtitle">${this._editingCell.slotLabel} • ${this._editingCell.dayLabel}</span>
             </div>
 
             <form id="timetable-edit-form">
               <div class="form-group">
-                <label>Schulfach</label>
+                <label>${this._t('subject_label')}</label>
                 <select id="modal-subject-select">
-                  <option value="">-- Kein Fach (Freistunde) --</option>
+                  <option value="">${this._t('no_subject_free')}</option>
                   ${subjectList.map(s => `
                     <option value="${s}" ${this._editingCell.subject === s ? 'selected' : ''}>${s}</option>
                   `).join('')}
                   ${this._editingCell.subject && !subjectList.includes(this._editingCell.subject) ? `
                     <option value="${this._editingCell.subject}" selected>${this._editingCell.subject}</option>
                   ` : ''}
-                  <option value="__custom__">➕ Neues / Anderes Fach eingeben...</option>
+                  <option value="__custom__">${this._t('custom_subject_opt')}</option>
                 </select>
-                <input type="text" id="modal-custom-subject" placeholder="Eigenes Fach eingeben" style="display: none; margin-top: 8px;" value="${this._editingCell.subject || ''}">
+                <input type="text" id="modal-custom-subject" placeholder="${this._t('custom_subject_placeholder')}" style="display: none; margin-top: 8px;" value="${this._editingCell.subject || ''}">
               </div>
 
               <div class="form-row">
                 <div class="form-group half">
-                  <label>Raum (optional)</label>
-                  <input type="text" id="modal-room" placeholder="z. B. R102" value="${this._editingCell.room || ''}">
+                  <label>${this._t('room_label')}</label>
+                  <input type="text" id="modal-room" placeholder="${this._t('room_placeholder')}" value="${this._editingCell.room || ''}">
                 </div>
                 <div class="form-group half">
-                  <label>Lehrkraft (optional)</label>
-                  <input type="text" id="modal-teacher" placeholder="z. B. Fr. Schmidt" value="${this._editingCell.teacher || ''}">
+                  <label>${this._t('teacher_label')}</label>
+                  <input type="text" id="modal-teacher" placeholder="${this._t('teacher_placeholder')}" value="${this._editingCell.teacher || ''}">
                 </div>
               </div>
 
               <div class="modal-actions">
-                <button type="button" class="delete-btn" id="modal-delete-btn" ${!this._editingCell.subject ? 'disabled style="opacity:0.4;cursor:not-allowed;"' : ''}>🗑️ Löschen</button>
+                <button type="button" class="delete-btn" id="modal-delete-btn" ${!this._editingCell.subject ? 'disabled style="opacity:0.4;cursor:not-allowed;"' : ''}>${this._t('delete_btn')}</button>
                 <div class="modal-actions-right">
-                  <button type="button" class="submit-btn secondary" id="modal-cancel-btn">Abbrechen</button>
-                  <button type="submit" class="submit-btn">💾 Speichern</button>
+                  <button type="button" class="submit-btn secondary" id="modal-cancel-btn">${this._t('cancel_btn')}</button>
+                  <button type="submit" class="submit-btn">${this._t('save_btn')}</button>
                 </div>
               </div>
             </form>
@@ -788,21 +1010,21 @@ class SchoolGradesPanel extends HTMLElement {
         <div class="modal-backdrop" id="yaml-modal-backdrop">
           <div class="modal-card yaml-modal-card">
             <div class="modal-header">
-              <h3>📋 Stundenplan YAML Import / Export</h3>
-              <span class="modal-subtitle">Füge hier deinen Stundenplan im YAML-Format ein oder kopiere die aktuelle Konfiguration</span>
+              <h3>${this._t('yaml_modal_title')}</h3>
+              <span class="modal-subtitle">${this._t('yaml_modal_subtitle')}</span>
             </div>
 
             <form id="yaml-import-form">
               <div class="form-group">
-                <label>Stundenplan YAML-Konfiguration (${this._selectedChild})</label>
+                <label>${this._t('yaml_textarea_label', { child: this._selectedChild })}</label>
                 <textarea id="yaml-textarea" rows="14" style="font-family: monospace; font-size: 13px; line-height: 1.4; resize: vertical; tab-size: 2;">${this._timetableToYaml(timetable)}</textarea>
               </div>
 
               <div class="modal-actions">
-                <button type="button" class="submit-btn secondary" id="yaml-copy-btn" style="width: auto; padding: 10px 18px;">📋 Kopieren</button>
+                <button type="button" class="submit-btn secondary" id="yaml-copy-btn" style="width: auto; padding: 10px 18px;">${this._t('copy_btn')}</button>
                 <div class="modal-actions-right">
-                  <button type="button" class="submit-btn secondary" id="yaml-cancel-btn">Abbrechen</button>
-                  <button type="submit" class="submit-btn">📥 YAML Importieren</button>
+                  <button type="button" class="submit-btn secondary" id="yaml-cancel-btn">${this._t('cancel_btn')}</button>
+                  <button type="submit" class="submit-btn">${this._t('import_btn')}</button>
                 </div>
               </div>
             </form>
@@ -822,11 +1044,11 @@ class SchoolGradesPanel extends HTMLElement {
 
     const diffDays = Math.round((target - now) / (1000 * 60 * 60 * 24));
 
-    if (diffDays < 0) return { text: 'Vergangen', cls: 'past' };
-    if (diffDays === 0) return { text: '⚡ HEUTE', cls: 'today' };
-    if (diffDays === 1) return { text: '⚠️ Morgen', cls: 'tomorrow' };
-    if (diffDays <= 7) return { text: `In ${diffDays} Tagen`, cls: 'soon' };
-    return { text: `In ${diffDays} Tagen`, cls: 'later' };
+    if (diffDays < 0) return { text: this._t('countdown_past'), cls: 'past' };
+    if (diffDays === 0) return { text: this._t('countdown_today'), cls: 'today' };
+    if (diffDays === 1) return { text: this._t('countdown_tomorrow'), cls: 'tomorrow' };
+    if (diffDays <= 7) return { text: this._t('countdown_days', { days: diffDays }), cls: 'soon' };
+    return { text: this._t('countdown_days', { days: diffDays }), cls: 'later' };
   }
 
   _getGradeColorClass(gradeVal) {
@@ -897,8 +1119,8 @@ class SchoolGradesPanel extends HTMLElement {
           const textarea = root.querySelector('#yaml-textarea');
           if (textarea) {
             navigator.clipboard.writeText(textarea.value);
-            copyYamlBtn.textContent = '✅ Kopiert!';
-            setTimeout(() => { copyYamlBtn.textContent = '📋 Kopieren'; }, 2000);
+            copyYamlBtn.textContent = this._t('copied_btn');
+            setTimeout(() => { copyYamlBtn.textContent = this._t('copy_btn'); }, 2000);
           }
         });
       }
@@ -1079,7 +1301,7 @@ class SchoolGradesPanel extends HTMLElement {
     if (deleteSubjectBtn) {
       deleteSubjectBtn.addEventListener('click', async () => {
         const subject = root.querySelector('#delete-subject-select').value;
-        if (subject && confirm(`Möchtest du das Fach "${subject}" wirklich inklusive aller Noten löschen?`)) {
+        if (subject && confirm(this._t('delete_subject_confirm', { subject: subject }))) {
           await this._hass.callService('school_grades', 'remove_subject', {
             child_name: this._selectedChild,
             subject: subject,
@@ -1095,7 +1317,7 @@ class SchoolGradesPanel extends HTMLElement {
       btn.addEventListener('click', async (e) => {
         const subject = e.currentTarget.dataset.subject;
         const gradeId = e.currentTarget.dataset.id;
-        if (confirm(`Möchtest du diese Note wirklich löschen?`)) {
+        if (confirm(this._t('delete_grade_confirm'))) {
           await this._hass.callService('school_grades', 'remove_grade', {
             child_name: this._selectedChild,
             subject: subject,

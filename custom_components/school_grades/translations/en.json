@@ -15,5 +15,35 @@
     "abort": {
       "already_configured": "Grade management for this child already exists."
     }
+  },
+  "services": {
+    "add_subject": {
+      "name": "Add Subject",
+      "description": "Adds a new school subject to the grade overview."
+    },
+    "remove_subject": {
+      "name": "Remove Subject",
+      "description": "Deletes a school subject and all associated grades."
+    },
+    "add_grade": {
+      "name": "Add Grade",
+      "description": "Records a new grade with selected weight."
+    },
+    "remove_grade": {
+      "name": "Remove Grade",
+      "description": "Deletes an existing grade by its ID."
+    },
+    "set_calendar": {
+      "name": "Assign Calendar",
+      "description": "Links a Home Assistant calendar to a child for upcoming exams."
+    },
+    "update_timetable_cell": {
+      "name": "Update Timetable Cell",
+      "description": "Updates subject, room, and teacher for a specific slot and day."
+    },
+    "import_timetable": {
+      "name": "Import Timetable via YAML",
+      "description": "Imports a complete timetable as YAML text or data structure."
+    }
   }
 }

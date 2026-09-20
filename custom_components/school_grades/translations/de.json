@@ -15,5 +15,35 @@
     "abort": {
       "already_configured": "Die Notenverwaltung für dieses Kind existiert bereits."
     }
+  },
+  "services": {
+    "add_subject": {
+      "name": "Schulfach hinzufügen",
+      "description": "Fügt ein neues Schulfach zur Notenübersicht hinzu."
+    },
+    "remove_subject": {
+      "name": "Schulfach löschen",
+      "description": "Löscht ein Schulfach und alle zugehörigen Noten."
+    },
+    "add_grade": {
+      "name": "Note hinzufügen",
+      "description": "Trägt eine neue Schulnote mit gewählter Gewichtung ein."
+    },
+    "remove_grade": {
+      "name": "Note löschen",
+      "description": "Löscht eine bestehende Note anhand ihrer ID."
+    },
+    "set_calendar": {
+      "name": "Kalender zuweisen",
+      "description": "Verknüpft einen Home Assistant Kalender mit einem Kind für anstehende Klausuren."
+    },
+    "update_timetable_cell": {
+      "name": "Stundenplan-Zelle aktualisieren",
+      "description": "Aktualisiert ein Fach, Raum und Lehrer für einen bestimmten Zeitslot und Tag."
+    },
+    "import_timetable": {
+      "name": "Stundenplan per YAML importieren",
+      "description": "Importiert einen kompletten Stundenplan als YAML-Text oder Datenstruktur."
+    }
   }
 }

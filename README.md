@@ -26,6 +26,9 @@ Mit dem **integrierten Sidebar-Panel** (`/schulnoten`) verwaltest du Noten, Fäc
   - Eintragen von Noten (1.0 bis 6.0) mit frei wählbarer Gewichtung (1-fach, 2-fach, 3-fach, 4-fach).
   - Automatische Errechnung des gewichteten Fachdurchschnitts sowie des Gesamtdurchschnitts.
   - Notenhistorie mit Datum, Bezeichnung (z. B. *1. Schulaufgabe*) und Löschoption.
+- 🌐 **Mehrsprachigkeit (Multi-Language i18n)**:
+  - Vollständige Unterstützung für **Deutsch 🇩🇪** und **Englisch 🇬🇧**.
+  - Die Benutzeroberfläche und Servicetexte passen sich automatisch der gewählten Sprache in den Home Assistant Benutzereinstellungen an.
 
 ---
 
