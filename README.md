@@ -1,20 +1,31 @@
-# Schulnoten (School Grades) - Home Assistant Integration (HACS)
+# 🎓 Schulnoten & Stundenplan - Home Assistant Integration (HACS)
 
-Eine elegante Home Assistant Custom Integration zur einfachen Verwaltung von Schulnoten. Sie unterstützt mehrere Instanzen (für mehrere Kinder), gewichtete Noten (1-fach, 2-fach, 3-fach, 4-fach etc.) und stellt Sensoren mit der Durchschnittsnote pro Fach sowie dem Gesamtdurchschnitt bereit.
+Eine moderne, umfassende Home Assistant Custom Integration zur einfachen Verwaltung von Schulnoten, Klausuren-Kalendern und interaktiven Wochenstundenplänen für deine Kinder.
+
+Mit dem **integrierten Sidebar-Panel** (`/schulnoten`) verwaltest du Noten, Fächer, Klausurtermine und Stundenpläne bequem an einem zentralen Ort – komplett ohne Dashboard-YAML-Cards!
 
 ---
 
 ## 🌟 Features
 
-- 👨‍👩‍👧‍👦 **Mehrere Kinder (Multi-Instance)**: Jede Instanz steht für ein Kind (z. B. Max, Emma).
-- 📱 **Eigene Sidebar-Konfigurationsseite (Seitenleiste)**: Erscheint automatisch als **🎓 Schulnoten** in der linken Home Assistant Menüleiste. Dort können Fächer und Noten mit Schnellauswahl-Buttons, Gewichtungs-Chips und Mülleimer-Icons extrem komfortabel verwaltet werden.
-- 📚 **Fächerverwaltung**: Fächer können dynamisch hinzugefügt oder gelöscht werden (z. B. Mathematik, Deutsch, Englisch, Physik).
-- ⚖️ **Gewichtete Noten**: Unterlaufene Noten können mit Faktoren wie 1-fach, 2-fach, 3-fach, 4-fach gewichtet werden.
-- 📊 **Durchschnittssensoren**:
-  - Pro Fach ein Sensor mit der gewichteten Durchschnittsnote (z.B. `sensor.max_mathematik_durchschnitt`).
-  - Ein Gesamtsensor pro Kind mit dem Gesamtdurchschnitt (z.B. `sensor.max_gesamtdurchschnitt`).
-- 📝 **Detaillierte Historie**: Sämtliche Noten inkl. Datum, Beschreibung (z. B. "1. Schulaufgabe", "Ex 2") und Gewichtung werden in den Sensor-Attributen gespeichert und können im Dashboard angezeigt werden.
-- ⚙️ **Bequemes Eintragen**: Noten können direkt über die **HA Benutzeroberfläche (Zahnrad/Optionen)** oder über **Home Assistant Aktionen/Services** (z. B. per Dashboard-Buttons oder Automatisierung) hinzugefügt und gelöscht werden.
+- 📱 **Zentrales Custom Sidebar-Panel (`🎓 Schulnoten`)**:
+  - Erscheint automatisch in der linken Menüleiste von Home Assistant.
+  - Komplette Verwaltung von Kindern, Noten, Fächern, Kalendern & Stundenplänen direkt in der Benutzeroberfläche.
+- 👨‍👩‍👧‍👦 **Multi-Kind Verwaltung**: Beliebig viele Kinder-Instanzen anlegen (z. B. Richard, Max, Emma) und per Tab-Reiter umschalten.
+- 📅 **Wochenstundenplan (Timetable Matrix)**:
+  - Übersichtlicher Stundenplan von Montag bis Freitag inkl. Unterrichtsstunden & Pausen.
+  - **Tages-Highlighting**: Heutiger Wochentag wird automatisch im Header und in den Spalten hervorgehoben (`HEUTE`).
+  - **Live-Unterrichtsanzeige (`⚡ JETZT`)**: Markiert die aktuell laufende Unterrichtsstunde in Echtzeit.
+  - **Visueller Cell-Editor**: Klick auf eine Zelle zum Bearbeiten von Fach, Raumnummer (📍) und Lehrkraft (👨‍🏫).
+  - **YAML Import & Export**: Stundenpläne bequem im YAML-Format importieren oder exportieren.
+- 📆 **Klausuren- & Termine-Kalender**:
+  - Verknüpfung mit jedem beliebigen Home Assistant Kalender (z. B. Google Kalender, CalDAV, lokaler Kalender).
+  - Übersicht anstehender Klausuren mit Countdown-Badges (`⚡ HEUTE`, `⚠️ Morgen`, `In X Tagen`).
+- 📘 **Fächer- & Notenverwaltung**:
+  - Fächer dynamisch anlegen und löschen.
+  - Eintragen von Noten (1.0 bis 6.0) mit frei wählbarer Gewichtung (1-fach, 2-fach, 3-fach, 4-fach).
+  - Automatische Errechnung des gewichteten Fachdurchschnitts sowie des Gesamtdurchschnitts.
+  - Notenhistorie mit Datum, Bezeichnung (z. B. *1. Schulaufgabe*) und Löschoption.
 
 ---
 
@@ -22,101 +33,35 @@ Eine elegante Home Assistant Custom Integration zur einfachen Verwaltung von Sch
 
 1. Öffne **HACS** in deinem Home Assistant.
 2. Klicke oben rechts auf die **drei Punkte** `⋮` und wähle **Benutzerdefinierte Repositories** (*Custom repositories*).
-3. Gib die URL deines GitHub-Repositories ein: `https://github.com/vitals5/ha-school-grades`.
+3. Gib die URL ein: `https://github.com/vitals5/ha-school-grades`.
 4. Wähle als Kategorie **Integration**.
 5. Klicke auf **Hinzufügen**.
 6. Suche nach **Schulnoten** in HACS, klicke auf **Herunterladen** und starte Home Assistant neu.
 
 ---
 
-## 🛠️ Manuelle Installation
-
-Copy code:
-1. Lade den Ordner `custom_components/school_grades` herunter.
-2. Kopiere den Ordner in das `custom_components` Verzeichnis deiner Home Assistant Installation (`/config/custom_components/school_grades`).
-3. Starte Home Assistant neu.
-
----
-
-## 🚀 Einrichtung in Home Assistant
+## ⚙️ Einrichtung
 
 1. Gehe zu **Einstellungen** ➔ **Geräte & Dienste** ➔ **Integration hinzufügen**.
 2. Suche nach **Schulnoten**.
-3. Gib den **Namen des Kindes** ein (z.B. `Max`).
-4. Klicke auf **Absenden**. Die Integration erstellt automatisch die Basis-Sensoren.
+3. Gib den **Namen des Kindes** ein (z. B. `Richard`).
+4. Nach dem Speichern erscheint in der linken Navigationsleiste automatisch das Icon **🎓 Schulnoten**.
 
 ---
 
 ## ⚡ Home Assistant Aktionen / Services
 
-Die Integration stellt 4 Aktionen (Services) zur Verfügung:
+Die Integration stellt folgende Aktionen (Services) für Automatisierungen oder Skripte zur Verfügung:
 
 | Aktion | Beschreibung | Parameter |
 | :--- | :--- | :--- |
-| `school_grades.add_subject` | Fach hinzufügen | `config_entry_id` / `child_name`, `subject` |
-| `school_grades.remove_subject` | Fach löschen | `config_entry_id` / `child_name`, `subject` |
-| `school_grades.add_grade` | Note hinzufügen | `config_entry_id` / `child_name`, `subject`, `grade`, `weight`, `name`, `date` |
-| `school_grades.remove_grade` | Note löschen | `config_entry_id` / `child_name`, `subject`, `grade_id` |
-
-### Beispiel: Note hinzufügen via Entwicklerwerkzeuge / Action Call
-```yaml
-action: school_grades.add_grade
-data:
-  child_name: "Max"
-  subject: "Mathematik"
-  grade: 2.0
-  weight: 2
-  name: "1. Schulaufgabe"
-  date: "2026-09-15"
-```
-
----
-
-## 🎨 Lovelace Dashboard Beispiele
-
-### 1. Markdown-Karte für eine übersichtliche Notentabelle
-Zeigt alle Fächer, den Schnitt sowie die einzelnen Noten im Detail an:
-
-```yaml
-type: markdown
-title: 🎓 Notenspiegel von Max
-content: >
-  **Gesamtdurchschnitt:** {{ states('sensor.max_gesamtdurchschnitt') }}
-
-  ---
-  {% for entity_id in integration_entities('school_grades') %}
-    {% if entity_id.endswith('_gesamtdurchschnitt') == false %}
-      ### 📘 {{ state_attr(entity_id, 'subject_name') }}: **{{ states(entity_id) }}**
-      | Note | Gewichtung | Datum | Beschreibung |
-      | :---: | :---: | :---: | :--- |
-      {% for g in state_attr(entity_id, 'grades') %}
-      | {{ g.grade }} | {{ g.weight }}-fach | {{ g.date }} | {{ g.name }} |
-      {% else %}
-      *Noch keine Noten eingetragen*
-      {% endfor %}
-
-    {% endif %}
-  {% endfor %}
-```
-
-### 2. Formular-Button zum schnellen Hinzufügen einer Note
-Füge eine Schaltfläche hinzu, um beispielsweise eine Mathematik-Schulaufgabe direkt aus dem Dashboard einzutragen:
-
-```yaml
-type: button
-name: ➕ Schulaufgabe Mathe (Note 2, 2-fach) eintragen
-icon: mdi:plus-circle
-tap_action:
-  action: call-service
-  service: school_grades.add_grade
-  target: {}
-  data:
-    child_name: "Max"
-    subject: "Mathematik"
-    grade: 2.0
-    weight: 2
-    name: "Schulaufgabe"
-```
+| `school_grades.add_grade` | Note hinzufügen | `child_name`, `subject`, `grade`, `weight`, `name`, `date` |
+| `school_grades.remove_grade` | Note löschen | `child_name`, `subject`, `grade_id` |
+| `school_grades.add_subject` | Schulfach anlegen | `child_name`, `subject` |
+| `school_grades.remove_subject` | Schulfach löschen | `child_name`, `subject` |
+| `school_grades.set_calendar` | Kalender zuweisen | `child_name`, `calendar_entity` |
+| `school_grades.update_timetable_cell` | Stundenplan-Zelle bearbeiten | `child_name`, `slot_id`, `day`, `subject`, `room`, `teacher` |
+| `school_grades.import_timetable` | Stundenplan per YAML importieren | `child_name`, `yaml_content` |
 
 ---
 
