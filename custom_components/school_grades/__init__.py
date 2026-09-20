@@ -111,10 +111,10 @@ async def _async_setup_frontend(hass: HomeAssistant) -> None:
         try:
             await panel_custom.async_register_panel(
                 hass=hass,
+                frontend_url_path="schulnoten",
                 webcomponent_name="school-grades-panel",
                 sidebar_title="Schulnoten",
                 sidebar_icon="mdi:school",
-                url_path="schulnoten",
                 module_url=f"{URL_BASE}/school-grades-panel.js",
                 embed_iframe=False,
                 require_admin=False,
