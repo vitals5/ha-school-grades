@@ -461,6 +461,37 @@ def _register_services(hass: HomeAssistant) -> None:
         except Exception as err:
             _LOGGER.error("Failed to create calendar event on %s: %s", target_calendar, err)
 
+    async def _async_find_event_uid(
+        target_calendar: str, summary: str | None, date_str: str | None
+    ) -> str | None:
+        """Helper to locate a calendar event UID by summary and date if UID is missing."""
+        if not summary or not date_str:
+            return None
+        try:
+            from datetime import datetime, timedelta
+            from homeassistant.components.calendar import async_get_events
+
+            clean_date = date_str.strip()
+            if len(clean_date) > 10:
+                clean_date = clean_date[:10]
+
+            target_date = datetime.fromisoformat(f"{clean_date}T00:00:00")
+            start_search = target_date - timedelta(days=1)
+            end_search = target_date + timedelta(days=2)
+
+            raw_events = await async_get_events(hass, target_calendar, start_search, end_search)
+            clean_summary = summary.strip().lower()
+
+            for evt in raw_events:
+                evt_summary = (getattr(evt, "summary", "") or getattr(evt, "title", "") or "").strip().lower()
+                if clean_summary in evt_summary or evt_summary in clean_summary:
+                    uid_val = getattr(evt, "uid", None) or getattr(evt, "id", None) or getattr(evt, "event_id", None)
+                    if uid_val:
+                        return str(uid_val)
+        except Exception as err:
+            _LOGGER.debug("Error finding event UID for %s on %s: %s", summary, target_calendar, err)
+        return None
+
     async def handle_update_calendar_event(call: ServiceCall) -> None:
         """Handle update_calendar_event action call."""
         child_name = call.data.get(CONF_CHILD_NAME)
@@ -479,6 +510,9 @@ def _register_services(hass: HomeAssistant) -> None:
             _LOGGER.error("No target calendar specified or assigned for child %s", child_name)
             return
 
+        if not uid or not str(uid).strip():
+            uid = await _async_find_event_uid(target_calendar, summary, date_str)
+
         try:
             from datetime import datetime, timedelta
 
@@ -491,37 +525,53 @@ def _register_services(hass: HomeAssistant) -> None:
             start_dt = datetime.fromisoformat(start_iso)
             end_dt = start_dt + timedelta(hours=1)
 
-            service_data = {
-                "entity_id": target_calendar,
-                "summary": summary,
-                "start_date_time": start_dt.isoformat(),
-                "end_date_time": end_dt.isoformat(),
-            }
+            success = False
             if uid:
-                service_data["uid"] = uid
-                service_data["event_uid"] = uid
-            if description:
-                service_data["description"] = description
+                # 1. Try update_event with event_uid
+                payload1 = {
+                    "entity_id": target_calendar,
+                    "event_uid": uid,
+                    "summary": summary,
+                    "start_date_time": start_dt.isoformat(),
+                    "end_date_time": end_dt.isoformat(),
+                }
+                if description:
+                    payload1["description"] = description
 
-            try:
-                await hass.services.async_call(
-                    "calendar",
-                    "update_event",
-                    service_data,
-                    blocking=True,
-                )
-            except Exception as update_err:
-                _LOGGER.debug("update_event failed, trying delete+create fallback: %s", update_err)
+                try:
+                    await hass.services.async_call("calendar", "update_event", payload1, blocking=True)
+                    success = True
+                except Exception as err1:
+                    _LOGGER.debug("update_event with event_uid failed: %s, trying uid key", err1)
+                    payload2 = {
+                        "entity_id": target_calendar,
+                        "uid": uid,
+                        "summary": summary,
+                        "start_date_time": start_dt.isoformat(),
+                        "end_date_time": end_dt.isoformat(),
+                    }
+                    if description:
+                        payload2["description"] = description
+                    try:
+                        await hass.services.async_call("calendar", "update_event", payload2, blocking=True)
+                        success = True
+                    except Exception as err2:
+                        _LOGGER.debug("update_event with uid key failed: %s", err2)
+
+            if not success:
+                # Fallback: delete old event if UID known and create new event
                 if uid:
                     try:
                         await hass.services.async_call(
-                            "calendar",
-                            "delete_event",
-                            {"entity_id": target_calendar, "uid": uid, "event_uid": uid},
-                            blocking=True,
+                            "calendar", "delete_event", {"entity_id": target_calendar, "event_uid": uid}, blocking=True
                         )
-                    except Exception as del_err:
-                        _LOGGER.debug("delete_event fallback failed: %s", del_err)
+                    except Exception:
+                        try:
+                            await hass.services.async_call(
+                                "calendar", "delete_event", {"entity_id": target_calendar, "uid": uid}, blocking=True
+                            )
+                        except Exception:
+                            pass
 
                 create_data = {
                     "entity_id": target_calendar,
@@ -531,9 +581,7 @@ def _register_services(hass: HomeAssistant) -> None:
                 }
                 if description:
                     create_data["description"] = description
-                await hass.services.async_call(
-                    "calendar", "create_event", create_data, blocking=True
-                )
+                await hass.services.async_call("calendar", "create_event", create_data, blocking=True)
 
             _LOGGER.info("Successfully updated calendar event '%s' on %s", summary, target_calendar)
 
@@ -549,6 +597,7 @@ def _register_services(hass: HomeAssistant) -> None:
         child_name = call.data.get(CONF_CHILD_NAME)
         uid = call.data.get("uid")
         summary = call.data.get(CONF_SUMMARY)
+        date_str = call.data.get(CONF_DATE)
         target_calendar = call.data.get(CONF_CALENDAR)
 
         storage = _get_storage(hass, child_name)
@@ -559,27 +608,35 @@ def _register_services(hass: HomeAssistant) -> None:
             _LOGGER.error("No target calendar specified or assigned for child %s", child_name)
             return
 
+        if (not uid or not str(uid).strip()) and summary:
+            uid = await _async_find_event_uid(target_calendar, summary, date_str)
+
+        if not uid:
+            _LOGGER.error("Cannot delete calendar event without UID on %s", target_calendar)
+            return
+
+        deleted = False
         try:
-            service_data = {"entity_id": target_calendar}
-            if uid:
-                service_data["uid"] = uid
-            elif summary:
-                service_data["summary"] = summary
-
             await hass.services.async_call(
-                "calendar",
-                "delete_event",
-                service_data,
-                blocking=True,
+                "calendar", "delete_event", {"entity_id": target_calendar, "event_uid": uid}, blocking=True
             )
-            _LOGGER.info("Successfully deleted calendar event on %s", target_calendar)
+            deleted = True
+        except Exception as err1:
+            _LOGGER.debug("delete_event with event_uid failed: %s, trying uid key", err1)
+            try:
+                await hass.services.async_call(
+                    "calendar", "delete_event", {"entity_id": target_calendar, "uid": uid}, blocking=True
+                )
+                deleted = True
+            except Exception as err2:
+                _LOGGER.error("Failed to delete calendar event %s on %s: %s", uid, target_calendar, err2)
 
+        if deleted:
+            _LOGGER.info("Successfully deleted calendar event %s on %s", uid, target_calendar)
             if storage:
                 async_dispatcher_send(
                     hass, SIGNAL_UPDATE_GRADES.format(entry_id=storage.entry_id)
                 )
-        except Exception as err:
-            _LOGGER.error("Failed to delete calendar event on %s: %s", target_calendar, err)
 
     hass.services.async_register(
         DOMAIN, SERVICE_ADD_SUBJECT, handle_add_subject, schema=SCHEMA_ADD_SUBJECT

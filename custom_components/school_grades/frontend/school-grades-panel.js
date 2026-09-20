@@ -1851,6 +1851,7 @@ class SchoolGradesPanel extends HTMLElement {
             calendar_entity: calEntity,
             uid: uid,
             summary: summary,
+            date: this._editingEvent ? this._editingEvent.date : '',
           });
           this._showAddEventCard = false;
           this._editingEvent = null;
