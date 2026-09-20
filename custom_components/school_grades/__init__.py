@@ -84,9 +84,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # Listen for config entry options updates
-    entry.async_on_unload(entry.add_update_listener(async_update_options_listener))
-
     # Setup custom sidebar panel & static HTTP assets
     await _async_setup_frontend(hass)
 
@@ -122,13 +119,6 @@ async def _async_setup_frontend(hass: HomeAssistant) -> None:
             _LOGGER.info("Successfully registered Schulnoten sidebar panel at /schulnoten")
         except Exception as err:
             _LOGGER.error("Failed to register Schulnoten panel: %s", err)
-
-
-async def async_update_options_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Handle options update by signaling sensors to update."""
-    async_dispatcher_send(
-        hass, SIGNAL_UPDATE_GRADES.format(entry_id=entry.entry_id)
-    )
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

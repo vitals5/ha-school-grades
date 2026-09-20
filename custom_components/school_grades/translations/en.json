@@ -5,7 +5,7 @@
         "title": "Add Child",
         "description": "Create a new instance to manage school grades for a child.",
         "data": {
-          "child_name": "Name of the child (e.g., Max)"
+          "child_name": "Name of the child (e.g., Richard, Emma)"
         }
       }
     },
@@ -14,54 +14,6 @@
     },
     "abort": {
       "already_configured": "Grade management for this child already exists."
-    }
-  },
-  "options": {
-    "step": {
-      "init": {
-        "title": "Manage School Grades",
-        "menu_options": {
-          "add_grade": "➕ Add Grade",
-          "add_subject": "📘 Add Subject",
-          "remove_grade": "❌ Delete Grade",
-          "remove_subject": "🗑️ Delete Subject"
-        }
-      },
-      "add_subject": {
-        "title": "Add New Subject",
-        "data": {
-          "subject": "Subject Name (e.g. Physics, Art)"
-        }
-      },
-      "remove_subject": {
-        "title": "Delete Subject",
-        "description": "Warning: This will also delete all grades recorded for this subject!",
-        "data": {
-          "subject": "Select Subject"
-        }
-      },
-      "add_grade": {
-        "title": "Add Grade",
-        "data": {
-          "subject": "Subject",
-          "grade": "Grade (1.0 to 6.0)",
-          "weight": "Weighting (1x, 2x, 3x, 4x)",
-          "name": "Description (e.g. 1st Exam)"
-        }
-      },
-      "remove_grade": {
-        "title": "Delete Grade",
-        "data": {
-          "grade_id": "Select grade to delete"
-        }
-      }
-    },
-    "error": {
-      "subject_exists": "This subject already exists."
-    },
-    "abort": {
-      "no_subjects": "No subjects available. Please add a subject first.",
-      "no_grades": "No grades found to delete."
     }
   }
 }
