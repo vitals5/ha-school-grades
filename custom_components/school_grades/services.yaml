@@ -206,4 +206,54 @@ import_timetable:
       selector:
         object:
 
+update_settings:
+  name: "Allgemeine Einstellungen aktualisieren"
+  description: "Aktualisiert das Land / Schulsystem oder den Kalender für eine Kinder-Instanz."
+  fields:
+    child_name:
+      name: "Name des Kindes"
+      description: "Name des Kindes (optional)."
+      example: "Max"
+      selector:
+        text:
+    country:
+      name: "Land / Schulsystem"
+      description: "Ländercode für die Notenskala (DE, AT, CH, FR, IT, ES, NL, PL, UK, US, RU, CN)."
+      example: "DE"
+      selector:
+        select:
+          options:
+            - label: "Deutschland (1.0 - 6.0)"
+              value: "DE"
+            - label: "Österreich (1 - 5)"
+              value: "AT"
+            - label: "Schweiz (6.0 - 1.0)"
+              value: "CH"
+            - label: "Frankreich (0 - 20)"
+              value: "FR"
+            - label: "Italien (1 - 10)"
+              value: "IT"
+            - label: "Spanien (1 - 10)"
+              value: "ES"
+            - label: "Niederlande (1.0 - 10.0)"
+              value: "NL"
+            - label: "Polen (1 - 6)"
+              value: "PL"
+            - label: "Großbritannien (UK)"
+              value: "UK"
+            - label: "USA (GPA 0.0 - 4.0)"
+              value: "US"
+            - label: "Russland (2 - 5)"
+              value: "RU"
+            - label: "China (0 - 100)"
+              value: "CN"
+    calendar_entity:
+      name: "Kalender-Entität"
+      description: "Verknüpfte Kalender-Entität (optional)."
+      example: "calendar.richard_klausuren"
+      selector:
+        entity:
+          domain: calendar
+
+
 

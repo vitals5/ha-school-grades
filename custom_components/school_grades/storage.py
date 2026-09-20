@@ -6,7 +6,7 @@ import uuid
 from datetime import date as dt_date
 from typing import Any
 
-from .const import DEFAULT_SUBJECTS
+from .const import COUNTRY_GRADING_SYSTEMS, DEFAULT_COUNTRY, DEFAULT_SUBJECTS
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -32,6 +32,7 @@ class SchoolGradesData:
         """Initialize data manager."""
         self.child_name = child_name
         if data is None:
+            self.country: str = DEFAULT_COUNTRY
             self.calendar_entity: str | None = None
             self._subjects: list[str] = list(DEFAULT_SUBJECTS)
             self._grades: dict[str, list[dict[str, Any]]] = {
@@ -43,6 +44,9 @@ class SchoolGradesData:
             }
         else:
             self.child_name = data.get("child_name", child_name)
+            self.country = str(data.get("country", DEFAULT_COUNTRY)).upper()
+            if self.country not in COUNTRY_GRADING_SYSTEMS:
+                self.country = DEFAULT_COUNTRY
             self.calendar_entity = data.get("calendar_entity")
             self._subjects = data.get("subjects", list(DEFAULT_SUBJECTS))
             self._grades = data.get("grades", {})
@@ -59,11 +63,20 @@ class SchoolGradesData:
         """Convert data to dictionary for JSON persistence."""
         return {
             "child_name": self.child_name,
+            "country": self.country,
             "calendar_entity": self.calendar_entity,
             "subjects": self._subjects,
             "grades": self._grades,
             "timetable": self.timetable,
         }
+
+    def set_country(self, country_code: str) -> bool:
+        """Set or update country code."""
+        code_upper = str(country_code).strip().upper()
+        if code_upper in COUNTRY_GRADING_SYSTEMS:
+            self.country = code_upper
+            return True
+        return False
 
     def set_calendar_entity(self, calendar_entity: str | None) -> None:
         """Set or update assigned calendar entity."""

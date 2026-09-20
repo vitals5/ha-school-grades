@@ -11,6 +11,244 @@ const DAYS = [
   { key: 'friday', short: 'Fr' },
 ];
 
+const COUNTRY_SYSTEMS = {
+  DE: {
+    name: "Deutschland",
+    flag: "🇩🇪",
+    scale: "1.0 - 6.0",
+    best: "1.0",
+    worst: "6.0",
+    lower_is_better: true,
+    grades: [
+      { val: 1.0, label: "1.0 (Sehr gut)" },
+      { val: 1.3, label: "1.3" },
+      { val: 1.5, label: "1.5" },
+      { val: 1.7, label: "1.7" },
+      { val: 2.0, label: "2.0 (Gut)" },
+      { val: 2.3, label: "2.3" },
+      { val: 2.5, label: "2.5" },
+      { val: 2.7, label: "2.7" },
+      { val: 3.0, label: "3.0 (Befriedigend)" },
+      { val: 3.3, label: "3.3" },
+      { val: 3.5, label: "3.5" },
+      { val: 3.7, label: "3.7" },
+      { val: 4.0, label: "4.0 (Ausreichend)" },
+      { val: 4.3, label: "4.3" },
+      { val: 4.5, label: "4.5" },
+      { val: 4.7, label: "4.7" },
+      { val: 5.0, label: "5.0 (Mangelhaft)" },
+      { val: 5.5, label: "5.5" },
+      { val: 6.0, label: "6.0 (Ungenügend)" }
+    ]
+  },
+  AT: {
+    name: "Österreich",
+    flag: "🇦🇹",
+    scale: "1 - 5",
+    best: "1",
+    worst: "5",
+    lower_is_better: true,
+    grades: [
+      { val: 1.0, label: "1 (Sehr gut)" },
+      { val: 2.0, label: "2 (Gut)" },
+      { val: 3.0, label: "3 (Befriedigend)" },
+      { val: 4.0, label: "4 (Genügend)" },
+      { val: 5.0, label: "5 (Nicht genügend)" }
+    ]
+  },
+  CH: {
+    name: "Schweiz",
+    flag: "🇨🇭",
+    scale: "6.0 - 1.0",
+    best: "6.0",
+    worst: "1.0",
+    lower_is_better: false,
+    grades: [
+      { val: 6.0, label: "6.0 (Sehr gut)" },
+      { val: 5.5, label: "5.5" },
+      { val: 5.0, label: "5.0 (Gut)" },
+      { val: 4.5, label: "4.5" },
+      { val: 4.0, label: "4.0 (Genügend)" },
+      { val: 3.5, label: "3.5" },
+      { val: 3.0, label: "3.0 (Ungenügend)" },
+      { val: 2.5, label: "2.5" },
+      { val: 2.0, label: "2.0 (Schlecht)" },
+      { val: 1.5, label: "1.5" },
+      { val: 1.0, label: "1.0 (Sehr schlecht)" }
+    ]
+  },
+  FR: {
+    name: "Frankreich",
+    flag: "🇫🇷",
+    scale: "0 - 20",
+    best: "20",
+    worst: "0",
+    lower_is_better: false,
+    grades: [
+      { val: 20.0, label: "20 (Très bien)" },
+      { val: 18.0, label: "18" },
+      { val: 16.0, label: "16 (Bien)" },
+      { val: 14.0, label: "14 (Assez bien)" },
+      { val: 12.0, label: "12 (Moyen)" },
+      { val: 10.0, label: "10 (Passable)" },
+      { val: 8.0, label: "8 (Insuffisant)" },
+      { val: 6.0, label: "6" },
+      { val: 4.0, label: "4" },
+      { val: 2.0, label: "2" },
+      { val: 0.0, label: "0" }
+    ]
+  },
+  IT: {
+    name: "Italien",
+    flag: "🇮🇹",
+    scale: "1 - 10",
+    best: "10",
+    worst: "1",
+    lower_is_better: false,
+    grades: [
+      { val: 10.0, label: "10 (Eccellente)" },
+      { val: 9.0, label: "9 (Ottimo)" },
+      { val: 8.0, label: "8 (Distinto)" },
+      { val: 7.0, label: "7 (Buono)" },
+      { val: 6.0, label: "6 (Sufficiente)" },
+      { val: 5.0, label: "5 (Insufficiente)" },
+      { val: 4.0, label: "4" },
+      { val: 3.0, label: "3" },
+      { val: 2.0, label: "2" },
+      { val: 1.0, label: "1" }
+    ]
+  },
+  ES: {
+    name: "Spanien",
+    flag: "🇪🇸",
+    scale: "1 - 10",
+    best: "10",
+    worst: "1",
+    lower_is_better: false,
+    grades: [
+      { val: 10.0, label: "10 (Sobresaliente)" },
+      { val: 9.0, label: "9 (Sobresaliente)" },
+      { val: 8.0, label: "8 (Notable)" },
+      { val: 7.0, label: "7 (Notable)" },
+      { val: 6.0, label: "6 (Bien)" },
+      { val: 5.0, label: "5 (Suficiente)" },
+      { val: 4.0, label: "4 (Insuficiente)" },
+      { val: 3.0, label: "3" },
+      { val: 2.0, label: "2" },
+      { val: 1.0, label: "1" }
+    ]
+  },
+  NL: {
+    name: "Niederlande",
+    flag: "🇳🇱",
+    scale: "1.0 - 10.0",
+    best: "10.0",
+    worst: "1.0",
+    lower_is_better: false,
+    grades: [
+      { val: 10.0, label: "10.0 (Uitmuntend)" },
+      { val: 9.0, label: "9.0 (Zeer goed)" },
+      { val: 8.0, label: "8.0 (Goed)" },
+      { val: 7.0, label: "7.0 (Ruim voldoende)" },
+      { val: 6.0, label: "6.0 (Voldoende)" },
+      { val: 5.5, label: "5.5 (Pass)" },
+      { val: 5.0, label: "5.0 (Onvoldoende)" },
+      { val: 4.0, label: "4.0" },
+      { val: 3.0, label: "3.0" },
+      { val: 2.0, label: "2.0" },
+      { val: 1.0, label: "1.0" }
+    ]
+  },
+  PL: {
+    name: "Polen",
+    flag: "🇵🇱",
+    scale: "1 - 6",
+    best: "6",
+    worst: "1",
+    lower_is_better: false,
+    grades: [
+      { val: 6.0, label: "6 (Celujący)" },
+      { val: 5.0, label: "5 (Bardzo dobry)" },
+      { val: 4.0, label: "4 (Dobry)" },
+      { val: 3.0, label: "3 (Dostateczny)" },
+      { val: 2.0, label: "2 (Dopuszczający)" },
+      { val: 1.0, label: "1 (Niedostateczny)" }
+    ]
+  },
+  UK: {
+    name: "Großbritannien (UK)",
+    flag: "🇬🇧",
+    scale: "1 - 9 (A* - G)",
+    best: "9 (A*)",
+    worst: "1 (U)",
+    lower_is_better: false,
+    grades: [
+      { val: 9.0, label: "9 (Grade A*)" },
+      { val: 8.0, label: "8 (Grade A*/A)" },
+      { val: 7.0, label: "7 (Grade A)" },
+      { val: 6.0, label: "6 (Grade B)" },
+      { val: 5.0, label: "5 (Grade B/C)" },
+      { val: 4.0, label: "4 (Grade C)" },
+      { val: 3.0, label: "3 (Grade D)" },
+      { val: 2.0, label: "2 (Grade E/F)" },
+      { val: 1.0, label: "1 (Grade G/U)" }
+    ]
+  },
+  US: {
+    name: "USA (GPA 0.0 - 4.0)",
+    flag: "🇺🇸",
+    scale: "0.0 - 4.0 (A+ - F)",
+    best: "4.0 (A+)",
+    worst: "0.0 (F)",
+    lower_is_better: false,
+    grades: [
+      { val: 4.0, label: "4.0 (A+ / A)" },
+      { val: 3.7, label: "3.7 (A-)" },
+      { val: 3.3, label: "3.3 (B+)" },
+      { val: 3.0, label: "3.0 (B)" },
+      { val: 2.7, label: "2.7 (B-)" },
+      { val: 2.3, label: "2.3 (C+)" },
+      { val: 2.0, label: "2.0 (C)" },
+      { val: 1.7, label: "1.7 (C-)" },
+      { val: 1.3, label: "1.3 (D+)" },
+      { val: 1.0, label: "1.0 (D)" },
+      { val: 0.0, label: "0.0 (F)" }
+    ]
+  },
+  RU: {
+    name: "Russland",
+    flag: "🇷🇺",
+    scale: "2 - 5",
+    best: "5",
+    worst: "2",
+    lower_is_better: false,
+    grades: [
+      { val: 5.0, label: "5 (Отлично)" },
+      { val: 4.0, label: "4 (Хорошо)" },
+      { val: 3.0, label: "3 (Удовлетворительно)" },
+      { val: 2.0, label: "2 (Неудовлетворительно)" }
+    ]
+  },
+  CN: {
+    name: "China",
+    flag: "🇨🇳",
+    scale: "0 - 100 Punkte / A-F",
+    best: "100 (A)",
+    worst: "0 (F)",
+    lower_is_better: false,
+    grades: [
+      { val: 100.0, label: "100 (A+ / 优秀)" },
+      { val: 90.0, label: "90 (A / 优秀)" },
+      { val: 85.0, label: "85 (B+ / 良好)" },
+      { val: 80.0, label: "80 (B / 良好)" },
+      { val: 75.0, label: "75 (C+ / 中等)" },
+      { val: 70.0, label: "70 (C / 中等)" },
+      { val: 60.0, label: "60 (D / 及格 Pass)" },
+      { val: 50.0, label: "50 (F / 不及格 Fail)" }
+    ]
+  }
+};
+
 const DEFAULT_TIMETABLE = {
   slots: [
     { id: 'slot_1', type: 'lesson', number: '1', label: '1. Stunde', start: '08:00', end: '08:45' },
@@ -100,6 +338,11 @@ const I18N = {
     table_action: "Aktion",
     delete_grade_confirm: "Möchtest du diese Note wirklich löschen?",
     
+    // Settings
+    settings_title: "⚙️ Allgemeine Einstellungen ({child})",
+    country_label: "Land / Schulsystem",
+    country_hint: "Bestimmt die Notenskala und Bewertung für diese Instanz.",
+
     // Modals
     modal_cell_title: "✏️ Stundenplan bearbeiten",
     no_subject_free: "-- Kein Fach (Freistunde) --",
@@ -201,6 +444,11 @@ const I18N = {
     table_action: "Action",
     delete_grade_confirm: "Are you sure you want to delete this grade?",
     
+    // Settings
+    settings_title: "⚙️ General Settings ({child})",
+    country_label: "Country / Grading System",
+    country_hint: "Determines the grading scale and evaluation system for this child.",
+
     // Modals
     modal_cell_title: "✏️ Edit Timetable Cell",
     no_subject_free: "-- No subject (Free period) --",
@@ -302,10 +550,15 @@ class SchoolGradesPanel extends HTMLElement {
         children[kindName] = {
           name: kindName,
           totalAverage: null,
+          country: 'DE',
           calendarEntity: null,
           timetable: null,
           subjects: {},
         };
+      }
+
+      if (attrs.country) {
+        children[kindName].country = String(attrs.country).toUpperCase();
       }
 
       if (attrs.subject_name) {
@@ -581,6 +834,8 @@ class SchoolGradesPanel extends HTMLElement {
     }
 
     const currentChild = data[this._selectedChild];
+    const childCountry = (currentChild && currentChild.country) || 'DE';
+    const countrySys = COUNTRY_SYSTEMS[childCountry] || COUNTRY_SYSTEMS.DE;
     const subjects = currentChild ? currentChild.subjects : {};
     const subjectList = Object.keys(subjects).sort();
     const upcomingEvents = this._calendarEvents[this._selectedChild] || [];
@@ -599,11 +854,15 @@ class SchoolGradesPanel extends HTMLElement {
             <p class="subtitle">${this._t('panel_subtitle')}</p>
           </div>
           <div class="child-tabs">
-            ${childNames.map(name => `
-              <button class="tab-btn ${name === this._selectedChild ? 'active' : ''}" data-child="${name}">
-                👤 ${name}
-              </button>
-            `).join('')}
+            ${childNames.map(name => {
+              const cData = data[name];
+              const sys = COUNTRY_SYSTEMS[cData ? cData.country : 'DE'] || COUNTRY_SYSTEMS.DE;
+              return `
+                <button class="tab-btn ${name === this._selectedChild ? 'active' : ''}" data-child="${name}">
+                  👤 ${name} ${sys.flag}
+                </button>
+              `;
+            }).join('')}
           </div>
         </header>
 
@@ -620,6 +879,34 @@ class SchoolGradesPanel extends HTMLElement {
           <div class="stat-card">
             <span class="stat-label">${this._t('total_grades')}</span>
             <span class="stat-value">${Object.values(subjects).reduce((acc, s) => acc + s.grades.length, 0)}</span>
+          </div>
+        </div>
+
+        <!-- General Settings Card -->
+        <div class="card settings-card" style="margin-bottom: 24px;">
+          <div class="settings-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <div class="title-with-badge">
+              <h3 style="margin: 0; font-size: 16px;">⚙️ ${this._t('settings_title', { child: this._selectedChild })}</h3>
+              <span class="timetable-subtitle" style="display: block; margin-top: 4px; font-size: 12px; opacity: 0.7;">${this._t('country_hint')}</span>
+            </div>
+          </div>
+          <div class="settings-body" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-top: 14px;">
+            <div class="form-group" style="margin: 0;">
+              <label style="display: block; margin-bottom: 6px; font-weight: 500; font-size: 13px;">🌍 ${this._t('country_label')}</label>
+              <select id="settings-country-select" style="width: 100%; padding: 10px 14px; border-radius: 8px; background: var(--card-background-color, rgba(0,0,0,0.2)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 14px; cursor: pointer;">
+                ${Object.entries(COUNTRY_SYSTEMS).map(([code, sys]) => `
+                  <option value="${code}" ${code === childCountry ? 'selected' : ''}>
+                    ${sys.flag} ${sys.name} (${sys.scale})
+                  </option>
+                `).join('')}
+              </select>
+            </div>
+            <div class="form-group" style="margin: 0; display: flex; align-items: flex-end;">
+              <div class="country-info-badge" style="padding: 10px 16px; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); width: 100%; font-size: 13px;">
+                <strong>${countrySys.flag} ${countrySys.name}</strong> • Skala: ${countrySys.scale} 
+                <br><small style="opacity: 0.8;">${countrySys.lower_is_better ? '📉 1.0 = Beste Note' : '📈 Höchste Note ist am besten'}</small>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -837,15 +1124,15 @@ class SchoolGradesPanel extends HTMLElement {
               </div>
 
               <div class="form-group">
-                <label>${this._t('grade_label')}</label>
+                <label>${this._t('grade_label')} (${countrySys.flag} ${countrySys.scale})</label>
                 <div class="quick-pills" id="grade-pills">
-                  ${[1.0, 1.3, 1.5, 2.0, 2.3, 2.5, 3.0, 3.3, 3.5, 4.0, 5.0, 6.0].map(val => `
-                    <button type="button" class="pill-btn ${val === this._selectedGrade ? 'active' : ''}" data-val="${val}">
-                      ${val.toFixed(1)}
+                  ${countrySys.grades.map(g => `
+                    <button type="button" class="pill-btn ${g.val === this._selectedGrade ? 'active' : ''}" data-val="${g.val}">
+                      ${g.label}
                     </button>
                   `).join('')}
                 </div>
-                <input type="number" id="grade-input" step="0.1" min="1" max="6" value="${this._selectedGrade}" required style="margin-top: 8px;">
+                <input type="number" id="grade-input" step="0.1" value="${this._selectedGrade}" required style="margin-top: 8px;" placeholder="${countrySys.scale}">
               </div>
 
               <div class="form-group">
@@ -910,7 +1197,7 @@ class SchoolGradesPanel extends HTMLElement {
                 <div class="subject-header">
                   <div class="subject-title">
                     <h3>${subjName}</h3>
-                    <span class="badge avg-badge ${this._getGradeColorClass(avg)}">${this._t('avg_label')}: ${avg}</span>
+                    <span class="badge avg-badge ${this._getGradeColorClass(avg, childCountry)}">${this._t('avg_label')}: ${avg}</span>
                   </div>
                   <span class="count-tag">${this._t('grades_tag', { count: subj.grades.length })}</span>
                 </div>
@@ -933,7 +1220,7 @@ class SchoolGradesPanel extends HTMLElement {
                         ${subj.grades.map(g => `
                           <tr>
                             <td>
-                              <span class="grade-pill ${this._getGradeColorClass(g.grade)}">
+                              <span class="grade-pill ${this._getGradeColorClass(g.grade, childCountry)}">
                                 ${parseFloat(g.grade).toFixed(1)}
                               </span>
                             </td>
@@ -1051,14 +1338,61 @@ class SchoolGradesPanel extends HTMLElement {
     return { text: this._t('countdown_days', { days: diffDays }), cls: 'later' };
   }
 
-  _getGradeColorClass(gradeVal) {
+  _getGradeColorClass(gradeVal, countryCode = 'DE') {
     const num = parseFloat(gradeVal);
     if (isNaN(num)) return 'grade-neutral';
-    if (num <= 1.5) return 'grade-excellent';
-    if (num <= 2.5) return 'grade-good';
-    if (num <= 3.5) return 'grade-satisfactory';
-    if (num <= 4.5) return 'grade-adequate';
-    return 'grade-poor';
+
+    const sys = COUNTRY_SYSTEMS[countryCode] || COUNTRY_SYSTEMS.DE;
+
+    if (sys.lower_is_better) {
+      if (num <= 1.5) return 'grade-excellent';
+      if (num <= 2.5) return 'grade-good';
+      if (num <= 3.5) return 'grade-satisfactory';
+      if (num <= 4.5) return 'grade-adequate';
+      return 'grade-poor';
+    } else {
+      if (countryCode === 'CH') {
+        if (num >= 5.5) return 'grade-excellent';
+        if (num >= 4.5) return 'grade-good';
+        if (num >= 4.0) return 'grade-satisfactory';
+        if (num >= 3.0) return 'grade-adequate';
+        return 'grade-poor';
+      } else if (countryCode === 'FR') {
+        if (num >= 16) return 'grade-excellent';
+        if (num >= 14) return 'grade-good';
+        if (num >= 12) return 'grade-satisfactory';
+        if (num >= 10) return 'grade-adequate';
+        return 'grade-poor';
+      } else if (['IT', 'ES', 'NL'].includes(countryCode)) {
+        if (num >= 8.5) return 'grade-excellent';
+        if (num >= 7.0) return 'grade-good';
+        if (num >= 6.0) return 'grade-satisfactory';
+        if (num >= 5.0) return 'grade-adequate';
+        return 'grade-poor';
+      } else if (countryCode === 'US') {
+        if (num >= 3.5) return 'grade-excellent';
+        if (num >= 3.0) return 'grade-good';
+        if (num >= 2.0) return 'grade-satisfactory';
+        if (num >= 1.0) return 'grade-adequate';
+        return 'grade-poor';
+      } else if (countryCode === 'RU') {
+        if (num >= 5.0) return 'grade-excellent';
+        if (num >= 4.0) return 'grade-good';
+        if (num >= 3.0) return 'grade-satisfactory';
+        return 'grade-poor';
+      } else if (countryCode === 'CN') {
+        if (num >= 85) return 'grade-excellent';
+        if (num >= 75) return 'grade-good';
+        if (num >= 60) return 'grade-satisfactory';
+        return 'grade-poor';
+      } else {
+        if (num >= 5.0) return 'grade-excellent';
+        if (num >= 4.0) return 'grade-good';
+        if (num >= 3.0) return 'grade-satisfactory';
+        if (num >= 2.0) return 'grade-adequate';
+        return 'grade-poor';
+      }
+    }
   }
 
   _attachEventListeners() {
@@ -1072,6 +1406,19 @@ class SchoolGradesPanel extends HTMLElement {
         this.render();
       });
     });
+
+    // Country Select
+    const countrySelect = root.querySelector('#settings-country-select');
+    if (countrySelect) {
+      countrySelect.addEventListener('change', async (e) => {
+        const newCountry = e.target.value;
+        await this._hass.callService('school_grades', 'update_settings', {
+          child_name: this._selectedChild,
+          country: newCountry,
+        });
+        setTimeout(() => this.render(), 300);
+      });
+    }
 
     // Calendar Select
     const calSelect = root.querySelector('#calendar-select');

@@ -106,6 +106,7 @@ class SchoolGradeSubjectSensor(SensorEntity):
         grades = self.storage.data.get_grades(self.subject)
         return {
             "kind_name": self.storage.child_name,
+            "country": self.storage.data.country,
             "subject_name": self.subject,
             "grade_count": len(grades),
             "grades": grades,
@@ -204,6 +205,7 @@ class SchoolGradeTotalSensor(SensorEntity):
         """Return summary of all subject averages, assigned calendar entity, timetable, and upcoming events."""
         return {
             "kind_name": self.storage.child_name,
+            "country": self.storage.data.country,
             "calendar_entity": self.storage.data.calendar_entity,
             "timetable": self.storage.data.timetable,
             "upcoming_events": self._upcoming_events,
