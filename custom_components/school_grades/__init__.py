@@ -42,7 +42,7 @@ from .storage import SchoolGradesStorage
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = ["sensor"]
+PLATFORMS = ["sensor", "binary_sensor"]
 
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "frontend")
 URL_BASE = "/school_grades_ui"

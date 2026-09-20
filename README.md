@@ -68,6 +68,43 @@ Die Integration stellt folgende Aktionen (Services) für Automatisierungen oder 
 
 ---
 
+## 🔔 Binary Sensor für Sprachansagen & Benachrichtigungen
+
+Die Integration erstellt für jedes Kind automatisch einen Binary Sensor: `binary_sensor.<kind_name>_anstehende_termine_morgen`.
+
+### 💡 Funktionsweise & Attribute
+- **Zustand (`state`)**:
+  - `on` (EIN): Wenn am nächsten Schultag/Tag mindestens ein Termin oder eine Klausur im verknüpften Kalender steht.
+  - `off` (AUS): Wenn **keine** Termine anstehen. Der Sensor bleibt somit AUS, damit Automatisierungen nicht fälschlicherweise auslösen!
+- **Verfügbare Attribute**:
+  - `event_count`: Anzahl der Termine (z. B. `2`).
+  - `event_names`: Liste der Terminbezeichnungen (z. B. `['Mathe Schulaufgabe', 'Physik Test']`).
+  - `event_titles`: Barrierefreier Text der Termine (z. B. `"Mathe Schulaufgabe und Physik Test"`).
+  - `message`: Vorgefertigter Satz für Sprachausgaben/TTS (z. B. `"Am Montag stehen 2 Termine an: Mathe Schulaufgabe und Physik Test."`).
+  - `timetable_subjects`: Liste der Schulfächer des nächsten Schultags laut Stundenplan.
+
+### 🤖 Beispiel-Automatisierung (Sprachansage um 18:00 Uhr)
+
+```yaml
+alias: "Schulnoten - Sprachansage für morgige Klausuren"
+trigger:
+  - platform: time
+    at: "18:00:00"
+condition:
+  - condition: state
+    entity_id: binary_sensor.richard_anstehende_termine_morgen
+    state: "on"
+action:
+  - service: tts.speak
+    target:
+      entity_id: tts.google_en_com
+    data:
+      media_player_entity_id: media_player.flur_speaker
+      message: "{{ state_attr('binary_sensor.richard_anstehende_termine_morgen', 'message') }}"
+```
+
+---
+
 ## 📄 Lizenz
 
 Dieses Projekt steht unter der [MIT-Lizenz](LICENSE).
