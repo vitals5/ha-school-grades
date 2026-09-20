@@ -26,13 +26,14 @@ Mit dem **integrierten Sidebar-Panel** (`/schulnoten`) verwaltest du Noten, Fäc
   - Verknüpfung mit jedem beliebigen Home Assistant Kalender (z. B. Google Kalender, CalDAV, lokaler Kalender).
   - Übersicht anstehender Klausuren mit Countdown-Badges (`⚡ HEUTE`, `⚠️ Morgen`, `In X Tagen`).
 - 📘 **Fächer- & Notenverwaltung**:
-  - Fächer dynamisch anlegen und löschen.
+  - **Einklappbares Noten-Formular (`➕ Neue Note eintragen`)**: Standardmäßig ausgeblendet für ein aufgeräumtes Dashboard; lässt sich per Action-Button direkt über der Notenübersicht aufklappen und klappt nach dem Eintragen automatisch wieder zu.
   - Eintragen von Noten (1.0 bis 6.0) mit frei wählbarer Gewichtung (1-fach, 2-fach, 3-fach, 4-fach).
   - Automatische Errechnung des gewichteten Fachdurchschnitts sowie des Gesamtdurchschnitts.
   - Notenhistorie mit Datum, Bezeichnung (z. B. *1. Schulaufgabe*) und Löschoption.
 - ⚙️ **Einstellungen-Modal mit Tabs (`⚙️ Allgemein` & `📘 Fächer verwalten`)**:
   - **Allgemein**: Anpassung der länderspezifischen Schulsysteme (🇩🇪, 🇦🇹, 🇨🇭, 🇫🇷, 🇮🇹, 🇪🇸, 🇳🇱, 🇵🇱, 🇬🇧, 🇺🇸, 🇷🇺, 🇨🇳) sowie individuelles Aus- und Einblenden aller 4 Dashboard-Bereiche.
   - **Fächer verwalten**: Bequemes Anlegen neuer Schulfächer sowie Löschen bestehender Fächer zentral im Einstellungen-Dialog.
+
 
 - 🌐 **Mehrsprachigkeit (Multi-Language i18n)**:
   - Vollständige Unterstützung für **Deutsch 🇩🇪** und **Englisch 🇬🇧**.
@@ -131,13 +132,14 @@ With the **built-in Sidebar Panel** (`/schulnoten`), you can manage grades, subj
   - Link any Home Assistant calendar (e.g. Google Calendar, CalDAV, Local HA Calendar).
   - Overview of upcoming exams with countdown badges (`⚡ TODAY`, `⚠️ Tomorrow`, `In X days`).
 - 📘 **Subject & Grade Management**:
-  - Dynamically add and delete subjects.
+  - **Collapsible Grade Form (`➕ Record New Grade`)**: Hidden by default for a clean UI; can be expanded on demand via a modern action button above the overview and auto-collapses upon saving.
   - Record grades (1.0 to 6.0) with configurable weight (1x, 2x, 3x, 4x).
   - Automatic calculation of weighted subject average and overall GPA.
   - Grade history with date, label (e.g., *1st Exam*), and deletion option.
 - ⚙️ **Tabbed Settings Modal (`⚙️ General` & `📘 Manage Subjects`)**:
   - **General**: Customize country-specific grading systems (🇩🇪, 🇦🇹, 🇨🇭, 🇫🇷, 🇮🇹, 🇪🇸, 🇳🇱, 🇵🇱, 🇬🇧, 🇺🇸, 🇷🇺, 🇨🇳) and toggle visibility of all 4 panel sections.
   - **Manage Subjects**: Easily add new subjects or remove existing subjects directly within the Settings dialog.
+
 
 - 🌐 **Multi-Language Support (i18n)**:
   - Full native support for **German 🇩🇪** and **English 🇬🇧**.
