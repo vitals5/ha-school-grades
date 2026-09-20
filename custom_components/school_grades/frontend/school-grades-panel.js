@@ -100,6 +100,9 @@ class SchoolGradesPanel extends HTMLElement {
         if (attrs.timetable) {
           children[kindName].timetable = attrs.timetable;
         }
+        if (attrs.upcoming_events) {
+          children[kindName].upcomingEvents = attrs.upcoming_events;
+        }
       }
     }
 
@@ -121,6 +124,7 @@ class SchoolGradesPanel extends HTMLElement {
     const data = this._getSchoolGradesData();
     const now = new Date();
     now.setHours(0, 0, 0, 0);
+
     const startIso = now.toISOString();
     const in1Year = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
     const endIso = in1Year.toISOString();
@@ -133,48 +137,56 @@ class SchoolGradesPanel extends HTMLElement {
       }
 
       let rawEvents = [];
-      try {
-        // Try HA REST API for calendars first (fetches all upcoming events in date range)
-        rawEvents = await this._hass.callApi(
-          'GET',
-          `calendars/${calEntity}?start=${encodeURIComponent(startIso)}&end=${encodeURIComponent(endIso)}`
-        );
-      } catch (err1) {
+
+      // 1. Check if backend total sensor already provided upcoming_events attribute
+      if (childData.upcomingEvents && Array.isArray(childData.upcomingEvents) && childData.upcomingEvents.length > 0) {
+        rawEvents = childData.upcomingEvents;
+      } else {
+        // 2. Try WebSocket API (with start_date_time)
         try {
-          // WS fallback 1
-          const res = await this._hass.callWS({
+          const wsRes = await this._hass.callWS({
             type: 'calendar/event/list',
             entity_id: calEntity,
             start_date_time: startIso,
             end_date_time: endIso,
           });
-          rawEvents = res ? (res.events || res) : [];
-        } catch (err2) {
+          if (wsRes && Array.isArray(wsRes.events)) {
+            rawEvents = wsRes.events;
+          } else if (Array.isArray(wsRes)) {
+            rawEvents = wsRes;
+          }
+        } catch (err1) {
+          // 3. Try REST API
           try {
-            // WS fallback 2
-            const res = await this._hass.callWS({
-              type: 'calendar/event/list',
-              entity_id: calEntity,
-              start_time: startIso,
-              end_time: endIso,
-            });
-            rawEvents = res ? (res.events || res) : [];
-          } catch (err3) {
-            console.warn('SchoolGrades: Could not fetch calendar events via API or WS', err3);
+            const apiRes = await this._hass.callApi(
+              'GET',
+              `calendars/${calEntity}?start=${encodeURIComponent(startIso)}&end=${encodeURIComponent(endIso)}`
+            );
+            if (Array.isArray(apiRes)) {
+              rawEvents = apiRes;
+            }
+          } catch (err2) {
+            console.warn('SchoolGrades: Could not fetch calendar events via WS or REST', err2);
             rawEvents = [];
           }
         }
       }
 
-      if (!Array.isArray(rawEvents)) {
-        if (rawEvents && Array.isArray(rawEvents.events)) {
-          rawEvents = rawEvents.events;
-        } else {
-          rawEvents = [];
+      // Fallback: If no events array obtained, use state attributes as last resort
+      if (rawEvents.length === 0) {
+        const stateObj = this._hass.states[calEntity];
+        if (stateObj && stateObj.attributes && stateObj.attributes.start_time) {
+          rawEvents = [{
+            summary: stateObj.attributes.message || stateObj.state,
+            start: stateObj.attributes.start_time,
+            end: stateObj.attributes.end_time,
+            description: stateObj.attributes.description || '',
+            location: stateObj.attributes.location || '',
+          }];
         }
       }
 
-      // Format & normalize all events
+      // Normalize and format events
       const parsedEvents = rawEvents.map(evt => {
         let startVal = evt.start;
         if (startVal && typeof startVal === 'object') {
@@ -197,7 +209,7 @@ class SchoolGradesPanel extends HTMLElement {
         };
       }).filter(evt => evt.start);
 
-      // Sort chronologically by start date
+      // Filter out events in the past and sort chronologically
       parsedEvents.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
 
       this._calendarEvents[childName] = parsedEvents;
@@ -205,6 +217,7 @@ class SchoolGradesPanel extends HTMLElement {
 
     this.render();
   }
+
 
   _isNowInSlot(slotStart, slotEnd, dayKey) {
     if (!slotStart || !slotEnd) return false;

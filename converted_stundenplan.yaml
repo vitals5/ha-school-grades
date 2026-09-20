@@ -1,0 +1,175 @@
+slots:
+  - id: slot_1
+    type: lesson
+    label: "1. Stunde"
+    start: "07:55"
+    end: "08:40"
+  - id: slot_2
+    type: lesson
+    label: "2. Stunde"
+    start: "08:40"
+    end: "09:25"
+  - id: slot_3
+    type: lesson
+    label: "3. Stunde"
+    start: "09:25"
+    end: "10:10"
+  - id: break_3
+    type: break
+    label: "Pause"
+    start: "10:10"
+    end: "10:30"
+  - id: slot_4
+    type: lesson
+    label: "4. Stunde"
+    start: "10:30"
+    end: "11:15"
+  - id: slot_5
+    type: lesson
+    label: "5. Stunde"
+    start: "11:15"
+    end: "12:00"
+  - id: slot_6
+    type: lesson
+    label: "6. Stunde"
+    start: "12:00"
+    end: "12:45"
+  - id: break_6
+    type: break
+    label: "Pause"
+    start: "12:45"
+    end: "13:00"
+  - id: slot_7
+    type: lesson
+    label: "7. Stunde"
+    start: "13:00"
+    end: "13:45"
+  - id: slot_8
+    type: lesson
+    label: "8. Stunde"
+    start: "13:45"
+    end: "14:30"
+  - id: slot_9
+    type: lesson
+    label: "9. Stunde"
+    start: "14:30"
+    end: "15:15"
+  - id: slot_10
+    type: lesson
+    label: "10. Stunde"
+    start: "15:15"
+    end: "16:00"
+
+schedule:
+  slot_1:
+    monday:
+      subject: "MgK/E2gK"
+      room: "806/803"
+    tuesday:
+      subject: "Eth/K/Ev"
+      room: "805/803/815"
+    wednesday:
+      subject: "Sm/Sm/Sw"
+      room: "th3/th2/th1"
+    thursday:
+      subject: "K/Ev/Eth"
+      room: "803/801/805"
+    friday:
+      subject: "Cho/Mu"
+      room: "716m/715m"
+  slot_2:
+    monday:
+      subject: "MgK/E2gK"
+      room: "806/803"
+    tuesday:
+      subject: "NuTI"
+      room: "503i"
+    wednesday:
+      subject: "Sm/Sw/Sm"
+      room: "th3/th1/th2"
+    thursday:
+      subject: "M"
+      room: "803"
+    friday:
+      subject: "D"
+      room: "803"
+  slot_3:
+    monday:
+      subject: "L1"
+      room: "803"
+    tuesday:
+      subject: "E2"
+      room: "803"
+    wednesday:
+      subject: "E2"
+      room: "803"
+    thursday:
+      subject: "L1"
+      room: "803"
+    friday:
+      subject: "Ku"
+      room: "203k"
+  slot_4:
+    monday:
+      subject: "L1"
+      room: "803"
+    tuesday:
+      subject: "M"
+      room: "803"
+    wednesday:
+      subject: "E2"
+      room: "803"
+    thursday:
+      subject: "D"
+      room: "803"
+    friday:
+      subject: "Ku"
+      room: "203k"
+  slot_5:
+    monday:
+      subject: "G"
+      room: "803"
+    tuesday:
+      subject: "Mu/Cho"
+      room: "715m/716m"
+    wednesday:
+      subject: "L1"
+      room: "803"
+    thursday:
+      subject: "D"
+      room: "803"
+    friday:
+      subject: "NuTB"
+      room: "107b"
+  slot_6:
+    monday:
+      subject: "D"
+      room: "803"
+    tuesday:
+      subject: "NuTB"
+      room: "106c"
+    wednesday:
+      subject: "M"
+      room: "803"
+    thursday:
+      subject: "Smd/Smd/Smd"
+      room: "th1/th3/th2"
+    friday:
+      subject: "G"
+      room: "803"
+  slot_7:
+    thursday:
+      subject: "Out/Out/Out"
+      room: "th3/th2/th1"
+  slot_8:
+    thursday:
+      subject: "Out/Out/Out"
+      room: "th2/th3/th1"
+  slot_9:
+    thursday:
+      subject: "Out/Out/Out"
+      room: "th2/th3/th1"
+  slot_10:
+    thursday:
+      subject: "Out/Out/Out"
+      room: "th2/th3/th1"

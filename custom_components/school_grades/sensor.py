@@ -143,6 +143,7 @@ class SchoolGradeTotalSensor(SensorEntity):
         self.entry_id = entry_id
         self._attr_name = f"{storage.child_name} Gesamtdurchschnitt"
         self._attr_unique_id = f"school_grades_{entry_id}_gesamtdurchschnitt"
+        self._upcoming_events: list[dict[str, Any]] = []
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -159,18 +160,59 @@ class SchoolGradeTotalSensor(SensorEntity):
         """Return total weighted average as native state value."""
         return self.storage.data.calculate_total_average()
 
+    async def async_update(self) -> None:
+        """Fetch upcoming calendar events when sensor updates."""
+        cal_entity = self.storage.data.calendar_entity
+        if cal_entity and self.hass and self.hass.states.get(cal_entity):
+            try:
+                from datetime import timedelta
+                from homeassistant.util import dt as dt_util
+                from homeassistant.components.calendar import async_get_events
+
+                start_date = dt_util.now()
+                end_date = start_date + timedelta(days=365)
+                raw_events = await async_get_events(self.hass, cal_entity, start_date, end_date)
+
+                events = []
+                for evt in raw_events:
+                    start_str = (
+                        evt.start.isoformat()
+                        if hasattr(evt.start, "isoformat")
+                        else str(evt.start)
+                    )
+                    end_str = (
+                        evt.end.isoformat()
+                        if hasattr(evt.end, "isoformat")
+                        else str(evt.end)
+                    )
+                    events.append({
+                        "summary": getattr(evt, "summary", "") or getattr(evt, "title", "Termin"),
+                        "start": start_str,
+                        "end": end_str,
+                        "description": getattr(evt, "description", "") or "",
+                        "location": getattr(evt, "location", "") or "",
+                    })
+                self._upcoming_events = sorted(events, key=lambda x: str(x["start"]))
+            except Exception as err:
+                _LOGGER.debug("Could not fetch calendar events in sensor for %s: %s", cal_entity, err)
+                self._upcoming_events = []
+        else:
+            self._upcoming_events = []
+
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return summary of all subject averages, assigned calendar entity, and timetable."""
+        """Return summary of all subject averages, assigned calendar entity, timetable, and upcoming events."""
         return {
             "kind_name": self.storage.child_name,
             "calendar_entity": self.storage.data.calendar_entity,
             "timetable": self.storage.data.timetable,
+            "upcoming_events": self._upcoming_events,
             "subjects_summary": {
                 subj: self.storage.data.calculate_subject_average(subj)
                 for subj in self.storage.data.subjects
             },
         }
+
 
     async def async_added_to_hass(self) -> None:
         """Register update listener when added to Home Assistant."""
