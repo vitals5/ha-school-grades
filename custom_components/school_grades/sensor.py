@@ -8,6 +8,7 @@ from homeassistant.components.sensor import SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import slugify
 
@@ -72,6 +73,7 @@ class SchoolGradeSubjectSensor(SensorEntity):
 
     _attr_icon = "mdi:school"
     _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_has_entity_name = False
 
     def __init__(
         self, storage: SchoolGradesStorage, entry_id: str, subject: str
@@ -82,6 +84,16 @@ class SchoolGradeSubjectSensor(SensorEntity):
         self.subject = subject
         self._attr_name = f"{storage.child_name} {subject} Durchschnitt"
         self._attr_unique_id = f"school_grades_{entry_id}_{slugify(subject)}"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info to group entities under child device."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self.entry_id)},
+            name=f"Schulnoten ({self.storage.child_name})",
+            manufacturer="Schulnoten",
+            model="Notenverwaltung",
+        )
 
     @property
     def native_value(self) -> float | None:
@@ -113,10 +125,9 @@ class SchoolGradeSubjectSensor(SensorEntity):
     def _handle_update(self) -> None:
         """Handle signal update and write state to Home Assistant."""
         if self.subject not in self.storage.data.subjects:
-            # Subject was removed, remove entity
             self.hass.async_create_task(self.async_remove())
             return
-        self.async_write_ha_state()
+        self.async_schedule_update_ha_state(True)
 
 
 class SchoolGradeTotalSensor(SensorEntity):
@@ -124,6 +135,7 @@ class SchoolGradeTotalSensor(SensorEntity):
 
     _attr_icon = "mdi:calculator-variant"
     _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_has_entity_name = False
 
     def __init__(self, storage: SchoolGradesStorage, entry_id: str) -> None:
         """Initialize total average sensor."""
@@ -131,6 +143,16 @@ class SchoolGradeTotalSensor(SensorEntity):
         self.entry_id = entry_id
         self._attr_name = f"{storage.child_name} Gesamtdurchschnitt"
         self._attr_unique_id = f"school_grades_{entry_id}_gesamtdurchschnitt"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info to group entities under child device."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self.entry_id)},
+            name=f"Schulnoten ({self.storage.child_name})",
+            manufacturer="Schulnoten",
+            model="Notenverwaltung",
+        )
 
     @property
     def native_value(self) -> float | None:
@@ -154,6 +176,11 @@ class SchoolGradeTotalSensor(SensorEntity):
             async_dispatcher_connect(
                 self.hass,
                 SIGNAL_UPDATE_GRADES.format(entry_id=self.entry_id),
-                self.async_write_ha_state,
+                self._handle_update,
             )
         )
+
+    @callback
+    def _handle_update(self) -> None:
+        """Handle signal update and write state to Home Assistant."""
+        self.async_schedule_update_ha_state(True)

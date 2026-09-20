@@ -26,6 +26,7 @@ class SchoolGradesData:
                 subj: [] for subj in self._subjects
             }
         else:
+            self.child_name = data.get("child_name", child_name)
             self._subjects = data.get("subjects", list(DEFAULT_SUBJECTS))
             self._grades = data.get("grades", {})
             # Ensure all subjects have an entry in grades dict
@@ -86,7 +87,7 @@ class SchoolGradesData:
             "grade": round(float(grade), 2),
             "weight": round(float(weight), 2),
             "name": name.strip(),
-            "date": date_str,
+            "date": str(date_str),
         }
         self._grades[clean_subj].append(grade_entry)
         return grade_entry
@@ -96,10 +97,10 @@ class SchoolGradesData:
         clean_subj = subject.strip()
         if clean_subj not in self._grades:
             return False
-        
+
         initial_len = len(self._grades[clean_subj])
         self._grades[clean_subj] = [
-            g for g in self._grades[clean_subj] if g.get("id") != grade_id
+            g for g in self._grades[clean_subj] if str(g.get("id")) != str(grade_id)
         ]
         return len(self._grades[clean_subj]) < initial_len
 
@@ -117,29 +118,42 @@ class SchoolGradesData:
         if not grades:
             return None
 
-        total_points = sum(g["grade"] * g["weight"] for g in grades)
-        total_weights = sum(g["weight"] for g in grades)
+        try:
+            total_points = 0.0
+            total_weights = 0.0
+            for g in grades:
+                g_val = float(g.get("grade", 0))
+                w_val = float(g.get("weight", 1.0))
+                total_points += g_val * w_val
+                total_weights += w_val
 
-        if total_weights <= 0:
+            if total_weights <= 0:
+                return None
+
+            return round(total_points / total_weights, 2)
+        except Exception as err:
+            _LOGGER.error("Error calculating average for %s: %s", subject, err)
             return None
-
-        return round(total_points / total_weights, 2)
 
     def calculate_total_average(self) -> float | None:
         """Calculate overall average across all subjects with available averages.
 
         Returns None if no subjects have grades.
         """
-        subject_averages = [
-            self.calculate_subject_average(subj)
-            for subj in self._subjects
-        ]
-        valid_averages = [avg for avg in subject_averages if avg is not None]
+        try:
+            subject_averages = [
+                self.calculate_subject_average(subj)
+                for subj in self._subjects
+            ]
+            valid_averages = [avg for avg in subject_averages if avg is not None]
 
-        if not valid_averages:
+            if not valid_averages:
+                return None
+
+            return round(sum(valid_averages) / len(valid_averages), 2)
+        except Exception as err:
+            _LOGGER.error("Error calculating total average: %s", err)
             return None
-
-        return round(sum(valid_averages) / len(valid_averages), 2)
 
 
 class SchoolGradesStorage:
