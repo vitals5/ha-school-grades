@@ -1,0 +1,174 @@
+# 🎓 Schulnoten - Beispiel Wochenstundenplan YAML Vorlage
+# Diese Datei kann als Vorlage zum Importieren oder für KI Prompts (ChatGPT / Claude / Gemini) genutzt werden.
+
+slots:
+  - id: slot_1
+    type: lesson
+    number: "1"
+    label: "1. Stunde"
+    start: "08:00"
+    end: "08:45"
+  - id: slot_2
+    type: lesson
+    number: "2"
+    label: "2. Stunde"
+    start: "08:45"
+    end: "09:30"
+  - id: break_1
+    type: break
+    label: "1. Pause"
+    start: "09:30"
+    end: "09:45"
+  - id: slot_3
+    type: lesson
+    number: "3"
+    label: "3. Stunde"
+    start: "09:45"
+    end: "10:30"
+  - id: slot_4
+    type: lesson
+    number: "4"
+    label: "4. Stunde"
+    start: "10:30"
+    end: "11:15"
+  - id: break_2
+    type: break
+    label: "2. Pause"
+    start: "11:15"
+    end: "11:30"
+  - id: slot_5
+    type: lesson
+    number: "5"
+    label: "5. Stunde"
+    start: "11:30"
+    end: "12:15"
+  - id: slot_6
+    type: lesson
+    number: "6"
+    label: "6. Stunde"
+    start: "12:15"
+    end: "13:00"
+
+schedule:
+  slot_1:
+    monday:
+      subject: "Mathematik"
+      room: "R101"
+      teacher: "Fr. Müller"
+    tuesday:
+      subject: "Deutsch"
+      room: "R205"
+      teacher: "Hr. Weber"
+    wednesday:
+      subject: "Englisch"
+      room: "R102"
+      teacher: "Fr. Smith"
+    thursday:
+      subject: "Physik"
+      room: "R301"
+      teacher: "Dr. Einstein"
+    friday:
+      subject: "Geschichte"
+      room: "R104"
+      teacher: "Hr. Fischer"
+  slot_2:
+    monday:
+      subject: "Mathematik"
+      room: "R101"
+      teacher: "Fr. Müller"
+    tuesday:
+      subject: "Sport"
+      room: "Turnhalle"
+      teacher: "Hr. Becker"
+    wednesday:
+      subject: "Englisch"
+      room: "R102"
+      teacher: "Fr. Smith"
+    thursday:
+      subject: "Biologie"
+      room: "R302"
+      teacher: "Fr. Koch"
+    friday:
+      subject: "Kunst"
+      room: "R001"
+      teacher: "Fr. Bauer"
+  slot_3:
+    monday:
+      subject: "Deutsch"
+      room: "R205"
+      teacher: "Hr. Weber"
+    tuesday:
+      subject: "Chemie"
+      room: "R303"
+      teacher: "Hr. Wagner"
+    wednesday:
+      subject: "Musik"
+      room: "R002"
+      teacher: "Fr. Richter"
+    thursday:
+      subject: "Informatik"
+      room: "EDV1"
+      teacher: "Hr. Hoffmann"
+    friday:
+      subject: "Geographie"
+      room: "R105"
+      teacher: "Fr. Schäfer"
+  slot_4:
+    monday:
+      subject: "Deutsch"
+      room: "R205"
+      teacher: "Hr. Weber"
+    tuesday:
+      subject: "Chemie"
+      room: "R303"
+      teacher: "Hr. Wagner"
+    wednesday:
+      subject: "Religion"
+      room: "R103"
+      teacher: "Fr. Klein"
+    thursday:
+      subject: "Informatik"
+      room: "EDV1"
+      teacher: "Hr. Hoffmann"
+    friday:
+      subject: "Mathematik"
+      room: "R101"
+      teacher: "Fr. Müller"
+  slot_5:
+    monday:
+      subject: "Englisch"
+      room: "R102"
+      teacher: "Fr. Smith"
+    tuesday:
+      subject: "Geschichte"
+      room: "R104"
+      teacher: "Hr. Fischer"
+    wednesday:
+      subject: "Mathematik"
+      room: "R101"
+      teacher: "Fr. Müller"
+    thursday:
+      subject: "Deutsch"
+      room: "R205"
+      teacher: "Hr. Weber"
+    friday:
+      subject: "Sport"
+      room: "Turnhalle"
+      teacher: "Hr. Becker"
+  slot_6:
+    monday:
+      subject: "Physik"
+      room: "R301"
+      teacher: "Dr. Einstein"
+    tuesday:
+      subject: "Politik"
+      room: "R104"
+      teacher: "Hr. Fischer"
+    wednesday:
+      subject: "Biologie"
+      room: "R302"
+      teacher: "Fr. Koch"
+    thursday:
+      subject: "Englisch"
+      room: "R102"
+      teacher: "Fr. Smith"

@@ -70,6 +70,72 @@ Die Integration stellt folgende Aktionen (Services) für Automatisierungen oder 
 | `school_grades.import_timetable` | Stundenplan per YAML importieren | `child_name`, `yaml_content` |
 | `school_grades.update_settings` | Land & Einstellungen aktualisieren | `child_name`, `country`, `calendar_entity`, `show_prep_card`, `show_calendar_card`, `show_timetable_card`, `show_overview_card` |
 
+### 🤖 Automatischer Stundenplan-Import per KI (Prompt-Vorlage)
+
+Hast du den Stundenplan deines Kindes als **PDF, Bild oder Foto** vorliegen? Du kannst ihn mit einer KI (z. B. **ChatGPT**, **Claude** oder **Gemini**) in wenigen Sekunden automatisch in das passende YAML-Format umwandeln lassen!
+
+#### 💡 Workflow:
+1. Kopiere die untenstehende **KI Prompt-Vorlage**.
+2. Lade dein Stundenplan-Foto oder ein PDF zusammen mit dem Prompt in ChatGPT, Claude oder Gemini hoch.
+3. Kopiere den von der KI generierten YAML-Code.
+4. Klicke im Schulnoten-Panel im Bereich Stundenplan auf **`📋 YAML Import / Export`** und füge den Code ein. Fertig!
+
+> 📄 **Beispiel-Vorlage im Repository**: [example_timetable.yaml](file:///example_timetable.yaml)
+
+#### 📋 KI Prompt-Vorlage (zum Kopieren):
+
+```text
+Du bist ein Assistent zur Datenstrukturierung. Analysiere das angehängte Bild / PDF meines Schulstundenplans und erstelle eine valide YAML-Datei für meine Home Assistant Schulnoten-Integration im exakt folgenden Format.
+
+Gib AUSSCHLIESSLICH den fertigen YAML-Codeblock aus, keine Einleitungen oder Erklärungen.
+
+YAML-Format-Vorlage:
+slots:
+  - id: slot_1
+    type: lesson
+    label: "1. Stunde"
+    start: "08:00"
+    end: "08:45"
+  - id: slot_2
+    type: lesson
+    label: "2. Stunde"
+    start: "08:45"
+    end: "09:30"
+  - id: break_1
+    type: break
+    label: "1. Pause"
+    start: "09:30"
+    end: "09:45"
+
+schedule:
+  slot_1:
+    monday:
+      subject: "Mathematik"
+      room: "R101"
+      teacher: "Fr. Müller"
+    tuesday:
+      subject: "Deutsch"
+      room: "R205"
+      teacher: "Hr. Weber"
+    wednesday:
+      subject: "Englisch"
+      room: "R102"
+      teacher: "Fr. Smith"
+    thursday:
+      subject: "Physik"
+      room: "R301"
+      teacher: "Dr. Einstein"
+    friday:
+      subject: "Geschichte"
+      room: "R104"
+      teacher: "Hr. Fischer"
+
+Regeln:
+1. Nutze als Wochentags-Schlüssel exakt: monday, tuesday, wednesday, thursday, friday.
+2. Wenn ein Fach keine Raum- oder Lehrerangabe hat, lasse room und teacher weg.
+3. Pausen (type: break) benötigen keinen Eintrag unter schedule.
+```
+
 
 ### 🔔 Binary Sensor für Sprachansagen & Benachrichtigungen
 
@@ -175,6 +241,55 @@ The integration provides the following actions (services) for automations and sc
 | `school_grades.update_timetable_cell` | Edit timetable slot | `child_name`, `slot_id`, `day`, `subject`, `room`, `teacher` |
 | `school_grades.import_timetable` | Import timetable via YAML | `child_name`, `yaml_content` |
 | `school_grades.update_settings` | Update country & settings | `child_name`, `country`, `calendar_entity`, `show_prep_card`, `show_calendar_card`, `show_timetable_card`, `show_overview_card` |
+
+### 🤖 Automatic Timetable Import via AI (Prompt Template)
+
+Do you have your child's timetable as a **PDF, photo, or image**? You can use an AI (e.g., **ChatGPT**, **Claude**, or **Gemini**) to convert it into the required YAML format within seconds!
+
+#### 💡 Workflow:
+1. Copy the **AI Prompt Template** below.
+2. Upload a picture or PDF of the timetable together with the prompt into ChatGPT, Claude, or Gemini.
+3. Copy the resulting YAML code snippet.
+4. In the Schulnoten sidebar panel, click **`📋 YAML Import / Export`** on the timetable card, paste the YAML, and click Import. Done!
+
+> 📄 **Example template file in repository**: [example_timetable.yaml](file:///example_timetable.yaml)
+
+#### 📋 AI Prompt Template (Ready to Copy):
+
+```text
+You are a data structuring assistant. Analyze the attached image / PDF of my school timetable and generate a valid YAML configuration for my Home Assistant School Grades integration in the exact format shown below.
+
+Output ONLY the final YAML code block without any surrounding text or explanations.
+
+YAML Format Template:
+slots:
+  - id: slot_1
+    type: lesson
+    label: "1st Period"
+    start: "08:00"
+    end: "08:45"
+  - id: break_1
+    type: break
+    label: "Break"
+    start: "09:30"
+    end: "09:45"
+
+schedule:
+  slot_1:
+    monday:
+      subject: "Mathematics"
+      room: "R101"
+      teacher: "Mrs. Smith"
+    tuesday:
+      subject: "English"
+      room: "R205"
+      teacher: "Mr. Jones"
+
+Rules:
+1. Use exact weekday keys: monday, tuesday, wednesday, thursday, friday.
+2. Omit room or teacher keys if not specified in the source document.
+3. Break slots (type: break) do not require an entry under schedule.
+```
 
 
 ### 🔔 Binary Sensor for Voice Announcements & Notifications
