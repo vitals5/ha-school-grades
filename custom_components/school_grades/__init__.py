@@ -41,9 +41,11 @@ from .const import (
     SERVICE_ADD_GRADE,
     SERVICE_ADD_SUBJECT,
     SERVICE_IMPORT_TIMETABLE,
+    SERVICE_REMOVE_CALENDAR_EVENT,
     SERVICE_REMOVE_GRADE,
     SERVICE_REMOVE_SUBJECT,
     SERVICE_SET_CALENDAR,
+    SERVICE_UPDATE_CALENDAR_EVENT,
     SERVICE_UPDATE_SETTINGS,
     SERVICE_UPDATE_TIMETABLE_CELL,
     SIGNAL_UPDATE_GRADES,
@@ -137,6 +139,28 @@ SCHEMA_ADD_CALENDAR_EVENT = vol.Schema(
         vol.Required(CONF_DATE): cv.string,
         vol.Optional(CONF_START_TIME, default="08:00"): cv.string,
         vol.Optional(CONF_DESCRIPTION, default=""): cv.string,
+    }
+)
+
+SCHEMA_UPDATE_CALENDAR_EVENT = vol.Schema(
+    {
+        vol.Optional(CONF_CHILD_NAME): cv.string,
+        vol.Optional(CONF_CALENDAR): cv.string,
+        vol.Optional("uid"): cv.string,
+        vol.Required(CONF_SUMMARY): cv.string,
+        vol.Required(CONF_DATE): cv.string,
+        vol.Optional(CONF_START_TIME, default="08:00"): cv.string,
+        vol.Optional(CONF_DESCRIPTION, default=""): cv.string,
+    }
+)
+
+SCHEMA_REMOVE_CALENDAR_EVENT = vol.Schema(
+    {
+        vol.Optional(CONF_CHILD_NAME): cv.string,
+        vol.Optional(CONF_CALENDAR): cv.string,
+        vol.Optional("uid"): cv.string,
+        vol.Optional(CONF_SUMMARY): cv.string,
+        vol.Optional(CONF_DATE): cv.string,
     }
 )
 
@@ -433,6 +457,113 @@ def _register_services(hass: HomeAssistant) -> None:
         except Exception as err:
             _LOGGER.error("Failed to create calendar event on %s: %s", target_calendar, err)
 
+    async def handle_update_calendar_event(call: ServiceCall) -> None:
+        """Handle update_calendar_event action call."""
+        child_name = call.data.get(CONF_CHILD_NAME)
+        uid = call.data.get("uid")
+        summary = call.data[CONF_SUMMARY]
+        date_str = call.data[CONF_DATE]
+        start_time_str = call.data.get(CONF_START_TIME, "08:00") or "08:00"
+        description = call.data.get(CONF_DESCRIPTION, "")
+        target_calendar = call.data.get(CONF_CALENDAR)
+
+        storage = _get_storage(hass, child_name)
+        if storage and not target_calendar:
+            target_calendar = storage.data.calendar_entity
+
+        if not target_calendar:
+            _LOGGER.error("No target calendar specified or assigned for child %s", child_name)
+            return
+
+        try:
+            from datetime import datetime, timedelta
+
+            clean_time = start_time_str.strip()
+            if len(clean_time) == 5 and ":" in clean_time:
+                start_iso = f"{date_str.strip()}T{clean_time}:00"
+            else:
+                start_iso = f"{date_str.strip()}T08:00:00"
+
+            start_dt = datetime.fromisoformat(start_iso)
+            end_dt = start_dt + timedelta(hours=1)
+
+            service_data = {
+                "entity_id": target_calendar,
+                "summary": summary,
+                "start_date_time": start_dt.isoformat(),
+                "end_date_time": end_dt.isoformat(),
+            }
+            if uid:
+                service_data["uid"] = uid
+            if description:
+                service_data["description"] = description
+
+            try:
+                await hass.services.async_call(
+                    "calendar",
+                    "update_event",
+                    service_data,
+                    blocking=True,
+                )
+            except Exception as update_err:
+                _LOGGER.debug("update_event failed, trying delete+create fallback: %s", update_err)
+                if uid:
+                    try:
+                        await hass.services.async_call(
+                            "calendar", "delete_event", {"entity_id": target_calendar, "uid": uid}, blocking=True
+                        )
+                    except Exception:
+                        pass
+                await hass.services.async_call(
+                    "calendar", "create_event", service_data, blocking=True
+                )
+
+            _LOGGER.info("Successfully updated calendar event '%s' on %s", summary, target_calendar)
+
+            if storage:
+                async_dispatcher_send(
+                    hass, SIGNAL_UPDATE_GRADES.format(entry_id=storage.entry_id)
+                )
+        except Exception as err:
+            _LOGGER.error("Failed to update calendar event on %s: %s", target_calendar, err)
+
+    async def handle_remove_calendar_event(call: ServiceCall) -> None:
+        """Handle remove_calendar_event action call."""
+        child_name = call.data.get(CONF_CHILD_NAME)
+        uid = call.data.get("uid")
+        summary = call.data.get(CONF_SUMMARY)
+        target_calendar = call.data.get(CONF_CALENDAR)
+
+        storage = _get_storage(hass, child_name)
+        if storage and not target_calendar:
+            target_calendar = storage.data.calendar_entity
+
+        if not target_calendar:
+            _LOGGER.error("No target calendar specified or assigned for child %s", child_name)
+            return
+
+        try:
+            service_data = {"entity_id": target_calendar}
+            if uid:
+                service_data["uid"] = uid
+            elif summary:
+                service_data["summary"] = summary
+
+            await hass.services.async_call(
+                "calendar",
+                "delete_event",
+                service_data,
+                blocking=True,
+            )
+            _LOGGER.info("Successfully deleted calendar event on %s", target_calendar)
+
+            if storage:
+                async_dispatcher_send(
+                    hass, SIGNAL_UPDATE_GRADES.format(entry_id=storage.entry_id)
+                )
+        except Exception as err:
+            _LOGGER.error("Failed to delete calendar event on %s: %s", target_calendar, err)
+
     hass.services.async_register(
         DOMAIN, SERVICE_ADD_SUBJECT, handle_add_subject, schema=SCHEMA_ADD_SUBJECT
     )
@@ -460,6 +591,12 @@ def _register_services(hass: HomeAssistant) -> None:
     hass.services.async_register(
         DOMAIN, SERVICE_ADD_CALENDAR_EVENT, handle_add_calendar_event, schema=SCHEMA_ADD_CALENDAR_EVENT
     )
+    hass.services.async_register(
+        DOMAIN, SERVICE_UPDATE_CALENDAR_EVENT, handle_update_calendar_event, schema=SCHEMA_UPDATE_CALENDAR_EVENT
+    )
+    hass.services.async_register(
+        DOMAIN, SERVICE_REMOVE_CALENDAR_EVENT, handle_remove_calendar_event, schema=SCHEMA_REMOVE_CALENDAR_EVENT
+    )
 
 
 def _unregister_services(hass: HomeAssistant) -> None:
@@ -473,4 +610,6 @@ def _unregister_services(hass: HomeAssistant) -> None:
     hass.services.async_remove(DOMAIN, SERVICE_IMPORT_TIMETABLE)
     hass.services.async_remove(DOMAIN, SERVICE_UPDATE_SETTINGS)
     hass.services.async_remove(DOMAIN, SERVICE_ADD_CALENDAR_EVENT)
+    hass.services.async_remove(DOMAIN, SERVICE_UPDATE_CALENDAR_EVENT)
+    hass.services.async_remove(DOMAIN, SERVICE_REMOVE_CALENDAR_EVENT)
 

@@ -186,7 +186,9 @@ class SchoolGradeTotalSensor(SensorEntity):
                         if hasattr(evt.end, "isoformat")
                         else str(evt.end)
                     )
+                    uid_val = getattr(evt, "uid", None) or getattr(evt, "id", None) or getattr(evt, "event_id", None) or ""
                     events.append({
+                        "uid": str(uid_val),
                         "summary": getattr(evt, "summary", "") or getattr(evt, "title", "Termin"),
                         "start": start_str,
                         "end": end_str,

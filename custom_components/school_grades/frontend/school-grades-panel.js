@@ -296,6 +296,7 @@ const I18N = {
     countdown_days: "In {days} Tagen",
     add_event_btn: "➕ Termin / Klausur eintragen",
     add_event_title: "📅 Neuen Termin / Klausur im Kalender erstellen",
+    edit_event_title: "✏️ Termin / Klausur bearbeiten",
     event_summary_label: "Terminname / Klausur",
     event_summary_placeholder: "z. B. Mathe Schulaufgabe, Bio Test",
     event_date_label: "Datum",
@@ -303,6 +304,9 @@ const I18N = {
     event_desc_label: "Beschreibung / Raum (optional)",
     event_desc_placeholder: "z. B. Raum 101, Themen Kap. 3",
     submit_add_event: "💾 Termin im Kalender speichern",
+    submit_update_event: "💾 Änderungen speichern",
+    delete_event_btn: "🗑️ Termin löschen",
+    delete_event_confirm: "Möchtest du den Termin \"{summary}\" wirklich aus dem Kalender löschen?",
     
     // Timetable card
     timetable_title: "📅 Wochenstundenplan",
@@ -421,6 +425,7 @@ const I18N = {
     countdown_days: "In {days} days",
     add_event_btn: "➕ Add Exam / Event",
     add_event_title: "📅 Create New Exam / Event in Calendar",
+    edit_event_title: "✏️ Edit Exam / Event",
     event_summary_label: "Title / Exam Name",
     event_summary_placeholder: "e.g., Math Exam, Biology Quiz",
     event_date_label: "Date",
@@ -428,6 +433,9 @@ const I18N = {
     event_desc_label: "Description / Room (optional)",
     event_desc_placeholder: "e.g., Room 101, Topics Ch. 3",
     submit_add_event: "💾 Save Event to Calendar",
+    submit_update_event: "💾 Save Changes",
+    delete_event_btn: "🗑️ Delete Event",
+    delete_event_confirm: "Are you sure you want to delete the event \"{summary}\" from the calendar?",
     
     // Timetable card
     timetable_title: "📅 Weekly Timetable",
@@ -530,6 +538,7 @@ class SchoolGradesPanel extends HTMLElement {
     this._settingsTab = 'general';
     this._showAddGradeCard = false;
     this._showAddEventCard = false;
+    this._editingEvent = null;
   }
 
   set hass(hass) {
@@ -1046,31 +1055,40 @@ class SchoolGradesPanel extends HTMLElement {
             ${this._showAddEventCard ? `
               <div class="add-event-form-container" style="background: rgba(0, 0, 0, 0.25); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); border-radius: 12px; padding: 16px; margin: 16px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-                  <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: #fff;">${this._t('add_event_title')}</h4>
+                  <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: #fff;">
+                    ${this._editingEvent ? this._t('edit_event_title') : this._t('add_event_title')}
+                  </h4>
                   <button type="button" id="close-add-event-x" style="background: none; border: none; color: rgba(255,255,255,0.6); cursor: pointer; font-size: 16px; padding: 4px;">✖</button>
                 </div>
                 <form id="add-event-form">
                   <div class="form-group" style="margin-bottom: 12px;">
                     <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: #fff;">${this._t('event_summary_label')}</label>
-                    <input type="text" id="event-summary-input" required placeholder="${this._t('event_summary_placeholder')}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 13px; box-sizing: border-box;">
+                    <input type="text" id="event-summary-input" required value="${this._editingEvent ? this._editingEvent.summary : ''}" placeholder="${this._t('event_summary_placeholder')}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 13px; box-sizing: border-box;">
                   </div>
                   <div class="form-row" style="display: flex; gap: 12px; margin-bottom: 12px;">
                     <div class="form-group half" style="flex: 1;">
                       <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: #fff;">${this._t('event_date_label')}</label>
-                      <input type="date" id="event-date-input" required value="${new Date().toISOString().split('T')[0]}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 13px; box-sizing: border-box;">
+                      <input type="date" id="event-date-input" required value="${this._editingEvent ? this._editingEvent.date : new Date().toISOString().split('T')[0]}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 13px; box-sizing: border-box;">
                     </div>
                     <div class="form-group half" style="flex: 1;">
                       <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: #fff;">${this._t('event_time_label')}</label>
-                      <input type="time" id="event-time-input" required value="08:00" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 13px; box-sizing: border-box;">
+                      <input type="time" id="event-time-input" required value="${this._editingEvent ? this._editingEvent.time : '08:00'}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 13px; box-sizing: border-box;">
                     </div>
                   </div>
                   <div class="form-group" style="margin-bottom: 16px;">
                     <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: #fff;">${this._t('event_desc_label')}</label>
-                    <input type="text" id="event-desc-input" placeholder="${this._t('event_desc_placeholder')}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 13px; box-sizing: border-box;">
+                    <input type="text" id="event-desc-input" value="${this._editingEvent ? (this._editingEvent.description || '') : ''}" placeholder="${this._t('event_desc_placeholder')}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 13px; box-sizing: border-box;">
                   </div>
-                  <div style="display: flex; justify-content: flex-end; gap: 10px;">
-                    <button type="button" class="submit-btn secondary" id="cancel-add-event-btn" style="width: auto; padding: 8px 16px; font-size: 13px;">${this._t('cancel_btn')}</button>
-                    <button type="submit" class="submit-btn" style="width: auto; padding: 8px 18px; font-size: 13px; background: linear-gradient(135deg, #10b981, #059669); color: #fff; border: none; border-radius: 8px; cursor: pointer;">${this._t('submit_add_event')}</button>
+                  <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                    ${this._editingEvent ? `
+                      <button type="button" class="delete-btn" id="delete-event-btn" style="padding: 8px 16px; font-size: 13px;">${this._t('delete_event_btn')}</button>
+                    ` : `<div></div>`}
+                    <div style="display: flex; gap: 10px;">
+                      <button type="button" class="submit-btn secondary" id="cancel-add-event-btn" style="width: auto; padding: 8px 16px; font-size: 13px;">${this._t('cancel_btn')}</button>
+                      <button type="submit" class="submit-btn" style="width: auto; padding: 8px 18px; font-size: 13px; background: linear-gradient(135deg, #10b981, #059669); color: #fff; border: none; border-radius: 8px; cursor: pointer;">
+                        ${this._editingEvent ? this._t('submit_update_event') : this._t('submit_add_event')}
+                      </button>
+                    </div>
                   </div>
                 </form>
               </div>
@@ -1094,7 +1112,7 @@ class SchoolGradesPanel extends HTMLElement {
                     const isAllDay = (typeof evt.start === 'string' && evt.start.length === 10) || formattedTime === '00:00';
                     const countdownText = this._getCountdownBadge(startDate);
                     return `
-                      <div class="event-item">
+                      <div class="event-item clickable-event" data-uid="${evt.uid || ''}" data-summary="${evt.summary || ''}" data-start="${evt.start || ''}" data-desc="${evt.description || ''}" style="cursor: pointer;" title="${this._t('edit_event_title')}">
                         <div class="event-badge-row">
                           <span class="event-countdown ${countdownText.cls}">${countdownText.text}</span>
                           <span class="event-time">${formattedDate} ${!isAllDay ? this._t('time_at', { time: formattedTime }) : this._t('all_day')}</span>
@@ -1748,7 +1766,13 @@ class SchoolGradesPanel extends HTMLElement {
     const toggleAddEventBtn = root.querySelector('#toggle-add-event-btn');
     if (toggleAddEventBtn) {
       toggleAddEventBtn.addEventListener('click', () => {
-        this._showAddEventCard = !this._showAddEventCard;
+        if (this._showAddEventCard) {
+          this._showAddEventCard = false;
+          this._editingEvent = null;
+        } else {
+          this._editingEvent = null;
+          this._showAddEventCard = true;
+        }
         this.render();
       });
     }
@@ -1757,6 +1781,7 @@ class SchoolGradesPanel extends HTMLElement {
     if (closeAddEventX) {
       closeAddEventX.addEventListener('click', () => {
         this._showAddEventCard = false;
+        this._editingEvent = null;
         this.render();
       });
     }
@@ -1765,11 +1790,78 @@ class SchoolGradesPanel extends HTMLElement {
     if (cancelAddEventBtn) {
       cancelAddEventBtn.addEventListener('click', () => {
         this._showAddEventCard = false;
+        this._editingEvent = null;
         this.render();
       });
     }
 
-    // Add Calendar Event Form Submit
+    // Click Event Item in Grid to Edit
+    root.querySelectorAll('.clickable-event').forEach(item => {
+      item.addEventListener('click', (e) => {
+        const uid = e.currentTarget.dataset.uid || '';
+        const summary = e.currentTarget.dataset.summary || '';
+        const startIso = e.currentTarget.dataset.start || '';
+        const description = e.currentTarget.dataset.desc || '';
+
+        let dateStr = new Date().toISOString().split('T')[0];
+        let timeStr = '08:00';
+
+        if (startIso) {
+          if (startIso.includes('T')) {
+            const parts = startIso.split('T');
+            dateStr = parts[0];
+            if (parts[1] && parts[1].length >= 5) {
+              timeStr = parts[1].substring(0, 5);
+            }
+          } else {
+            dateStr = startIso.substring(0, 10);
+          }
+        }
+
+        this._editingEvent = {
+          uid: uid,
+          summary: summary,
+          date: dateStr,
+          time: timeStr,
+          description: description,
+        };
+        this._showAddEventCard = true;
+        this.render();
+      });
+    });
+
+    // Delete Calendar Event Button
+    const deleteEventBtn = root.querySelector('#delete-event-btn');
+    if (deleteEventBtn && this._editingEvent) {
+      deleteEventBtn.addEventListener('click', async () => {
+        const summary = this._editingEvent.summary;
+        const uid = this._editingEvent.uid;
+        if (confirm(this._t('delete_event_confirm', { summary: summary }))) {
+          const currentChildData = this._getSchoolGradesData()[this._selectedChild];
+          const calEntity = currentChildData ? currentChildData.calendarEntity : null;
+          await this._hass.callService('school_grades', 'remove_calendar_event', {
+            child_name: this._selectedChild,
+            calendar_entity: calEntity,
+            uid: uid,
+            summary: summary,
+          });
+          this._showAddEventCard = false;
+          this._editingEvent = null;
+          this.render();
+          this._fetchUpcomingCalendarEvents();
+          setTimeout(() => {
+            this._fetchUpcomingCalendarEvents();
+            this.render();
+          }, 500);
+          setTimeout(() => {
+            this._fetchUpcomingCalendarEvents();
+            this.render();
+          }, 1200);
+        }
+      });
+    }
+
+    // Add / Update Calendar Event Form Submit
     const addEventForm = root.querySelector('#add-event-form');
     if (addEventForm) {
       addEventForm.addEventListener('submit', async (e) => {
@@ -1788,15 +1880,22 @@ class SchoolGradesPanel extends HTMLElement {
         const calEntity = currentChildData ? currentChildData.calendarEntity : null;
 
         if (summary && dateVal && calEntity) {
-          await this._hass.callService('school_grades', 'add_calendar_event', {
+          const serviceName = this._editingEvent ? 'update_calendar_event' : 'add_calendar_event';
+          const payload = {
             child_name: this._selectedChild,
             calendar_entity: calEntity,
             summary: summary,
             date: dateVal,
             start_time: timeVal || '08:00',
             description: descVal,
-          });
+          };
+          if (this._editingEvent && this._editingEvent.uid) {
+            payload.uid = this._editingEvent.uid;
+          }
+
+          await this._hass.callService('school_grades', serviceName, payload);
           this._showAddEventCard = false;
+          this._editingEvent = null;
           this.render();
           this._fetchUpcomingCalendarEvents();
           setTimeout(() => {
@@ -2359,6 +2458,13 @@ class SchoolGradesPanel extends HTMLElement {
         border: 1px solid rgba(255, 255, 255, 0.08);
         border-radius: 12px;
         padding: 14px;
+        transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+      }
+
+      .event-item.clickable-event:hover {
+        transform: translateY(-2px);
+        border-color: var(--primary-color, #4ea8de);
+        box-shadow: 0 4px 14px rgba(78, 168, 222, 0.25);
       }
 
       .event-badge-row {

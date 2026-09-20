@@ -53,6 +53,14 @@
     "add_calendar_event": {
       "name": "Klausur / Termin im Kalender erstellen",
       "description": "Erstellt einen neuen Kalendereintrag im verknüpften Kalender."
+    },
+    "update_calendar_event": {
+      "name": "Klausur / Termin im Kalender bearbeiten",
+      "description": "Aktualisiert einen bestehenden Kalendereintrag im verknüpften Kalender."
+    },
+    "remove_calendar_event": {
+      "name": "Klausur / Termin aus Kalender löschen",
+      "description": "Löscht einen Kalendereintrag aus dem verknüpften Kalender."
     }
   }
 }

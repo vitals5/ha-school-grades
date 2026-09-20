@@ -324,6 +324,88 @@ add_calendar_event:
       selector:
         text:
 
+update_calendar_event:
+  name: "Klausur / Termin im Kalender bearbeiten"
+  description: "Aktualisiert einen bestehenden Kalendereintrag im verknüpften Kalender."
+  fields:
+    child_name:
+      name: "Name des Kindes"
+      description: "Name des Kindes (optional)."
+      example: "Max"
+      selector:
+        text:
+    calendar_entity:
+      name: "Kalender-Entität"
+      description: "Ziel-Kalender (optional)."
+      example: "calendar.richard_klausuren"
+      selector:
+        entity:
+          domain: calendar
+    uid:
+      name: "Termin-UID"
+      description: "Eindeutige ID des Kalendereintrags."
+      example: "a1b2c3d4"
+      selector:
+        text:
+    summary:
+      name: "Terminname / Klausur"
+      description: "Titel oder Bezeichnung."
+      required: true
+      example: "Mathe Schulaufgabe"
+      selector:
+        text:
+    date:
+      name: "Datum"
+      description: "Datum des Termins (YYYY-MM-DD)."
+      required: true
+      example: "2026-09-25"
+      selector:
+        date:
+    start_time:
+      name: "Uhrzeit"
+      description: "Uhrzeit im Format HH:MM."
+      default: "08:00"
+      example: "08:00"
+      selector:
+        time:
+    description:
+      name: "Beschreibung"
+      description: "Zusatzinformationen oder Raumnummer."
+      example: "Raum 101"
+      selector:
+        text:
+
+remove_calendar_event:
+  name: "Klausur / Termin aus Kalender löschen"
+  description: "Löscht einen Kalendereintrag aus dem verknüpften Kalender."
+  fields:
+    child_name:
+      name: "Name des Kindes"
+      description: "Name des Kindes (optional)."
+      example: "Max"
+      selector:
+        text:
+    calendar_entity:
+      name: "Kalender-Entität"
+      description: "Ziel-Kalender (optional)."
+      example: "calendar.richard_klausuren"
+      selector:
+        entity:
+          domain: calendar
+    uid:
+      name: "Termin-UID"
+      description: "Eindeutige ID des zu löschenden Kalendereintrags."
+      example: "a1b2c3d4"
+      selector:
+        text:
+    summary:
+      name: "Terminname"
+      description: "Titel des zu löschenden Termins (falls UID nicht bekannt)."
+      example: "Mathe Schulaufgabe"
+      selector:
+        text:
+
+
 
 
 
