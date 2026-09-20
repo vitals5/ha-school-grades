@@ -58,7 +58,7 @@ async def async_setup_entry(
 
     async_add_entities(initial_entities)
 
-    # Listen for update signals to dynamically add subject sensors
+    # Listen for update signals on ConfigEntry to dynamically add subject sensors
     entry.async_on_unload(
         async_dispatcher_connect(
             hass,
@@ -113,7 +113,7 @@ class SchoolGradeSubjectSensor(SensorEntity):
 
     async def async_added_to_hass(self) -> None:
         """Register update listener when added to Home Assistant."""
-        self.async_on_unload(
+        self.async_on_remove(
             async_dispatcher_connect(
                 self.hass,
                 SIGNAL_UPDATE_GRADES.format(entry_id=self.entry_id),
@@ -172,7 +172,7 @@ class SchoolGradeTotalSensor(SensorEntity):
 
     async def async_added_to_hass(self) -> None:
         """Register update listener when added to Home Assistant."""
-        self.async_on_unload(
+        self.async_on_remove(
             async_dispatcher_connect(
                 self.hass,
                 SIGNAL_UPDATE_GRADES.format(entry_id=self.entry_id),
