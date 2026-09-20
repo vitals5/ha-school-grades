@@ -3,6 +3,7 @@
   "name": "Schulnoten",
   "codeowners": ["@vitals5"],
   "config_flow": true,
+  "dependencies": ["frontend", "panel_custom", "http"],
   "documentation": "https://github.com/vitals5/ha-school-grades",
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/vitals5/ha-school-grades/issues",

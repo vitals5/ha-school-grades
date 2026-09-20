@@ -108,16 +108,20 @@ async def _async_setup_frontend(hass: HomeAssistant) -> None:
 
     if not hass.data.get(f"{DOMAIN}_panel_registered"):
         hass.data[f"{DOMAIN}_panel_registered"] = True
-        await panel_custom.async_register_panel(
-            hass=hass,
-            webcomponent_name="school-grades-panel",
-            sidebar_title="Schulnoten",
-            sidebar_icon="mdi:school",
-            url_path="schulnoten",
-            module_url=f"{URL_BASE}/school-grades-panel.js",
-            embed_iframe=False,
-            require_admin=False,
-        )
+        try:
+            await panel_custom.async_register_panel(
+                hass=hass,
+                webcomponent_name="school-grades-panel",
+                sidebar_title="Schulnoten",
+                sidebar_icon="mdi:school",
+                url_path="schulnoten",
+                module_url=f"{URL_BASE}/school-grades-panel.js",
+                embed_iframe=False,
+                require_admin=False,
+            )
+            _LOGGER.info("Successfully registered Schulnoten sidebar panel at /schulnoten")
+        except Exception as err:
+            _LOGGER.error("Failed to register Schulnoten panel: %s", err)
 
 
 async def async_update_options_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:

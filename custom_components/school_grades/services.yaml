@@ -65,19 +65,19 @@ add_grade:
     weight:
       name: "Gewichtung"
       description: "Gewichtung der Note (z.B. 1-fach, 2-fach, 3-fach, 4-fach)."
-      default: 1.0
-      example: 2.0
+      default: "1.0"
+      example: "2.0"
       selector:
         select:
           options:
             - label: "1-fach (normal)"
-              value: 1.0
+              value: "1.0"
             - label: "2-fach (doppelt)"
-              value: 2.0
+              value: "2.0"
             - label: "3-fach (dreifach)"
-              value: 3.0
+              value: "3.0"
             - label: "4-fach (vierfach)"
-              value: 4.0
+              value: "4.0"
           custom_value: true
     name:
       name: "Beschreibung / Bezeichnung"
