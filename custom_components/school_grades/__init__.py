@@ -598,21 +598,109 @@ def _register_services(hass: HomeAssistant) -> None:
                     except Exception as err2:
                         _LOGGER.debug("Update action %s.%s with uid key failed: %s", domain, svc_name, err2)
 
-            if not success:
-                # If update action failed or not supported, attempt delete old (if possible) and create new event
-                if uid:
-                    del_domain, del_svc = _find_calendar_service("delete")
+    async def _async_delete_calendar_event(target_calendar: str, uid: str) -> bool:
+        """Helper to delete a calendar event using direct entity calls or service calls."""
+        if not target_calendar or not uid:
+            return False
+
+        # Method 1: Try direct CalendarEntity.async_delete_event on registered entity
+        try:
+            entity_components = hass.data.get("entity_components", {})
+            cal_component = entity_components.get("calendar")
+            if cal_component:
+                entity = cal_component.get_entity(target_calendar)
+                if entity and hasattr(entity, "async_delete_event"):
+                    await entity.async_delete_event(uid)
+                    _LOGGER.info("Successfully deleted calendar event %s directly via entity on %s", uid, target_calendar)
+                    return True
+        except Exception as direct_err:
+            _LOGGER.debug("Direct entity delete_event failed on %s: %s", target_calendar, direct_err)
+
+        # Method 2: Try calendar.delete_event service call with event_uid
+        del_domain, del_svc = _find_calendar_service("delete")
+        try:
+            await hass.services.async_call(
+                del_domain, del_svc, {"entity_id": target_calendar, "event_uid": uid}, blocking=True
+            )
+            return True
+        except Exception as err1:
+            _LOGGER.debug("Delete action %s.%s with event_uid failed: %s", del_domain, del_svc, err1)
+
+        # Method 3: Try calendar.delete_event service call with uid
+        try:
+            await hass.services.async_call(
+                del_domain, del_svc, {"entity_id": target_calendar, "uid": uid}, blocking=True
+            )
+            return True
+        except Exception as err2:
+            _LOGGER.debug("Delete action %s.%s with uid key failed: %s", del_domain, del_svc, err2)
+
+        return False
+
+    async def handle_update_calendar_event(call: ServiceCall) -> None:
+        """Handle update_calendar_event action call."""
+        child_name = call.data.get(CONF_CHILD_NAME)
+        uid = call.data.get("uid")
+        original_summary = call.data.get("original_summary")
+        original_date = call.data.get("original_date")
+        summary = call.data[CONF_SUMMARY]
+        date_str = call.data[CONF_DATE]
+        start_time_str = call.data.get(CONF_START_TIME, "08:00") or "08:00"
+        description = call.data.get(CONF_DESCRIPTION, "")
+        target_calendar = call.data.get(CONF_CALENDAR)
+
+        storage = _get_storage(hass, child_name)
+        if storage and not target_calendar:
+            target_calendar = storage.data.calendar_entity
+
+        if not target_calendar:
+            _LOGGER.error("No target calendar specified or assigned for child %s", child_name)
+            return
+
+        if not uid or not str(uid).strip():
+            uid = await _async_find_event_uid(target_calendar, original_summary or summary, original_date or date_str)
+
+        try:
+            start_iso, end_iso = _parse_event_datetime(date_str, start_time_str)
+
+            success = False
+            domain, svc_name = _find_calendar_service("update")
+
+            if uid:
+                payload1 = {
+                    "entity_id": target_calendar,
+                    "event_uid": uid,
+                    "summary": summary,
+                    "start_date_time": start_iso,
+                    "end_date_time": end_iso,
+                }
+                if description:
+                    payload1["description"] = description
+
+                try:
+                    await hass.services.async_call(domain, svc_name, payload1, blocking=True)
+                    success = True
+                except Exception as err1:
+                    _LOGGER.debug("Update action %s.%s with event_uid failed: %s, trying uid key", domain, svc_name, err1)
+                    payload2 = {
+                        "entity_id": target_calendar,
+                        "uid": uid,
+                        "summary": summary,
+                        "start_date_time": start_iso,
+                        "end_date_time": end_iso,
+                    }
+                    if description:
+                        payload2["description"] = description
                     try:
-                        await hass.services.async_call(
-                            del_domain, del_svc, {"entity_id": target_calendar, "event_uid": uid}, blocking=True
-                        )
-                    except Exception:
-                        try:
-                            await hass.services.async_call(
-                                del_domain, del_svc, {"entity_id": target_calendar, "uid": uid}, blocking=True
-                            )
-                        except Exception as del_err:
-                            _LOGGER.debug("Fallback delete failed: %s", del_err)
+                        await hass.services.async_call(domain, svc_name, payload2, blocking=True)
+                        success = True
+                    except Exception as err2:
+                        _LOGGER.debug("Update action %s.%s with uid key failed: %s", domain, svc_name, err2)
+
+            if not success:
+                # Fallback: Delete old event if possible and create new event
+                if uid:
+                    await _async_delete_calendar_event(target_calendar, uid)
 
                 c_domain, c_svc = _find_calendar_service("create")
                 create_data = {
@@ -652,36 +740,23 @@ def _register_services(hass: HomeAssistant) -> None:
             _LOGGER.error("No target calendar specified or assigned for child %s", child_name)
             return
 
-        if (not uid or not str(uid).strip()) and (summary or original_summary):
-            uid = await _async_find_event_uid(target_calendar, original_summary or summary, original_date or date_str)
-
-        domain, svc_name = _find_calendar_service("delete")
         deleted = False
+        if uid and str(uid).strip():
+            deleted = await _async_delete_calendar_event(target_calendar, str(uid).strip())
 
-        if uid:
-            try:
-                await hass.services.async_call(
-                    domain, svc_name, {"entity_id": target_calendar, "event_uid": uid}, blocking=True
-                )
-                deleted = True
-            except Exception as err1:
-                _LOGGER.debug("Delete action %s.%s with event_uid failed: %s, trying uid key", domain, svc_name, err1)
-                try:
-                    await hass.services.async_call(
-                        domain, svc_name, {"entity_id": target_calendar, "uid": uid}, blocking=True
-                    )
-                    deleted = True
-                except Exception as err2:
-                    _LOGGER.error("Failed to delete calendar event %s on %s using %s.%s: %s", uid, target_calendar, domain, svc_name, err2)
+        if not deleted and (summary or original_summary):
+            found_uid = await _async_find_event_uid(target_calendar, original_summary or summary, original_date or date_str)
+            if found_uid and found_uid != uid:
+                deleted = await _async_delete_calendar_event(target_calendar, found_uid)
 
         if deleted:
-            _LOGGER.info("Successfully deleted calendar event %s on %s", uid, target_calendar)
+            _LOGGER.info("Successfully deleted calendar event on %s", target_calendar)
             if storage:
                 async_dispatcher_send(
                     hass, SIGNAL_UPDATE_GRADES.format(entry_id=storage.entry_id)
                 )
         else:
-            _LOGGER.warning("Calendar '%s' does not allow deleting events via API in Home Assistant.", target_calendar)
+            _LOGGER.warning("Could not delete event on %s - ensure calendar entity supports deletion", target_calendar)
 
     hass.services.async_register(
         DOMAIN, SERVICE_ADD_SUBJECT, handle_add_subject, schema=SCHEMA_ADD_SUBJECT
