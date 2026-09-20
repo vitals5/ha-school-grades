@@ -279,6 +279,52 @@ update_settings:
       selector:
         boolean:
 
+add_calendar_event:
+  name: "Klausur / Termin im Kalender erstellen"
+  description: "Erstellt einen neuen Kalendereintrag (z. B. Klausur oder Schulaufgabe) im verknüpften Kalender."
+  fields:
+    child_name:
+      name: "Name des Kindes"
+      description: "Name des Kindes (optional)."
+      example: "Max"
+      selector:
+        text:
+    calendar_entity:
+      name: "Kalender-Entität"
+      description: "Ziel-Kalender (optional, falls dem Kind bereits zugewiesen)."
+      example: "calendar.richard_klausuren"
+      selector:
+        entity:
+          domain: calendar
+    summary:
+      name: "Terminname / Klausur"
+      description: "Titel oder Bezeichnung der Klausur / des Termins."
+      required: true
+      example: "Mathe Schulaufgabe"
+      selector:
+        text:
+    date:
+      name: "Datum"
+      description: "Datum des Termins (YYYY-MM-DD)."
+      required: true
+      example: "2026-09-25"
+      selector:
+        date:
+    start_time:
+      name: "Uhrzeit"
+      description: "Uhrzeit im Format HH:MM (z. B. 08:00)."
+      default: "08:00"
+      example: "08:00"
+      selector:
+        time:
+    description:
+      name: "Beschreibung"
+      description: "Zusatzinformationen, Raumnummer oder Fach (optional)."
+      example: "Raum 101, Taschenrechner mitbringen"
+      selector:
+        text:
+
+
 
 
 

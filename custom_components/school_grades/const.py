@@ -161,6 +161,12 @@ SERVICE_UPDATE_TIMETABLE = "update_timetable"
 SERVICE_UPDATE_TIMETABLE_CELL = "update_timetable_cell"
 SERVICE_IMPORT_TIMETABLE = "import_timetable"
 SERVICE_UPDATE_SETTINGS = "update_settings"
+SERVICE_ADD_CALENDAR_EVENT = "add_calendar_event"
+
 CONF_YAML_CONTENT = "yaml_content"
+CONF_SUMMARY = "summary"
+CONF_START_TIME = "start_time"
+CONF_DESCRIPTION = "description"
+
 
 

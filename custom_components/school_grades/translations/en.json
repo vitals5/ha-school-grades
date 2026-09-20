@@ -45,6 +45,14 @@
     "import_timetable": {
       "name": "Import Timetable via YAML",
       "description": "Imports a complete timetable as YAML text or data structure."
+    },
+    "update_settings": {
+      "name": "Update General Settings",
+      "description": "Updates country grading system, section visibility, or assigned calendar for a child."
+    },
+    "add_calendar_event": {
+      "name": "Create Calendar Event / Exam",
+      "description": "Creates a new event or exam in the assigned calendar."
     }
   }
 }

@@ -45,6 +45,14 @@
     "import_timetable": {
       "name": "Stundenplan per YAML importieren",
       "description": "Importiert einen kompletten Stundenplan als YAML-Text oder Datenstruktur."
+    },
+    "update_settings": {
+      "name": "Allgemeine Einstellungen aktualisieren",
+      "description": "Aktualisiert das Land / Schulsystem, Sichtbarkeiten oder den Kalender für ein Kind."
+    },
+    "add_calendar_event": {
+      "name": "Klausur / Termin im Kalender erstellen",
+      "description": "Erstellt einen neuen Kalendereintrag im verknüpften Kalender."
     }
   }
 }

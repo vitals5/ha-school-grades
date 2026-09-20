@@ -294,6 +294,15 @@ const I18N = {
     countdown_today: "⚡ HEUTE",
     countdown_tomorrow: "⚠️ Morgen",
     countdown_days: "In {days} Tagen",
+    add_event_btn: "➕ Termin / Klausur eintragen",
+    add_event_title: "📅 Neuen Termin / Klausur im Kalender erstellen",
+    event_summary_label: "Terminname / Klausur",
+    event_summary_placeholder: "z. B. Mathe Schulaufgabe, Bio Test",
+    event_date_label: "Datum",
+    event_time_label: "Uhrzeit",
+    event_desc_label: "Beschreibung / Raum (optional)",
+    event_desc_placeholder: "z. B. Raum 101, Themen Kap. 3",
+    submit_add_event: "💾 Termin im Kalender speichern",
     
     // Timetable card
     timetable_title: "📅 Wochenstundenplan",
@@ -410,6 +419,15 @@ const I18N = {
     countdown_today: "⚡ TODAY",
     countdown_tomorrow: "⚠️ Tomorrow",
     countdown_days: "In {days} days",
+    add_event_btn: "➕ Add Exam / Event",
+    add_event_title: "📅 Create New Exam / Event in Calendar",
+    event_summary_label: "Title / Exam Name",
+    event_summary_placeholder: "e.g., Math Exam, Biology Quiz",
+    event_date_label: "Date",
+    event_time_label: "Time",
+    event_desc_label: "Description / Room (optional)",
+    event_desc_placeholder: "e.g., Room 101, Topics Ch. 3",
+    submit_add_event: "💾 Save Event to Calendar",
     
     // Timetable card
     timetable_title: "📅 Weekly Timetable",
@@ -511,6 +529,7 @@ class SchoolGradesPanel extends HTMLElement {
     this._showSettingsModal = false;
     this._settingsTab = 'general';
     this._showAddGradeCard = false;
+    this._showAddEventCard = false;
   }
 
   set hass(hass) {
@@ -1005,7 +1024,14 @@ class SchoolGradesPanel extends HTMLElement {
         ${secVis.show_calendar_card ? `
           <div class="card calendar-card" style="margin-bottom: 24px;">
             <div class="calendar-header">
-              <h3>${this._t('calendar_title', { count: upcomingEvents.length })}</h3>
+              <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <h3 style="margin: 0;">${this._t('calendar_title', { count: upcomingEvents.length })}</h3>
+                ${currentChild && currentChild.calendarEntity ? `
+                  <button class="pill-btn add-event-toggle-btn" id="toggle-add-event-btn" style="padding: 6px 14px; font-size: 13px; font-weight: 600; background: linear-gradient(135deg, #10b981, #059669); color: #fff; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35); transition: all 0.2s ease;">
+                    ${this._showAddEventCard ? this._t('close_add_grade_btn') : this._t('add_event_btn')}
+                  </button>
+                ` : ''}
+              </div>
               <div class="calendar-select-group">
                 <label>${this._t('calendar_select_label', { child: this._selectedChild })}</label>
                 <select id="calendar-select">
@@ -1018,6 +1044,39 @@ class SchoolGradesPanel extends HTMLElement {
                 </select>
               </div>
             </div>
+
+            ${this._showAddEventCard ? `
+              <div class="add-event-form-container" style="background: rgba(0, 0, 0, 0.25); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); border-radius: 12px; padding: 16px; margin: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                  <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: #fff;">${this._t('add_event_title')}</h4>
+                  <button type="button" id="close-add-event-x" style="background: none; border: none; color: rgba(255,255,255,0.6); cursor: pointer; font-size: 16px; padding: 4px;">✖</button>
+                </div>
+                <form id="add-event-form">
+                  <div class="form-group" style="margin-bottom: 12px;">
+                    <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: #fff;">${this._t('event_summary_label')}</label>
+                    <input type="text" id="event-summary-input" required placeholder="${this._t('event_summary_placeholder')}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 13px; box-sizing: border-box;">
+                  </div>
+                  <div class="form-row" style="display: flex; gap: 12px; margin-bottom: 12px;">
+                    <div class="form-group half" style="flex: 1;">
+                      <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: #fff;">${this._t('event_date_label')}</label>
+                      <input type="date" id="event-date-input" required value="${new Date().toISOString().split('T')[0]}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 13px; box-sizing: border-box;">
+                    </div>
+                    <div class="form-group half" style="flex: 1;">
+                      <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: #fff;">${this._t('event_time_label')}</label>
+                      <input type="time" id="event-time-input" required value="08:00" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 13px; box-sizing: border-box;">
+                    </div>
+                  </div>
+                  <div class="form-group" style="margin-bottom: 16px;">
+                    <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: #fff;">${this._t('event_desc_label')}</label>
+                    <input type="text" id="event-desc-input" placeholder="${this._t('event_desc_placeholder')}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 13px; box-sizing: border-box;">
+                  </div>
+                  <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                    <button type="button" class="submit-btn secondary" id="cancel-add-event-btn" style="width: auto; padding: 8px 16px; font-size: 13px;">${this._t('cancel_btn')}</button>
+                    <button type="submit" class="submit-btn" style="width: auto; padding: 8px 18px; font-size: 13px; background: linear-gradient(135deg, #10b981, #059669); color: #fff; border: none; border-radius: 8px; cursor: pointer;">${this._t('submit_add_event')}</button>
+                  </div>
+                </form>
+              </div>
+            ` : ''}
 
             <div class="events-list">
               ${!currentChild || !currentChild.calendarEntity ? `
@@ -1684,6 +1743,73 @@ class SchoolGradesPanel extends HTMLElement {
           calendar_entity: calEntity,
         });
         setTimeout(() => this._fetchUpcomingCalendarEvents(), 300);
+      });
+    }
+
+    // Toggle Add Calendar Event Form
+    const toggleAddEventBtn = root.querySelector('#toggle-add-event-btn');
+    if (toggleAddEventBtn) {
+      toggleAddEventBtn.addEventListener('click', () => {
+        this._showAddEventCard = !this._showAddEventCard;
+        this.render();
+      });
+    }
+
+    const closeAddEventX = root.querySelector('#close-add-event-x');
+    if (closeAddEventX) {
+      closeAddEventX.addEventListener('click', () => {
+        this._showAddEventCard = false;
+        this.render();
+      });
+    }
+
+    const cancelAddEventBtn = root.querySelector('#cancel-add-event-btn');
+    if (cancelAddEventBtn) {
+      cancelAddEventBtn.addEventListener('click', () => {
+        this._showAddEventCard = false;
+        this.render();
+      });
+    }
+
+    // Add Calendar Event Form Submit
+    const addEventForm = root.querySelector('#add-event-form');
+    if (addEventForm) {
+      addEventForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const summaryElem = root.querySelector('#event-summary-input');
+        const dateElem = root.querySelector('#event-date-input');
+        const timeElem = root.querySelector('#event-time-input');
+        const descElem = root.querySelector('#event-desc-input');
+
+        const summary = summaryElem ? summaryElem.value.trim() : '';
+        const dateVal = dateElem ? dateElem.value : '';
+        const timeVal = timeElem ? timeElem.value : '08:00';
+        const descVal = descElem ? descElem.value.trim() : '';
+
+        const currentChildData = this._getSchoolGradesData()[this._selectedChild];
+        const calEntity = currentChildData ? currentChildData.calendarEntity : null;
+
+        if (summary && dateVal && calEntity) {
+          await this._hass.callService('school_grades', 'add_calendar_event', {
+            child_name: this._selectedChild,
+            calendar_entity: calEntity,
+            summary: summary,
+            date: dateVal,
+            start_time: timeVal || '08:00',
+            description: descVal,
+          });
+          this._showAddEventCard = false;
+          this.render();
+          this._fetchUpcomingCalendarEvents();
+          setTimeout(() => {
+            this._fetchUpcomingCalendarEvents();
+            this.render();
+          }, 500);
+          setTimeout(() => {
+            this._fetchUpcomingCalendarEvents();
+            this.render();
+          }, 1200);
+        }
       });
     }
 
