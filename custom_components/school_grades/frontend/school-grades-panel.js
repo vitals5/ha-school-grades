@@ -20,9 +20,15 @@ class SchoolGradesPanel extends HTMLElement {
 
   _hasGradesDataChanged(oldHass, newHass) {
     if (!oldHass || !newHass) return true;
-    for (const key in newHass.states) {
-      if (key.includes('school_grades') || key.includes('durchschnitt')) {
-        if (oldHass.states[key] !== newHass.states[key]) return true;
+    if (oldHass.states !== newHass.states) {
+      for (const key in newHass.states) {
+        const oldState = oldHass.states[key];
+        const newState = newHass.states[key];
+        if (!oldState || oldState !== newState) {
+          if (newState.attributes && newState.attributes.kind_name) {
+            return true;
+          }
+        }
       }
     }
     return false;
@@ -303,7 +309,7 @@ class SchoolGradesPanel extends HTMLElement {
     // Add Grade Form Submit
     const addGradeForm = root.querySelector('#add-grade-form');
     if (addGradeForm) {
-      addGradeForm.addEventListener('submit', (e) => {
+      addGradeForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const subject = root.querySelector('#grade-subject').value;
         const grade = parseFloat(root.querySelector('#grade-input').value);
@@ -311,7 +317,7 @@ class SchoolGradesPanel extends HTMLElement {
         const name = root.querySelector('#grade-name').value;
         const date = root.querySelector('#grade-date').value;
 
-        this._hass.callService('school_grades', 'add_grade', {
+        await this._hass.callService('school_grades', 'add_grade', {
           child_name: this._selectedChild,
           subject: subject,
           grade: grade,
@@ -321,21 +327,25 @@ class SchoolGradesPanel extends HTMLElement {
         });
 
         root.querySelector('#grade-name').value = '';
+        setTimeout(() => this.render(), 200);
+        setTimeout(() => this.render(), 600);
       });
     }
 
     // Add Subject Form Submit
     const addSubjectForm = root.querySelector('#add-subject-form');
     if (addSubjectForm) {
-      addSubjectForm.addEventListener('submit', (e) => {
+      addSubjectForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const newSubject = root.querySelector('#new-subject-name').value.trim();
         if (newSubject) {
-          this._hass.callService('school_grades', 'add_subject', {
+          await this._hass.callService('school_grades', 'add_subject', {
             child_name: this._selectedChild,
             subject: newSubject,
           });
           root.querySelector('#new-subject-name').value = '';
+          setTimeout(() => this.render(), 200);
+          setTimeout(() => this.render(), 600);
         }
       });
     }
@@ -343,28 +353,32 @@ class SchoolGradesPanel extends HTMLElement {
     // Delete Subject Button
     const deleteSubjectBtn = root.querySelector('#delete-subject-btn');
     if (deleteSubjectBtn) {
-      deleteSubjectBtn.addEventListener('click', () => {
+      deleteSubjectBtn.addEventListener('click', async () => {
         const subject = root.querySelector('#delete-subject-select').value;
         if (subject && confirm(`Möchtest du das Fach "${subject}" wirklich inklusive aller Noten löschen?`)) {
-          this._hass.callService('school_grades', 'remove_subject', {
+          await this._hass.callService('school_grades', 'remove_subject', {
             child_name: this._selectedChild,
             subject: subject,
           });
+          setTimeout(() => this.render(), 200);
+          setTimeout(() => this.render(), 600);
         }
       });
     }
 
     // Delete Grade Buttons
     root.querySelectorAll('.delete-grade-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
+      btn.addEventListener('click', async (e) => {
         const subject = e.currentTarget.dataset.subject;
         const gradeId = e.currentTarget.dataset.id;
         if (confirm(`Möchtest du diese Note wirklich löschen?`)) {
-          this._hass.callService('school_grades', 'remove_grade', {
+          await this._hass.callService('school_grades', 'remove_grade', {
             child_name: this._selectedChild,
             subject: subject,
             grade_id: gradeId,
           });
+          setTimeout(() => this.render(), 200);
+          setTimeout(() => this.render(), 600);
         }
       });
     });
