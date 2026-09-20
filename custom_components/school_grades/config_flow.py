@@ -33,6 +33,7 @@ class SchoolGradesConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Schulnoten."""
 
     VERSION = 1
+    DOMAIN = DOMAIN
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -58,7 +59,7 @@ class SchoolGradesConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         schema = vol.Schema(
             {
-                vol.Required(CONF_CHILD_NAME): str,
+                vol.Required(CONF_CHILD_NAME): cv.string,
             }
         )
 
@@ -80,7 +81,13 @@ class SchoolGradesOptionsFlowHandler(config_entries.OptionsFlow):
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""
-        self.config_entry = config_entry
+        super().__init__()
+        self._config_entry = config_entry
+
+    @property
+    def config_entry(self) -> config_entries.ConfigEntry:
+        """Return config entry."""
+        return self._config_entry
 
     @property
     def storage(self) -> SchoolGradesStorage | None:
@@ -115,7 +122,7 @@ class SchoolGradesOptionsFlowHandler(config_entries.OptionsFlow):
                     return self.async_create_entry(title="", data={})
                 errors["base"] = "subject_exists"
 
-        schema = vol.Schema({vol.Required(CONF_SUBJECT): str})
+        schema = vol.Schema({vol.Required(CONF_SUBJECT): cv.string})
         return self.async_show_form(
             step_id="add_subject", data_schema=schema, errors=errors
         )
@@ -182,7 +189,7 @@ class SchoolGradesOptionsFlowHandler(config_entries.OptionsFlow):
                     vol.Coerce(float), vol.Range(min=1.0, max=6.0)
                 ),
                 vol.Required(CONF_WEIGHT, default=1.0): vol.In([1.0, 2.0, 3.0, 4.0]),
-                vol.Optional(CONF_NAME, default=""): str,
+                vol.Optional(CONF_NAME, default=""): cv.string,
             }
         )
         return self.async_show_form(
