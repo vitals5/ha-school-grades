@@ -21,7 +21,7 @@ Eine elegante Home Assistant Custom Integration zur einfachen Verwaltung von Sch
 
 1. Öffne **HACS** in deinem Home Assistant.
 2. Klicke oben rechts auf die **drei Punkte** `⋮` und wähle **Benutzerdefinierte Repositories** (*Custom repositories*).
-3. Gib die URL deines GitHub-Repositories ein (z. B. `https://github.com/DeinUser/school_grades`).
+3. Gib die URL deines GitHub-Repositories ein: `https://github.com/vitals5/ha-school-grades`.
 4. Wähle als Kategorie **Integration**.
 5. Klicke auf **Hinzufügen**.
 6. Suche nach **Schulnoten** in HACS, klicke auf **Herunterladen** und starte Home Assistant neu.
