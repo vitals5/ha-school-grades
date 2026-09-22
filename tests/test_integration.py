@@ -216,15 +216,13 @@ class TestSchoolGradesLogic(unittest.TestCase):
             "show_calendar_card": True,
             "show_timetable_card": True,
             "show_overview_card": True,
-            "show_back_button": False,
         })
-        data.set_section_visibility({"show_prep_card": False, "show_timetable_card": False, "show_back_button": True})
+        data.set_section_visibility({"show_prep_card": False, "show_timetable_card": False})
         self.assertEqual(data.section_visibility, {
             "show_prep_card": False,
             "show_calendar_card": True,
             "show_timetable_card": False,
             "show_overview_card": True,
-            "show_back_button": True,
         })
 
 

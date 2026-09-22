@@ -284,12 +284,6 @@ update_settings:
       example: true
       selector:
         boolean:
-    show_back_button:
-      name: "Zurück-Button anzeigen"
-      description: "Zeigt einen Zurück-Button neben dem Menü in der Kopfzeile an."
-      example: false
-      selector:
-        boolean:
 
 add_calendar_event:
   name: "Klausur / Termin im Kalender erstellen"
