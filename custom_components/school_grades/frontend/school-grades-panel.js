@@ -271,6 +271,7 @@ const I18N = {
     no_children_text1: "Es wurden noch keine Kinder-Instanzen in Home Assistant konfiguriert.",
     no_children_text2: "Bitte gehe zu Einstellungen ➔ Geräte & Dienste ➔ Integration hinzufügen ➔ Schulnoten.",
     total_avg: "Gesamtdurchschnitt",
+    menu_toggle: "Seitenleiste öffnen / schließen",
     
     // Prep card
     prep_title: "🎒 Vorbereitung für den nächsten Schultag",
@@ -406,6 +407,7 @@ const I18N = {
     no_children_text1: "No child instances have been configured in Home Assistant yet.",
     no_children_text2: "Please go to Settings ➔ Devices & Services ➔ Add Integration ➔ Schulnoten.",
     total_avg: "Overall Average",
+    menu_toggle: "Open / close sidebar",
     
     // Prep card
     prep_title: "🎒 Preparation for the Next School Day",
@@ -1147,6 +1149,20 @@ class SchoolGradesPanel extends HTMLElement {
       this.shadowRoot.innerHTML = `
         <style>${this._getStyles()}</style>
         <div class="container">
+          <header class="header">
+            <div class="header-left">
+              <button class="menu-btn" id="menu-toggle-btn" aria-label="${this._t('menu_toggle')}" title="${this._t('menu_toggle')}">
+                <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="3" y1="6" x2="21" y2="6"></line>
+                  <line x1="3" y1="12" x2="21" y2="12"></line>
+                  <line x1="3" y1="18" x2="21" y2="18"></line>
+                </svg>
+              </button>
+              <div class="title-section">
+                <h1>${this._t('panel_title')}</h1>
+              </div>
+            </div>
+          </header>
           <div class="card empty-card">
             <h2>${this._t('no_children_title')}</h2>
             <p>${this._t('no_children_text1')}</p>
@@ -1154,6 +1170,7 @@ class SchoolGradesPanel extends HTMLElement {
           </div>
         </div>
       `;
+      this._attachEventListeners();
       return;
     }
 
@@ -1183,8 +1200,17 @@ class SchoolGradesPanel extends HTMLElement {
       <div class="container">
         <!-- Header & Child Selector (Without Subtitle, Without Flag, With Grade Level) -->
         <header class="header">
-          <div class="title-section">
-            <h1>${this._t('panel_title')}</h1>
+          <div class="header-left">
+            <button class="menu-btn" id="menu-toggle-btn" aria-label="${this._t('menu_toggle')}" title="${this._t('menu_toggle')}">
+              <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+              </svg>
+            </button>
+            <div class="title-section">
+              <h1>${this._t('panel_title')}</h1>
+            </div>
           </div>
           <div class="child-tabs">
             ${childNames.map(name => {
@@ -1906,6 +1932,34 @@ class SchoolGradesPanel extends HTMLElement {
 
   _attachEventListeners() {
     const root = this.shadowRoot;
+
+    // Hamburger Menu Toggle (opens/closes Home Assistant sidebar)
+    const menuToggleBtn = root.querySelector('#menu-toggle-btn');
+    if (menuToggleBtn) {
+      menuToggleBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const event = new CustomEvent('hass-toggle-menu', {
+          bubbles: true,
+          composed: true,
+          detail: { open: true },
+        });
+        this.dispatchEvent(event);
+        window.dispatchEvent(event);
+        try {
+          const ha = document.querySelector('home-assistant');
+          const main = ha && ha.shadowRoot && ha.shadowRoot.querySelector('home-assistant-main');
+          if (main) {
+            main.dispatchEvent(new CustomEvent('hass-toggle-menu', { bubbles: true, composed: true, detail: { open: true } }));
+          }
+        } catch (err) {}
+        if (window.parent && window.parent !== window) {
+          try {
+            window.parent.dispatchEvent(new CustomEvent('hass-toggle-menu', { bubbles: true, composed: true, detail: { open: true } }));
+          } catch (err) {}
+        }
+      });
+    }
 
     // Child Tabs
     root.querySelectorAll('.child-tabs .tab-btn[data-child]').forEach(btn => {
@@ -2749,6 +2803,49 @@ class SchoolGradesPanel extends HTMLElement {
         gap: 16px;
       }
 
+      .header-left {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .menu-btn {
+        background: var(--card-background-color, #1f2937);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: var(--primary-text-color, #f3f4f6);
+        width: 44px;
+        height: 44px;
+        min-width: 44px;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        padding: 0;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .menu-btn:hover {
+        background: rgba(59, 130, 246, 0.15);
+        border-color: var(--primary-color, #3b82f6);
+        color: var(--primary-color, #60a5fa);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 10px rgba(59, 130, 246, 0.25);
+      }
+
+      .menu-btn:active {
+        transform: translateY(0);
+        background: rgba(59, 130, 246, 0.25);
+      }
+
+      .menu-btn svg {
+        display: block;
+        pointer-events: none;
+      }
+
       .title-section h1 {
         margin: 0;
         font-size: 28px;
@@ -3397,6 +3494,27 @@ class SchoolGradesPanel extends HTMLElement {
       @media (max-width: 900px) {
         .forms-grid {
           grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 600px) {
+        :host {
+          padding: 12px 12px 24px 12px;
+        }
+        .header {
+          gap: 12px;
+          margin-bottom: 16px;
+        }
+        .title-section h1 {
+          font-size: 20px;
+        }
+        .header-left {
+          gap: 10px;
+        }
+        .menu-btn {
+          width: 40px;
+          height: 40px;
+          min-width: 40px;
         }
       }
 
