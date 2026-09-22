@@ -1,4 +1,6 @@
 {
   "name": "Schulnoten (School Grades)",
-  "render_readme": true
+  "render_readme": true,
+  "zip_release": true,
+  "filename": "school_grades.zip"
 }
