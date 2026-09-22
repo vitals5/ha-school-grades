@@ -551,6 +551,10 @@ class SchoolGradesPanel extends HTMLElement {
     this._showAddGradeCard = false;
     this._showAddEventCard = false;
     this._editingEvent = null;
+    this._localPreparedSubjects = {}; // { [childName]: { [subject]: boolean } }
+    this._localPreparationDone = {}; // { [childName]: boolean }
+    this._localHomeworkDone = {}; // { [childName]: boolean }
+    this._lastPreparedDate = {}; // { [childName]: string }
   }
 
   set hass(hass) {
@@ -637,17 +641,43 @@ class SchoolGradesPanel extends HTMLElement {
       if (attrs.grade_level !== undefined) {
         children[kindName].gradeLevel = String(attrs.grade_level || '');
       }
+      if (entityId.includes('vorbereitung') && (stateObj.state === 'on' || stateObj.state === 'off')) {
+        children[kindName].preparationDone = (stateObj.state === 'on');
+      }
+      if (entityId.includes('hausaufgaben') && (stateObj.state === 'on' || stateObj.state === 'off')) {
+        children[kindName].homeworkDone = (stateObj.state === 'on');
+      }
       if (attrs.homework_done !== undefined) {
         children[kindName].homeworkDone = Boolean(attrs.homework_done);
       }
       if (attrs.preparation_done !== undefined) {
         children[kindName].preparationDone = Boolean(attrs.preparation_done);
       }
+
+      const isBinaryPrepEntity = entityId.startsWith('binary_sensor.') && entityId.includes('vorbereitung');
       if (attrs.prepared_subjects && typeof attrs.prepared_subjects === 'object') {
-        children[kindName].preparedSubjects = attrs.prepared_subjects;
+        if (isBinaryPrepEntity || !children[kindName]._prepFromBinarySensor) {
+          children[kindName].preparedSubjects = { ...attrs.prepared_subjects };
+          if (isBinaryPrepEntity) {
+            children[kindName]._prepFromBinarySensor = true;
+          }
+        }
       }
       if (attrs.prepared_subjects_date) {
-        children[kindName].preparedSubjectsDate = String(attrs.prepared_subjects_date);
+        const dateStr = String(attrs.prepared_subjects_date);
+        if (isBinaryPrepEntity || !children[kindName]._prepFromBinarySensor) {
+          if (this._lastPreparedDate && this._lastPreparedDate[kindName] && this._lastPreparedDate[kindName] !== dateStr) {
+            if (this._localPreparedSubjects && this._localPreparedSubjects[kindName]) {
+              this._localPreparedSubjects[kindName] = {};
+            }
+            if (this._localPreparationDone && this._localPreparationDone[kindName] !== undefined) {
+              delete this._localPreparationDone[kindName];
+            }
+          }
+          if (!this._lastPreparedDate) this._lastPreparedDate = {};
+          this._lastPreparedDate[kindName] = dateStr;
+          children[kindName].preparedSubjectsDate = dateStr;
+        }
       }
       if (attrs.calendar_entity !== undefined) {
         children[kindName].calendarEntity = attrs.calendar_entity;
@@ -684,6 +714,44 @@ class SchoolGradesPanel extends HTMLElement {
           ...children[kindName].sectionVisibility,
           ...this._localSectionVisibility[kindName],
         };
+      }
+    }
+
+    // Apply local optimistic overrides and auto-recalculate preparationDone
+    for (const [kindName, child] of Object.entries(children)) {
+      if (this._localHomeworkDone && this._localHomeworkDone[kindName] !== undefined) {
+        if (child.homeworkDone === this._localHomeworkDone[kindName]) {
+          delete this._localHomeworkDone[kindName];
+        } else {
+          child.homeworkDone = this._localHomeworkDone[kindName];
+        }
+      }
+      if (this._localPreparedSubjects && this._localPreparedSubjects[kindName]) {
+        for (const [subj, val] of Object.entries(this._localPreparedSubjects[kindName])) {
+          if (child.preparedSubjects && child.preparedSubjects[subj] === val) {
+            delete this._localPreparedSubjects[kindName][subj];
+          } else {
+            if (!child.preparedSubjects) child.preparedSubjects = {};
+            child.preparedSubjects[subj] = val;
+          }
+        }
+      }
+      if (this._localPreparationDone && this._localPreparationDone[kindName] !== undefined) {
+        if (child.preparationDone === this._localPreparationDone[kindName]) {
+          delete this._localPreparationDone[kindName];
+        } else {
+          child.preparationDone = this._localPreparationDone[kindName];
+        }
+      }
+
+      // Check if all needed subjects for next school day are prepared
+      const timetable = child.timetable;
+      if (timetable) {
+        const nextDayInfo = this._getNextSchoolDayInfo(timetable, []);
+        if (nextDayInfo && nextDayInfo.lessons && nextDayInfo.lessons.length > 0) {
+          const allPrepared = nextDayInfo.lessons.every(l => Boolean(child.preparedSubjects && child.preparedSubjects[l.subject]));
+          child.preparationDone = allPrepared;
+        }
       }
     }
 
@@ -832,19 +900,85 @@ class SchoolGradesPanel extends HTMLElement {
     const slots = (timetable && timetable.slots) || [];
     const schedule = (timetable && timetable.schedule) || {};
 
-    const lessons = [];
+    // Group lesson slots by subject so double periods or multiple periods of the
+    // same subject on the same day form a single consolidated subject preparation card.
+    const subjectMap = new Map();
     for (const slot of slots) {
       if (slot.type === 'break') continue;
       const cell = schedule[slot.id] && schedule[slot.id][targetDayKey];
       if (cell && cell.subject) {
-        lessons.push({
-          slotLabel: slot.label,
-          slotTime: `${slot.start} - ${slot.end}`,
-          subject: cell.subject,
-          room: cell.room || '',
-          teacher: cell.teacher || '',
-        });
+        const cleanSubj = String(cell.subject).trim();
+        if (!cleanSubj) continue;
+
+        if (!subjectMap.has(cleanSubj)) {
+          subjectMap.set(cleanSubj, {
+            subject: cleanSubj,
+            slots: [],
+            rooms: [],
+            teachers: [],
+          });
+        }
+        const entry = subjectMap.get(cleanSubj);
+        entry.slots.push(slot);
+        if (cell.room) {
+          const r = String(cell.room).trim();
+          if (r && !entry.rooms.includes(r)) entry.rooms.push(r);
+        }
+        if (cell.teacher) {
+          const t = String(cell.teacher).trim();
+          if (t && !entry.teachers.includes(t)) entry.teachers.push(t);
+        }
       }
+    }
+
+    const getSlotNum = (s) => {
+      if (s.number && !isNaN(parseInt(s.number, 10))) return parseInt(s.number, 10);
+      const match = String(s.label || '').match(/(\d+)/);
+      return match ? parseInt(match[1], 10) : null;
+    };
+
+    const lessons = [];
+    for (const [subj, entry] of subjectMap.entries()) {
+      const entrySlots = entry.slots;
+      let slotLabel = '';
+      let slotTime = '';
+
+      if (entrySlots.length === 1) {
+        slotLabel = entrySlots[0].label || `${entrySlots[0].number || 1}. Stunde`;
+        slotTime = `${entrySlots[0].start} - ${entrySlots[0].end}`;
+      } else {
+        const numbers = entrySlots.map(getSlotNum);
+        const allHaveNumbers = numbers.every(n => n !== null);
+
+        if (allHaveNumbers) {
+          const sortedNumbers = [...numbers].sort((a, b) => a - b);
+          const isConsecutive = sortedNumbers.every((n, idx) => idx === 0 || n === sortedNumbers[idx - 1] + 1);
+          if (isConsecutive) {
+            if (sortedNumbers.length === 2) {
+              slotLabel = `${sortedNumbers[0]}. & ${sortedNumbers[1]}. Stunde`;
+            } else {
+              slotLabel = `${sortedNumbers[0]}. - ${sortedNumbers[sortedNumbers.length - 1]}. Stunde`;
+            }
+            const firstStart = entrySlots[0].start;
+            const lastEnd = entrySlots[entrySlots.length - 1].end;
+            slotTime = (firstStart && lastEnd) ? `${firstStart} - ${lastEnd}` : entrySlots.map(s => `${s.start} - ${s.end}`).join(', ');
+          } else {
+            slotLabel = `${sortedNumbers.join('., ')}. Stunde`;
+            slotTime = entrySlots.map(s => `${s.start} - ${s.end}`).join(' / ');
+          }
+        } else {
+          slotLabel = entrySlots.map(s => s.label || s.number || '').filter(Boolean).join(' & ');
+          slotTime = entrySlots.map(s => `${s.start} - ${s.end}`).join(' / ');
+        }
+      }
+
+      lessons.push({
+        subject: subj,
+        slotLabel: slotLabel,
+        slotTime: slotTime,
+        room: entry.rooms.join(', '),
+        teacher: entry.teachers.join(', '),
+      });
     }
 
     const targetDateIso = targetDate.toISOString().split('T')[0];
@@ -1044,14 +1178,14 @@ class SchoolGradesPanel extends HTMLElement {
                       return `
                         <div class="prep-item prep-item-clickable ${isPrepared ? 'prepared-subject' : ''} ${isExamSubject ? 'has-exam' : ''}"
                              data-subject="${l.subject}"
-                             style="cursor: pointer; ${isPrepared ? 'border: 2px solid #22c55e; background: rgba(34, 197, 94, 0.12);' : ''}">
+                             style="cursor: pointer; ${isPrepared ? 'border: 2px solid #22c55e !important; background: rgba(34, 197, 94, 0.14) !important;' : ''}">
                           <div class="prep-item-top">
                             <span class="prep-slot-badge">${l.slotLabel}</span>
                             <span class="prep-slot-time">${l.slotTime}</span>
                           </div>
                           <div class="prep-subject-name" style="display: flex; align-items: center; justify-content: space-between;">
                             <span>${l.subject}</span>
-                            ${isPrepared ? '<span style="color: #22c55e; font-size: 16px; font-weight: bold;">✓</span>' : ''}
+                            <span class="prep-check-icon" style="color: #22c55e; font-size: 16px; font-weight: bold; ${isPrepared ? 'display: inline;' : 'display: none;'}">✓</span>
                           </div>
                           <div class="prep-meta">
                             ${l.room ? `<span class="prep-meta-tag">📍 ${l.room}</span>` : ''}
@@ -1700,47 +1834,189 @@ class SchoolGradesPanel extends HTMLElement {
     // Summary Banner Interactive Toggles
     const toggleHomeworkBtn = root.querySelector('#toggle-homework-btn');
     if (toggleHomeworkBtn) {
-      toggleHomeworkBtn.addEventListener('click', async () => {
+      toggleHomeworkBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
         const currentChild = this._getSchoolGradesData()[this._selectedChild];
         const newStatus = !(currentChild && currentChild.homeworkDone);
-        await this._hass.callService('school_grades', 'set_homework_done', {
-          child_name: this._selectedChild,
-          homework_done: newStatus,
-        });
-        setTimeout(() => this.render(), 200);
+
+        if (!this._localHomeworkDone) this._localHomeworkDone = {};
+        this._localHomeworkDone[this._selectedChild] = newStatus;
+
+        if (currentChild) {
+          currentChild.homeworkDone = newStatus;
+        }
+
+        // Instant visual feedback on button
+        if (newStatus) {
+          toggleHomeworkBtn.classList.add('done-card');
+          toggleHomeworkBtn.style.setProperty('border', '2px solid #22c55e', 'important');
+          toggleHomeworkBtn.style.setProperty('background', 'rgba(34, 197, 94, 0.12)', 'important');
+          const statVal = toggleHomeworkBtn.querySelector('.stat-value');
+          if (statVal) {
+            statVal.style.color = '#22c55e';
+            statVal.textContent = this._t('homework_done_badge');
+          }
+        } else {
+          toggleHomeworkBtn.classList.remove('done-card');
+          toggleHomeworkBtn.style.removeProperty('border');
+          toggleHomeworkBtn.style.removeProperty('background');
+          const statVal = toggleHomeworkBtn.querySelector('.stat-value');
+          if (statVal) {
+            statVal.style.color = '#9ca3af';
+            statVal.textContent = this._t('homework_open_badge');
+          }
+        }
+
+        try {
+          await this._hass.callService('school_grades', 'set_homework_done', {
+            child_name: this._selectedChild,
+            homework_done: newStatus,
+          });
+        } catch (err) {
+          console.error("Failed to set homework done:", err);
+        }
       });
     }
 
     const togglePrepBtn = root.querySelector('#toggle-prep-btn');
     if (togglePrepBtn) {
-      togglePrepBtn.addEventListener('click', async () => {
+      togglePrepBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
         const currentChild = this._getSchoolGradesData()[this._selectedChild];
         const newStatus = !(currentChild && currentChild.preparationDone);
-        await this._hass.callService('school_grades', 'set_preparation_done', {
-          child_name: this._selectedChild,
-          preparation_done: newStatus,
+
+        // Instant local state update
+        if (!this._localPreparationDone) this._localPreparationDone = {};
+        this._localPreparationDone[this._selectedChild] = newStatus;
+
+        if (!this._localPreparedSubjects) this._localPreparedSubjects = {};
+        if (!this._localPreparedSubjects[this._selectedChild]) this._localPreparedSubjects[this._selectedChild] = {};
+
+        // Update all prep subject cards on screen immediately
+        root.querySelectorAll('.prep-item-clickable').forEach(item => {
+          const subj = item.dataset.subject;
+          if (subj) {
+            this._localPreparedSubjects[this._selectedChild][subj] = newStatus;
+          }
+          if (newStatus) {
+            item.classList.add('prepared-subject');
+            item.style.setProperty('border', '2px solid #22c55e', 'important');
+            item.style.setProperty('background', 'rgba(34, 197, 94, 0.14)', 'important');
+            const checkIcon = item.querySelector('.prep-check-icon');
+            if (checkIcon) checkIcon.style.display = 'inline';
+          } else {
+            item.classList.remove('prepared-subject');
+            item.style.removeProperty('border');
+            item.style.removeProperty('background');
+            const checkIcon = item.querySelector('.prep-check-icon');
+            if (checkIcon) checkIcon.style.display = 'none';
+          }
         });
-        setTimeout(() => this.render(), 200);
+
+        // Instant visual feedback on banner button
+        if (newStatus) {
+          togglePrepBtn.classList.add('done-card');
+          togglePrepBtn.style.setProperty('border', '2px solid #22c55e', 'important');
+          togglePrepBtn.style.setProperty('background', 'rgba(34, 197, 94, 0.12)', 'important');
+          const statVal = togglePrepBtn.querySelector('.stat-value');
+          if (statVal) {
+            statVal.style.color = '#22c55e';
+            statVal.textContent = this._t('prep_done_badge');
+          }
+        } else {
+          togglePrepBtn.classList.remove('done-card');
+          togglePrepBtn.style.removeProperty('border');
+          togglePrepBtn.style.removeProperty('background');
+          const statVal = togglePrepBtn.querySelector('.stat-value');
+          if (statVal) {
+            statVal.style.color = '#9ca3af';
+            statVal.textContent = this._t('prep_open_badge');
+          }
+        }
+
+        try {
+          await this._hass.callService('school_grades', 'set_preparation_done', {
+            child_name: this._selectedChild,
+            preparation_done: newStatus,
+          });
+        } catch (err) {
+          console.error("Failed to set preparation done:", err);
+        }
       });
     }
 
     // Next-day prep clickable subjects
     root.querySelectorAll('.prep-item-clickable').forEach(item => {
       item.addEventListener('click', async (e) => {
-        const subject = e.currentTarget.dataset.subject;
-        if (subject) {
-          const currentChild = this._getSchoolGradesData()[this._selectedChild];
-          if (currentChild) {
-            if (!currentChild.preparedSubjects) currentChild.preparedSubjects = {};
-            currentChild.preparedSubjects[subject] = !currentChild.preparedSubjects[subject];
-            this.render();
+        e.stopPropagation();
+        const subject = item.dataset.subject;
+        if (!subject) return;
+
+        const currentChild = this._getSchoolGradesData()[this._selectedChild];
+        const prepMap = (currentChild && currentChild.preparedSubjects) || {};
+        const isCurrentlyPrepared = Boolean(prepMap[subject]);
+        const newPrepared = !isCurrentlyPrepared;
+
+        // 1. Instant local state update
+        if (!this._localPreparedSubjects) this._localPreparedSubjects = {};
+        if (!this._localPreparedSubjects[this._selectedChild]) this._localPreparedSubjects[this._selectedChild] = {};
+        this._localPreparedSubjects[this._selectedChild][subject] = newPrepared;
+
+        if (currentChild) {
+          if (!currentChild.preparedSubjects) currentChild.preparedSubjects = {};
+          currentChild.preparedSubjects[subject] = newPrepared;
+        }
+
+        // 2. Instant DOM visual feedback (immediate border and checkmark)
+        if (newPrepared) {
+          item.classList.add('prepared-subject');
+          item.style.setProperty('border', '2px solid #22c55e', 'important');
+          item.style.setProperty('background', 'rgba(34, 197, 94, 0.14)', 'important');
+          const checkIcon = item.querySelector('.prep-check-icon');
+          if (checkIcon) checkIcon.style.display = 'inline';
+        } else {
+          item.classList.remove('prepared-subject');
+          item.style.removeProperty('border');
+          item.style.removeProperty('background');
+          const checkIcon = item.querySelector('.prep-check-icon');
+          if (checkIcon) checkIcon.style.display = 'none';
+        }
+
+        // 3. Instant banner card update
+        const allItems = Array.from(root.querySelectorAll('.prep-item-clickable'));
+        const allDone = allItems.length > 0 && allItems.every(el => el.classList.contains('prepared-subject'));
+        const prepBtn = root.querySelector('#toggle-prep-btn');
+        if (prepBtn) {
+          if (allDone) {
+            prepBtn.classList.add('done-card');
+            prepBtn.style.setProperty('border', '2px solid #22c55e', 'important');
+            prepBtn.style.setProperty('background', 'rgba(34, 197, 94, 0.12)', 'important');
+            const statVal = prepBtn.querySelector('.stat-value');
+            if (statVal) {
+              statVal.style.color = '#22c55e';
+              statVal.textContent = this._t('prep_done_badge');
+            }
+          } else {
+            prepBtn.classList.remove('done-card');
+            prepBtn.style.removeProperty('border');
+            prepBtn.style.removeProperty('background');
+            const statVal = prepBtn.querySelector('.stat-value');
+            if (statVal) {
+              statVal.style.color = '#9ca3af';
+              statVal.textContent = this._t('prep_open_badge');
+            }
           }
+        }
+
+        // 4. Asynchronously send service call
+        try {
           await this._hass.callService('school_grades', 'toggle_prepared_subject', {
             child_name: this._selectedChild,
             subject: subject,
+            state: newPrepared,
           });
-          setTimeout(() => this.render(), 100);
-          setTimeout(() => this.render(), 300);
+        } catch (err) {
+          console.error("Failed to toggle prepared subject:", err);
         }
       });
     });
