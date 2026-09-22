@@ -78,11 +78,70 @@ Die Integration stellt folgende Aktionen (Services) für Automatisierungen oder 
 | `school_grades.import_timetable` | Stundenplan per YAML importieren | `child_name`, `yaml_content` |
 | `school_grades.update_settings` | Land, Klasse & Einstellungen aktualisieren | `child_name`, `country`, `grade_level`, `calendar_entity`, `show_prep_card`, ... |
 
----
+### 🤖 Automatischer Stundenplan-Import per KI (Prompt-Vorlage)
 
-### 🤖 Beispiel-Automatisierungen
+Hast du den Stundenplan deines Kindes als **PDF, Bild oder Foto** vorliegen? Du kannst ihn mit einer KI (z. B. **ChatGPT**, **Claude** oder **Gemini**) in wenigen Sekunden automatisch in das passende YAML-Format umwandeln lassen!
 
-#### 1. Internet-Sperre aktivieren, bis die Schultaschen-Vorbereitung erledigt ist
+#### 💡 Workflow:
+1. Kopiere die untenstehende **KI Prompt-Vorlage**.
+2. Lade dein Stundenplan-Foto oder ein PDF zusammen mit dem Prompt in ChatGPT, Claude oder Gemini hoch.
+3. Kopiere den von der KI generierten YAML-Code.
+4. Klicke im Schulnoten-Panel im Bereich Stundenplan auf **`📋 YAML Import / Export`** und füge den Code ein. Fertig!
+
+> 📄 **Beispiel-Vorlage im Repository**: [example_timetable.yaml](file:///example_timetable.yaml)
+
+#### 📋 KI Prompt-Vorlage (zum Kopieren):
+
+```text
+Du bist ein Assistent zur Datenstrukturierung. Analysiere das angehängte Bild / PDF meines Schulstundenplans und erstelle eine valide YAML-Datei für meine Home Assistant Schulnoten-Integration im exakt folgenden Format.
+
+Gib AUSSCHLIESSLICH den fertigen YAML-Codeblock aus, keine Einleitungen oder Erklärungen.
+
+YAML-Format-Vorlage:
+slots:
+  - id: slot_1
+    type: lesson
+    label: "1. Stunde"
+    start: "08:00"
+    end: "08:45"
+  - id: slot_2
+    type: lesson
+    label: "2. Stunde"
+    start: "08:45"
+    end: "09:30"
+  - id: break_1
+    type: break
+    label: "1. Pause"
+    start: "09:30"
+    end: "09:45"
+
+schedule:
+  slot_1:
+    monday:
+      subject: "Mathematik"
+      room: "R101"
+      teacher: "Fr. Müller"
+    tuesday:
+      subject: "Deutsch"
+      room: "R205"
+      teacher: "Hr. Weber"
+
+Regeln:
+1. Nutze als Wochentags-Schlüssel exakt: monday, tuesday, wednesday, thursday, friday.
+2. Wenn ein Fach keine Raum- oder Lehrerangabe hat, lasse room und teacher weg.
+3. Pausen (type: break) benötigen keinen Eintrag unter schedule.
+```
+
+### 🔔 Binary Sensoren für Sprachansagen & Benachrichtigungen
+
+Die Integration erstellt für jedes Kind automatisch folgende Binary Sensoren:
+- `binary_sensor.<kind_name>_anstehende_termine_morgen`
+- `binary_sensor.<kind_name>_hausaufgaben_erledigt`
+- `binary_sensor.<kind_name>_vorbereitung_erledigt`
+
+#### 🤖 Beispiel-Automatisierungen
+
+##### 1. Internet-Sperre aktivieren, bis die Schultaschen-Vorbereitung erledigt ist
 
 Sperrt um 17:00 Uhr das WLAN/Internet der Spielekonsole oder des Kinder-Handys, bis der Binary Sensor `binary_sensor.richard_vorbereitung_erledigt` auf `on` steht:
 
@@ -123,7 +182,7 @@ action:
       message: "Alle Fächer sind vorbereitet. Das Internet wurde wieder freigeschaltet."
 ```
 
-#### 2. Benachrichtigungs-Erinnerung für Hausaufgaben & Klausuren
+##### 2. Benachrichtigungs-Erinnerung für Hausaufgaben & Klausuren
 
 ```yaml
 alias: "Schulnoten - Abendliche Erinnerung an unerledigte Hausaufgaben"
@@ -145,9 +204,63 @@ action:
 
 ## 🇬🇧 English
 
-A modern, feature-rich Home Assistant Custom Integration for easy management of school grades, exam calendars, next-day preparations, and interactive weekly timetables for your children.
+A modern, comprehensive Home Assistant Custom Integration for easily managing school grades, exam calendars, next-day preparations, and interactive weekly timetables for your children.
+
+With the **built-in Sidebar Panel** (`/schulnoten`), you can manage grades, subjects, exam dates, homework status, preparations, and timetables conveniently in one central location — completely without dashboard YAML cards!
+
+### 🌟 Features
+
+- 📱 **Central Custom Sidebar Panel (`🎓 Schulnoten`)**:
+  - Automatically appears in Home Assistant's left navigation sidebar.
+  - Complete management of children, grades, subjects, calendars & timetables directly inside the interface.
+- 👨‍👩‍👧‍👦 **Multi-Child Management**: Create as many child instances as needed (e.g. Richard, Max, Emma) and switch between them via tab buttons (including class/grade display e.g. `👤 Richard (5a)`).
+- 🎒 **Preparation for Next School Day & Interactive Check-off Mode**:
+  - Clear overview of subjects scheduled for the next school day.
+  - Click any subject card to highlight it with a green border and mark it as prepared.
+  - **Overall Status Binary Sensor (`binary_sensor.<child>_preparation_done`)**: Automatically turns `on` when all subjects for tomorrow are checked off as prepared.
+- 📝 **Homework Status (`binary_sensor.<child>_homework_done`)**:
+  - Interactive status button in the banner with a green border when completed.
+  - Automatically resets to `off` at the start of each school day morning.
+- 📅 **Weekly Timetable Matrix**:
+  - Clear timetable from Monday to Friday including lesson periods & breaks.
+  - **Day Highlighting**: Automatically highlights current day in header and columns (`TODAY`).
+  - **Live Class Indicator (`⚡ NOW`)**: Marks the currently active lesson period in real time.
+  - **Visual Cell Editor**: Click any cell to edit subject, room number (📍), and teacher (👨‍🏫). Custom subjects can be created directly within the dialog.
+  - **YAML Import & Export**: Import or export timetables conveniently in YAML format.
+- 📆 **Exams & Events Calendar**:
+  - Link any Home Assistant calendar (e.g. Google Calendar, CalDAV, Local HA Calendar).
+  - Overview of upcoming exams with countdown badges (`⚡ TODAY`, `⚠️ Tomorrow`, `In X days`) and **urgency color-coding** (Red ≤ 1 day, Orange 2-3 days, Yellow 4-7 days).
+- 📘 **Subject & Grade Management**:
+  - **Collapsible Grade Form (`➕ Record New Grade`)**: Hidden by default for a clean UI; can be expanded on demand via an action button.
+  - Record grades (1.0 to 6.0) with configurable weights (1x, 2x, 3x, 4x).
+  - Automatic calculation of weighted subject average and overall GPA.
+  - Grade history with date, label (e.g., *1st Exam*), and deletion option.
+- ⚙️ **3-Tab Settings Modal (`⚙️ General`, `📘 Manage Subjects` & `📅 Timetable`)**:
+  - **General**: Customize country-specific grading systems (🇩🇪, 🇦🇹, 🇨🇭, 🇫🇷, 🇮🇹, 🇪🇸, 🇳🇱, 🇵🇱, 🇬🇧, 🇺🇸, 🇷🇺, 🇨🇳), class level (e.g. `5a`), calendar selection, and section visibilities.
+  - **Manage Subjects**: Easily add new subjects or delete existing ones.
+  - **Timetable**: Direct YAML import/export.
+- 🌐 **Multi-Language Support (i18n)**:
+  - Native support for **German 🇩🇪** and **English 🇬🇧**.
+
+### 📦 Installation via HACS (Custom Repository)
+
+1. Open **HACS** in Home Assistant.
+2. Click the **three dots** `⋮` in the top right corner and select **Custom repositories**.
+3. Enter repository URL: `https://github.com/vitals5/ha-school-grades`.
+4. Select category **Integration**.
+5. Click **Add**.
+6. Search for **Schulnoten** in HACS, click **Download**, and restart Home Assistant.
+
+### ⚙️ Setup
+
+1. Navigate to **Settings** ➔ **Devices & Services** ➔ **Add Integration**.
+2. Search for **Schulnoten**.
+3. Enter the **child's name** (e.g., `Richard`).
+4. After saving, the icon **🎓 Schulnoten** will automatically appear in your left sidebar.
 
 ### ⚡ Home Assistant Actions / Services
+
+The integration provides the following actions (services) for automations and scripts:
 
 | Action | Description | Parameters |
 | :--- | :--- | :--- |
@@ -162,6 +275,123 @@ A modern, feature-rich Home Assistant Custom Integration for easy management of 
 | `school_grades.update_timetable_cell` | Edit timetable slot | `child_name`, `slot_id`, `day`, `subject`, `room`, `teacher` |
 | `school_grades.import_timetable` | Import timetable via YAML | `child_name`, `yaml_content` |
 | `school_grades.update_settings` | Update settings & grade level | `child_name`, `country`, `grade_level`, `calendar_entity`, ... |
+
+### 🤖 Automatic Timetable Import via AI (Prompt Template)
+
+Do you have your child's timetable as a **PDF, photo, or image**? You can use an AI (e.g., **ChatGPT**, **Claude**, or **Gemini**) to convert it into the required YAML format within seconds!
+
+#### 💡 Workflow:
+1. Copy the **AI Prompt Template** below.
+2. Upload a picture or PDF of the timetable together with the prompt into ChatGPT, Claude, or Gemini.
+3. Copy the resulting YAML code snippet.
+4. In the Schulnoten sidebar panel, click **`📋 YAML Import / Export`** on the timetable card, paste the YAML, and click Import. Done!
+
+> 📄 **Example template file in repository**: [example_timetable.yaml](file:///example_timetable.yaml)
+
+#### 📋 AI Prompt Template (Ready to Copy):
+
+```text
+You are a data structuring assistant. Analyze the attached image / PDF of my school timetable and generate a valid YAML configuration for my Home Assistant School Grades integration in the exact format shown below.
+
+Output ONLY the final YAML code block without any surrounding text or explanations.
+
+YAML Format Template:
+slots:
+  - id: slot_1
+    type: lesson
+    label: "1st Period"
+    start: "08:00"
+    end: "08:45"
+  - id: break_1
+    type: break
+    label: "Break"
+    start: "09:30"
+    end: "09:45"
+
+schedule:
+  slot_1:
+    monday:
+      subject: "Mathematics"
+      room: "R101"
+      teacher: "Mrs. Smith"
+    tuesday:
+      subject: "English"
+      room: "R205"
+      teacher: "Mr. Jones"
+
+Rules:
+1. Use exact weekday keys: monday, tuesday, wednesday, thursday, friday.
+2. Omit room or teacher keys if not specified in the source document.
+3. Break slots (type: break) do not require an entry under schedule.
+```
+
+### 🔔 Binary Sensors for Voice Announcements & Notifications
+
+The integration automatically creates binary sensors for each child:
+- `binary_sensor.<child_name>_upcoming_events_tomorrow` / `binary_sensor.<kind_name>_anstehende_termine_morgen`
+- `binary_sensor.<child_name>_homework_done` / `binary_sensor.<kind_name>_hausaufgaben_erledigt`
+- `binary_sensor.<child_name>_preparation_done` / `binary_sensor.<kind_name>_vorbereitung_erledigt`
+
+#### 🤖 Example Automations
+
+##### 1. Activate Internet Block Until School Bag Preparation Is Completed
+
+Blocks internet access at 17:00 until `binary_sensor.richard_preparation_done` is `on`:
+
+```yaml
+alias: "School Grades - Internet Block on Unprepared School Bag"
+trigger:
+  - platform: time
+    at: "17:00:00"
+condition:
+  - condition: state
+    entity_id: binary_sensor.richard_preparation_done
+    state: "off"
+action:
+  - service: switch.turn_off
+    target:
+      entity_id: switch.kids_internet_access
+  - service: notify.mobile_app_richard
+    data:
+      title: "🎒 Prepare School Bag!"
+      message: "Your internet access has been paused. Please pack your school bag for tomorrow and check off your subjects!"
+```
+
+Unblocks internet automatically as soon as all subjects are checked off:
+
+```yaml
+alias: "School Grades - Unblock Internet Access"
+trigger:
+  - platform: state
+    entity_id: binary_sensor.richard_preparation_done
+    to: "on"
+action:
+  - service: switch.turn_on
+    target:
+      entity_id: switch.kids_internet_access
+  - service: notify.mobile_app_richard
+    data:
+      title: "✅ Great Job!"
+      message: "All subjects are prepared. Internet access has been restored."
+```
+
+##### 2. Notification Reminder for Unfinished Homework
+
+```yaml
+alias: "School Grades - Evening Homework Reminder"
+trigger:
+  - platform: time
+    at: "18:30:00"
+condition:
+  - condition: state
+    entity_id: binary_sensor.richard_homework_done
+    state: "off"
+action:
+  - service: notify.mobile_app_richard
+    data:
+      title: "📝 Homework Reminder"
+      message: "You haven't marked your homework as completed today yet!"
+```
 
 ---
 
