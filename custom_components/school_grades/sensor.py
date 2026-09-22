@@ -1,6 +1,7 @@
 """Sensor platform for Schulnoten (School Grades) integration."""
 from __future__ import annotations
 
+import copy
 import logging
 from typing import Any
 
@@ -217,7 +218,8 @@ class SchoolGradeTotalSensor(SensorEntity):
             "prepared_subjects_date": self.storage.data.prepared_subjects_date,
             "section_visibility": self.storage.data.section_visibility,
             "calendar_entity": self.storage.data.calendar_entity,
-            "timetable": self.storage.data.timetable,
+            "timetable": copy.deepcopy(self.storage.data.timetable),
+            "timetable_version": getattr(self.storage.data, "timetable_version", 1),
             "upcoming_events": self._upcoming_events,
             "subjects_summary": {
                 subj: self.storage.data.calculate_subject_average(subj)

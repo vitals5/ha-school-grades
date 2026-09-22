@@ -81,16 +81,32 @@ class TestSchoolGradesLogic(unittest.TestCase):
     def test_timetable_cell_update(self):
         data = SchoolGradesData("Richard")
         self.assertIsNotNone(data.timetable)
-        data.update_timetable_cell("slot_1", "monday", "Mathematik", "R101", "Fr. Müller")
-        self.assertEqual(data.timetable["schedule"]["slot_1"]["monday"]["subject"], "Mathematik")
+        initial_version = data.timetable_version
+        initial_timetable = data.timetable
+
+        # Add new subject to cell
+        data.update_timetable_cell("slot_1", "monday", "Informatik", "R101", "Fr. Müller")
+        self.assertEqual(data.timetable["schedule"]["slot_1"]["monday"]["subject"], "Informatik")
         self.assertEqual(data.timetable["schedule"]["slot_1"]["monday"]["room"], "R101")
         self.assertEqual(data.timetable["schedule"]["slot_1"]["monday"]["teacher"], "Fr. Müller")
+        # Ensure deep copy / different dict reference
+        self.assertIsNot(data.timetable, initial_timetable)
+        # Ensure version incremented
+        self.assertEqual(data.timetable_version, initial_version + 1)
+        # Ensure newly introduced subject is auto-registered
+        self.assertIn("Informatik", data.subjects)
+        self.assertEqual(data.get_grades("Informatik"), [])
 
+        # Clear cell
+        mid_timetable = data.timetable
         data.update_timetable_cell("slot_1", "monday", "", "", "")
         self.assertNotIn("monday", data.timetable["schedule"]["slot_1"])
+        self.assertIsNot(data.timetable, mid_timetable)
+        self.assertEqual(data.timetable_version, initial_version + 2)
 
     def test_timetable_yaml_import(self):
         data = SchoolGradesData("Richard")
+        prev_version = data.timetable_version
         import_data = {
             "slots": [
                 {"id": "slot_1", "label": "1. Stunde", "start": "08:00", "end": "08:45"}
@@ -105,6 +121,9 @@ class TestSchoolGradesLogic(unittest.TestCase):
         self.assertTrue(res)
         self.assertEqual(data.timetable["slots"][0]["id"], "slot_1")
         self.assertEqual(data.timetable["schedule"]["slot_1"]["monday"]["subject"], "Physik")
+        self.assertEqual(data.timetable_version, prev_version + 1)
+        self.assertIn("Physik", data.subjects)
+        self.assertEqual(data.get_grades("Physik"), [])
 
     def test_country_settings(self):
         data = SchoolGradesData("Nicole")

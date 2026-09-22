@@ -55,6 +55,7 @@ class SchoolGradesData:
                 "slots": list(DEFAULT_TIMETABLE_SLOTS),
                 "schedule": {},
             }
+            self.timetable_version: int = 1
         else:
             self.child_name = data.get("child_name", child_name)
             self.country = str(data.get("country", DEFAULT_COUNTRY)).upper()
@@ -75,6 +76,7 @@ class SchoolGradesData:
                 "timetable",
                 {"slots": list(DEFAULT_TIMETABLE_SLOTS), "schedule": {}},
             )
+            self.timetable_version = int(data.get("timetable_version", 1))
             # Ensure all subjects have an entry in grades dict
             for subj in self._subjects:
                 if subj not in self._grades:
@@ -96,6 +98,7 @@ class SchoolGradesData:
             "subjects": self._subjects,
             "grades": self._grades,
             "timetable": self.timetable,
+            "timetable_version": getattr(self, "timetable_version", 1),
         }
 
     def set_grade_level(self, grade_level: str) -> None:
@@ -244,26 +247,39 @@ class SchoolGradesData:
     def update_timetable(self, timetable_data: dict[str, Any]) -> None:
         """Update timetable slots and schedule data."""
         if isinstance(timetable_data, dict):
-            self.timetable = timetable_data
+            import copy
+            self.timetable = copy.deepcopy(timetable_data)
+            self.timetable_version = getattr(self, "timetable_version", 1) + 1
 
     def update_timetable_cell(
         self, slot_id: str, day: str, subject: str, room: str = "", teacher: str = ""
     ) -> None:
         """Update or clear a single cell in the timetable matrix."""
-        if "schedule" not in self.timetable or not isinstance(self.timetable["schedule"], dict):
-            self.timetable["schedule"] = {}
-        if slot_id not in self.timetable["schedule"]:
-            self.timetable["schedule"][slot_id] = {}
+        import copy
+        new_timetable = copy.deepcopy(self.timetable)
+        if "schedule" not in new_timetable or not isinstance(new_timetable["schedule"], dict):
+            new_timetable["schedule"] = {}
+        if slot_id not in new_timetable["schedule"]:
+            new_timetable["schedule"][slot_id] = {}
 
-        clean_subj = subject.strip()
+        clean_subj = str(subject or "").strip()
+        clean_day = str(day or "").strip().lower()
         if not clean_subj:
-            self.timetable["schedule"][slot_id].pop(day, None)
+            new_timetable["schedule"][slot_id].pop(clean_day, None)
         else:
-            self.timetable["schedule"][slot_id][day] = {
+            new_timetable["schedule"][slot_id][clean_day] = {
                 "subject": clean_subj,
-                "room": room.strip(),
-                "teacher": teacher.strip(),
+                "room": str(room or "").strip(),
+                "teacher": str(teacher or "").strip(),
             }
+            # Automatically register new subject in child's subjects list if not yet present
+            if clean_subj not in self._subjects:
+                self._subjects.append(clean_subj)
+                if clean_subj not in self._grades:
+                    self._grades[clean_subj] = []
+
+        self.timetable = new_timetable
+        self.timetable_version = getattr(self, "timetable_version", 1) + 1
 
     def import_timetable_data(self, timetable_data: dict[str, Any]) -> bool:
         """Import a full timetable configuration (parsed from YAML or dict)."""
@@ -291,26 +307,37 @@ class SchoolGradesData:
                     day = k1_lower
                     for slot_id, cell in val1.items():
                         if isinstance(cell, dict):
+                            subj = str(cell.get("subject", "") or "").strip()
                             normalized_schedule.setdefault(str(slot_id), {})[day] = {
-                                "subject": str(cell.get("subject", "") or "").strip(),
+                                "subject": subj,
                                 "room": str(cell.get("room", "") or "").strip(),
                                 "teacher": str(cell.get("teacher", "") or "").strip(),
                             }
+                            if subj and subj not in self._subjects:
+                                self._subjects.append(subj)
+                                if subj not in self._grades:
+                                    self._grades[subj] = []
                 else:
                     # Format: schedule[slot_1][monday] = {subject: "Mathe"}
                     slot_id = str(key1)
                     for day_key, cell in val1.items():
                         day = str(day_key).lower()
                         if isinstance(cell, dict) and day in valid_days:
+                            subj = str(cell.get("subject", "") or "").strip()
                             normalized_schedule.setdefault(slot_id, {})[day] = {
-                                "subject": str(cell.get("subject", "") or "").strip(),
+                                "subject": subj,
                                 "room": str(cell.get("room", "") or "").strip(),
                                 "teacher": str(cell.get("teacher", "") or "").strip(),
                             }
+                            if subj and subj not in self._subjects:
+                                self._subjects.append(subj)
+                                if subj not in self._grades:
+                                    self._grades[subj] = []
 
             new_timetable["schedule"] = normalized_schedule
 
         self.timetable = new_timetable
+        self.timetable_version = getattr(self, "timetable_version", 1) + 1
         return True
 
 

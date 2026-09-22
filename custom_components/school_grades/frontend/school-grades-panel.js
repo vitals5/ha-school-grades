@@ -555,6 +555,7 @@ class SchoolGradesPanel extends HTMLElement {
     this._localPreparationDone = {}; // { [childName]: boolean }
     this._localHomeworkDone = {}; // { [childName]: boolean }
     this._lastPreparedDate = {}; // { [childName]: string }
+    this._localTimetableSchedule = {}; // { [childName]: { [slotId]: { [day]: { subject, room, teacher } } } }
   }
 
   set hass(hass) {
@@ -683,7 +684,10 @@ class SchoolGradesPanel extends HTMLElement {
         children[kindName].calendarEntity = attrs.calendar_entity;
       }
       if (attrs.timetable) {
-        children[kindName].timetable = attrs.timetable;
+        children[kindName].timetable = JSON.parse(JSON.stringify(attrs.timetable));
+      }
+      if (attrs.timetable_version !== undefined) {
+        children[kindName].timetableVersion = attrs.timetable_version;
       }
       if (attrs.upcoming_events) {
         children[kindName].upcomingEvents = attrs.upcoming_events;
@@ -709,6 +713,20 @@ class SchoolGradesPanel extends HTMLElement {
         children[kindName].totalAverage = stateObj.state;
       }
 
+      if (attrs.subjects_summary && typeof attrs.subjects_summary === 'object') {
+        for (const subj of Object.keys(attrs.subjects_summary)) {
+          if (!children[kindName].subjects[subj]) {
+            children[kindName].subjects[subj] = {
+              entityId: null,
+              name: subj,
+              average: attrs.subjects_summary[subj] != null ? attrs.subjects_summary[subj] : '-',
+              grades: [],
+              count: 0,
+            };
+          }
+        }
+      }
+
       if (this._localSectionVisibility && this._localSectionVisibility[kindName]) {
         children[kindName].sectionVisibility = {
           ...children[kindName].sectionVisibility,
@@ -719,6 +737,76 @@ class SchoolGradesPanel extends HTMLElement {
 
     // Apply local optimistic overrides and auto-recalculate preparationDone
     for (const [kindName, child] of Object.entries(children)) {
+      // Ensure all subjects from timetable schedule are also in child.subjects
+      if (child.timetable && child.timetable.schedule) {
+        for (const slotCells of Object.values(child.timetable.schedule)) {
+          if (slotCells && typeof slotCells === 'object') {
+            for (const cell of Object.values(slotCells)) {
+              if (cell && cell.subject) {
+                const sName = String(cell.subject).trim();
+                if (sName && !child.subjects[sName]) {
+                  child.subjects[sName] = {
+                    entityId: null,
+                    name: sName,
+                    average: '-',
+                    grades: [],
+                    count: 0,
+                  };
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Apply optimistic timetable overrides
+      if (this._localTimetableSchedule && this._localTimetableSchedule[kindName]) {
+        if (!child.timetable) {
+          child.timetable = { slots: [], schedule: {} };
+        }
+        if (!child.timetable.schedule) {
+          child.timetable.schedule = {};
+        }
+        for (const [slotId, dayMap] of Object.entries(this._localTimetableSchedule[kindName])) {
+          for (const [day, cell] of Object.entries(dayMap)) {
+            const currentCell = child.timetable.schedule[slotId] && child.timetable.schedule[slotId][day];
+            const currentSubj = currentCell ? String(currentCell.subject || '').trim() : '';
+            const currentRoom = currentCell ? String(currentCell.room || '').trim() : '';
+            const currentTeacher = currentCell ? String(currentCell.teacher || '').trim() : '';
+
+            const expectedSubj = cell ? String(cell.subject || '').trim() : '';
+            const expectedRoom = cell ? String(cell.room || '').trim() : '';
+            const expectedTeacher = cell ? String(cell.teacher || '').trim() : '';
+
+            if (currentSubj === expectedSubj && currentRoom === expectedRoom && currentTeacher === expectedTeacher) {
+              delete this._localTimetableSchedule[kindName][slotId][day];
+            } else {
+              if (!child.timetable.schedule[slotId]) {
+                child.timetable.schedule[slotId] = {};
+              }
+              if (!expectedSubj) {
+                delete child.timetable.schedule[slotId][day];
+              } else {
+                child.timetable.schedule[slotId][day] = {
+                  subject: expectedSubj,
+                  room: expectedRoom,
+                  teacher: expectedTeacher,
+                };
+                if (!child.subjects[expectedSubj]) {
+                  child.subjects[expectedSubj] = {
+                    entityId: null,
+                    name: expectedSubj,
+                    average: '-',
+                    grades: [],
+                    count: 0,
+                  };
+                }
+              }
+            }
+          }
+        }
+      }
+
       if (this._localHomeworkDone && this._localHomeworkDone[kindName] !== undefined) {
         if (child.homeworkDone === this._localHomeworkDone[kindName]) {
           delete this._localHomeworkDone[kindName];
@@ -1545,7 +1633,7 @@ class SchoolGradesPanel extends HTMLElement {
                   ` : ''}
                   <option value="__custom__">${this._t('custom_subject_opt')}</option>
                 </select>
-                <input type="text" id="modal-custom-subject" placeholder="${this._t('custom_subject_placeholder')}" style="display: none; margin-top: 8px;" value="${this._editingCell.subject || ''}">
+                <input type="text" id="modal-custom-subject" placeholder="${this._t('custom_subject_placeholder')}" style="display: none; margin-top: 8px;" value="">
               </div>
 
               <div class="form-row">
@@ -2181,14 +2269,21 @@ class SchoolGradesPanel extends HTMLElement {
       if (settingsYamlForm) {
         settingsYamlForm.addEventListener('submit', async (e) => {
           e.preventDefault();
+          const childName = this._selectedChild;
           const yamlText = root.querySelector('#settings-yaml-textarea').value;
-          await this._hass.callService('school_grades', 'import_timetable', {
-            child_name: this._selectedChild,
-            yaml_content: yamlText,
-          });
+          if (this._localTimetableSchedule && this._localTimetableSchedule[childName]) {
+            delete this._localTimetableSchedule[childName];
+          }
           this._showSettingsModal = false;
-          setTimeout(() => this.render(), 300);
-          setTimeout(() => this.render(), 700);
+          this.render();
+          try {
+            await this._hass.callService('school_grades', 'import_timetable', {
+              child_name: childName,
+              yaml_content: yamlText,
+            });
+          } catch (err) {
+            console.error('Failed to import timetable YAML:', err);
+          }
         });
       }
     }
@@ -2398,14 +2493,21 @@ class SchoolGradesPanel extends HTMLElement {
       if (yamlForm) {
         yamlForm.addEventListener('submit', async (e) => {
           e.preventDefault();
+          const childName = this._selectedChild;
           const yamlText = root.querySelector('#yaml-textarea').value;
-          await this._hass.callService('school_grades', 'import_timetable', {
-            child_name: this._selectedChild,
-            yaml_content: yamlText,
-          });
+          if (this._localTimetableSchedule && this._localTimetableSchedule[childName]) {
+            delete this._localTimetableSchedule[childName];
+          }
           this._showYamlModal = false;
-          setTimeout(() => this.render(), 300);
-          setTimeout(() => this.render(), 700);
+          this.render();
+          try {
+            await this._hass.callService('school_grades', 'import_timetable', {
+              child_name: childName,
+              yaml_content: yamlText,
+            });
+          } catch (err) {
+            console.error('Failed to import timetable YAML:', err);
+          }
         });
       }
     }
@@ -2443,6 +2545,7 @@ class SchoolGradesPanel extends HTMLElement {
         subjectSelect.addEventListener('change', (e) => {
           if (e.target.value === '__custom__') {
             customSubjectInput.style.display = 'block';
+            customSubjectInput.value = '';
             customSubjectInput.focus();
           } else {
             customSubjectInput.style.display = 'none';
@@ -2461,17 +2564,36 @@ class SchoolGradesPanel extends HTMLElement {
       const deleteBtn = root.querySelector('#modal-delete-btn');
       if (deleteBtn) {
         deleteBtn.addEventListener('click', async () => {
-          await this._hass.callService('school_grades', 'update_timetable_cell', {
-            child_name: this._selectedChild,
-            slot_id: this._editingCell.slotId,
-            day: this._editingCell.day,
+          if (!this._editingCell) return;
+          const childName = this._selectedChild;
+          const slotId = this._editingCell.slotId;
+          const day = this._editingCell.day;
+
+          // Optimistically update local timetable schedule
+          if (!this._localTimetableSchedule) this._localTimetableSchedule = {};
+          if (!this._localTimetableSchedule[childName]) this._localTimetableSchedule[childName] = {};
+          if (!this._localTimetableSchedule[childName][slotId]) this._localTimetableSchedule[childName][slotId] = {};
+          this._localTimetableSchedule[childName][slotId][day] = {
             subject: '',
             room: '',
             teacher: '',
-          });
+          };
+
           this._editingCell = null;
-          setTimeout(() => this.render(), 200);
-          setTimeout(() => this.render(), 600);
+          this.render();
+
+          try {
+            await this._hass.callService('school_grades', 'update_timetable_cell', {
+              child_name: childName,
+              slot_id: slotId,
+              day: day,
+              subject: '',
+              room: '',
+              teacher: '',
+            });
+          } catch (err) {
+            console.error('Failed to clear timetable cell:', err);
+          }
         });
       }
 
@@ -2479,35 +2601,43 @@ class SchoolGradesPanel extends HTMLElement {
       if (editForm) {
         editForm.addEventListener('submit', async (e) => {
           e.preventDefault();
+          if (!this._editingCell) return;
+          const childName = this._selectedChild;
+          const slotId = this._editingCell.slotId;
+          const day = this._editingCell.day;
+
           let subjectVal = root.querySelector('#modal-subject-select').value;
           if (subjectVal === '__custom__') {
-            subjectVal = root.querySelector('#modal-custom-subject').value.trim();
+            subjectVal = (root.querySelector('#modal-custom-subject').value || '').trim();
           }
-          const roomVal = root.querySelector('#modal-room').value.trim();
-          const teacherVal = root.querySelector('#modal-teacher').value.trim();
+          const roomVal = (root.querySelector('#modal-room').value || '').trim();
+          const teacherVal = (root.querySelector('#modal-teacher').value || '').trim();
 
-          // Auto-add new custom subject to integration if not present
-          const currentChild = this._getSchoolGradesData()[this._selectedChild];
-          const existingSubjects = currentChild ? Object.keys(currentChild.subjects) : [];
-          if (subjectVal && !existingSubjects.includes(subjectVal)) {
-            await this._hass.callService('school_grades', 'add_subject', {
-              child_name: this._selectedChild,
-              subject: subjectVal,
-            });
-          }
-
-          await this._hass.callService('school_grades', 'update_timetable_cell', {
-            child_name: this._selectedChild,
-            slot_id: this._editingCell.slotId,
-            day: this._editingCell.day,
+          // Optimistically update local timetable schedule
+          if (!this._localTimetableSchedule) this._localTimetableSchedule = {};
+          if (!this._localTimetableSchedule[childName]) this._localTimetableSchedule[childName] = {};
+          if (!this._localTimetableSchedule[childName][slotId]) this._localTimetableSchedule[childName][slotId] = {};
+          this._localTimetableSchedule[childName][slotId][day] = {
             subject: subjectVal,
             room: roomVal,
             teacher: teacherVal,
-          });
+          };
 
           this._editingCell = null;
-          setTimeout(() => this.render(), 200);
-          setTimeout(() => this.render(), 600);
+          this.render();
+
+          try {
+            await this._hass.callService('school_grades', 'update_timetable_cell', {
+              child_name: childName,
+              slot_id: slotId,
+              day: day,
+              subject: subjectVal,
+              room: roomVal,
+              teacher: teacherVal,
+            });
+          } catch (err) {
+            console.error('Failed to update timetable cell:', err);
+          }
         });
       }
     }
