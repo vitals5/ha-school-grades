@@ -310,8 +310,7 @@ const I18N = {
     
     // Timetable card
     timetable_title: "📅 Wochenstundenplan",
-    timetable_subtitle: "Klicke auf eine Zelle zum Bearbeiten oder nutze den YAML Import/Export",
-    yaml_button: "📋 YAML Import / Export",
+    timetable_subtitle: "Klicke auf eine Zelle zum Bearbeiten",
     legend_now: "⚡ JETZT",
     legend_today: "Heute",
     time_hour_col: "Zeit / Stunde",
@@ -386,8 +385,6 @@ const I18N = {
     cancel_btn: "Abbrechen",
     save_btn: "💾 Speichern",
     
-    yaml_modal_title: "📋 Stundenplan YAML Import / Export",
-    yaml_modal_subtitle: "Füge hier deinen Stundenplan im YAML-Format ein oder kopiere die aktuelle Konfiguration",
     yaml_textarea_label: "Stundenplan YAML-Konfiguration ({child})",
     copy_btn: "📋 Kopieren",
     copied_btn: "✅ Kopiert!",
@@ -447,8 +444,7 @@ const I18N = {
     
     // Timetable card
     timetable_title: "📅 Weekly Timetable",
-    timetable_subtitle: "Click a cell to edit or use YAML Import/Export",
-    yaml_button: "📋 YAML Import / Export",
+    timetable_subtitle: "Click a cell to edit",
     legend_now: "⚡ NOW",
     legend_today: "Today",
     time_hour_col: "Time / Slot",
@@ -523,8 +519,6 @@ const I18N = {
     cancel_btn: "Cancel",
     save_btn: "💾 Save",
     
-    yaml_modal_title: "📋 Timetable YAML Import / Export",
-    yaml_modal_subtitle: "Paste your timetable in YAML format here or copy the current configuration",
     yaml_textarea_label: "Timetable YAML Configuration ({child})",
     copy_btn: "📋 Copy",
     copied_btn: "✅ Copied!",
@@ -549,7 +543,6 @@ class SchoolGradesPanel extends HTMLElement {
     this._selectedWeight = 1.0;
     this._calendarEvents = {}; // { childName: [events] }
     this._editingCell = null; // { slotId, day, slotLabel, dayLabel, subject, room, teacher }
-    this._showYamlModal = false;
     this._showSettingsModal = false;
     this._settingsTab = 'general';
     this._showAddGradeCard = false;
@@ -1446,7 +1439,6 @@ class SchoolGradesPanel extends HTMLElement {
                 <span class="timetable-subtitle">${this._t('timetable_subtitle')}</span>
               </div>
               <div class="timetable-header-actions">
-                <button class="pill-btn yaml-btn" id="open-yaml-modal-btn">${this._t('yaml_button')}</button>
                 <div class="timetable-legend">
                   <span class="legend-item"><span class="legend-dot now-dot"></span>${this._t('legend_now')}</span>
                   <span class="legend-item"><span class="legend-dot today-dot"></span>${this._t('legend_today')}</span>
@@ -1692,33 +1684,6 @@ class SchoolGradesPanel extends HTMLElement {
                 <div class="modal-actions-right">
                   <button type="button" class="submit-btn secondary" id="modal-cancel-btn">${this._t('cancel_btn')}</button>
                   <button type="submit" class="submit-btn">${this._t('save_btn')}</button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-      ` : ''}
-
-      <!-- YAML Import / Export Modal -->
-      ${this._showYamlModal ? `
-        <div class="modal-backdrop" id="yaml-modal-backdrop">
-          <div class="modal-card yaml-modal-card">
-            <div class="modal-header">
-              <h3>${this._t('yaml_modal_title')}</h3>
-              <span class="modal-subtitle">${this._t('yaml_modal_subtitle')}</span>
-            </div>
-
-            <form id="yaml-import-form">
-              <div class="form-group">
-                <label>${this._t('yaml_textarea_label', { child: this._selectedChild })}</label>
-                <textarea id="yaml-textarea" rows="14" style="font-family: monospace; font-size: 13px; line-height: 1.4; resize: vertical; tab-size: 2;">${this._timetableToYaml(timetable)}</textarea>
-              </div>
-
-              <div class="modal-actions">
-                <button type="button" class="submit-btn secondary" id="yaml-copy-btn" style="width: auto; padding: 10px 18px;">${this._t('copy_btn')}</button>
-                <div class="modal-actions-right">
-                  <button type="button" class="submit-btn secondary" id="yaml-cancel-btn">${this._t('cancel_btn')}</button>
-                  <button type="submit" class="submit-btn">${this._t('import_btn')}</button>
                 </div>
               </div>
             </form>
@@ -2523,77 +2488,6 @@ class SchoolGradesPanel extends HTMLElement {
       });
     }
 
-    // Open YAML Modal
-    const openYamlBtn = root.querySelector('#open-yaml-modal-btn');
-    if (openYamlBtn) {
-      openYamlBtn.addEventListener('click', () => {
-        this._showYamlModal = true;
-        this.render();
-      });
-    }
-
-    // YAML Modal Backdrop & Form
-    const yamlBackdrop = root.querySelector('#yaml-modal-backdrop');
-    if (yamlBackdrop) {
-      yamlBackdrop.addEventListener('click', (e) => {
-        if (e.target === yamlBackdrop) {
-          this._showYamlModal = false;
-          this.render();
-        }
-      });
-
-      const cancelYamlBtn = root.querySelector('#yaml-cancel-btn');
-      if (cancelYamlBtn) {
-        cancelYamlBtn.addEventListener('click', () => {
-          this._showYamlModal = false;
-          this.render();
-        });
-      }
-
-      const copyYamlBtn = root.querySelector('#yaml-copy-btn');
-      if (copyYamlBtn) {
-        copyYamlBtn.addEventListener('click', async () => {
-          const textarea = root.querySelector('#yaml-textarea');
-          if (textarea) {
-            try {
-              if (navigator.clipboard && navigator.clipboard.writeText) {
-                await navigator.clipboard.writeText(textarea.value);
-              } else {
-                throw new Error('Clipboard API unavailable');
-              }
-            } catch (err) {
-              textarea.select();
-              document.execCommand('copy');
-            }
-            copyYamlBtn.textContent = this._t('copied_btn');
-            setTimeout(() => { copyYamlBtn.textContent = this._t('copy_btn'); }, 2000);
-          }
-        });
-      }
-
-      const yamlForm = root.querySelector('#yaml-import-form');
-      if (yamlForm) {
-        yamlForm.addEventListener('submit', async (e) => {
-          e.preventDefault();
-          const childName = this._selectedChild;
-          const yamlText = root.querySelector('#yaml-textarea').value;
-          if (this._localTimetableSchedule && this._localTimetableSchedule[childName]) {
-            delete this._localTimetableSchedule[childName];
-          }
-          this._showYamlModal = false;
-          this.render();
-          try {
-            await this._hass.callService('school_grades', 'import_timetable', {
-              child_name: childName,
-              yaml_content: yamlText,
-            });
-          } catch (err) {
-            console.error('Failed to import timetable YAML:', err);
-          }
-        });
-      }
-    }
-
     // Timetable Cell Clicks
     root.querySelectorAll('.timetable-cell').forEach(cell => {
       cell.addEventListener('click', (e) => {
@@ -3257,17 +3151,6 @@ class SchoolGradesPanel extends HTMLElement {
         flex-wrap: wrap;
       }
 
-      .yaml-btn {
-        background: rgba(59, 130, 246, 0.15) !important;
-        border-color: rgba(59, 130, 246, 0.4) !important;
-        color: #60a5fa !important;
-      }
-
-      .yaml-btn:hover {
-        background: #2563eb !important;
-        color: #ffffff !important;
-      }
-
       .timetable-legend {
         display: flex;
         gap: 16px;
@@ -3476,10 +3359,6 @@ class SchoolGradesPanel extends HTMLElement {
         width: 90%;
         max-width: 460px;
         box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
-      }
-
-      .yaml-modal-card {
-        max-width: 620px !important;
       }
 
       .modal-header {
