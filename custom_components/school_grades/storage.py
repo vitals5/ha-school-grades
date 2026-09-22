@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import date as dt_date
+from datetime import date as dt_date, timedelta
 from typing import Any
 
 from .const import (
@@ -19,14 +19,14 @@ STORAGE_VERSION = 1
 STORAGE_KEY = "school_grades.{entry_id}"
 
 DEFAULT_TIMETABLE_SLOTS = [
-    {"id": "s1", "type": "lesson", "number": 1, "start": "08:00", "end": "08:45"},
-    {"id": "s2", "type": "lesson", "number": 2, "start": "08:45", "end": "09:30"},
-    {"id": "b1", "type": "break", "label": "1. Pause", "start": "09:30", "end": "09:50"},
-    {"id": "s3", "type": "lesson", "number": 3, "start": "09:50", "end": "10:35"},
-    {"id": "s4", "type": "lesson", "number": 4, "start": "10:35", "end": "11:20"},
-    {"id": "b2", "type": "break", "label": "2. Pause", "start": "11:20", "end": "11:40"},
-    {"id": "s5", "type": "lesson", "number": 5, "start": "11:40", "end": "12:25"},
-    {"id": "s6", "type": "lesson", "number": 6, "start": "12:25", "end": "13:10"},
+    {"id": "slot_1", "type": "lesson", "number": "1", "label": "1. Stunde", "start": "08:00", "end": "08:45"},
+    {"id": "slot_2", "type": "lesson", "number": "2", "label": "2. Stunde", "start": "08:45", "end": "09:30"},
+    {"id": "break_1", "type": "break", "label": "1. Pause", "start": "09:30", "end": "09:45"},
+    {"id": "slot_3", "type": "lesson", "number": "3", "label": "3. Stunde", "start": "09:45", "end": "10:30"},
+    {"id": "slot_4", "type": "lesson", "number": "4", "label": "4. Stunde", "start": "10:30", "end": "11:15"},
+    {"id": "break_2", "type": "break", "label": "2. Pause", "start": "11:15", "end": "11:30"},
+    {"id": "slot_5", "type": "lesson", "number": "5", "label": "5. Stunde", "start": "11:30", "end": "12:15"},
+    {"id": "slot_6", "type": "lesson", "number": "6", "label": "6. Stunde", "start": "12:15", "end": "13:00"},
 ]
 
 
@@ -114,18 +114,91 @@ class SchoolGradesData:
             return True
         return False
 
-    def set_preparation_done(self, state: bool) -> None:
-        """Set overall preparation done status."""
-        self.preparation_done = bool(state)
+    def get_next_school_day_date(self, ref_date: dt_date | None = None) -> tuple[str, dt_date]:
+        """Return (day_key, target_date) for the next school day.
 
-    def toggle_prepared_subject(
-        self, subject: str, state: bool | None = None, target_date_str: str = ""
+        day_key is one of: monday, tuesday, wednesday, thursday, friday.
+        """
+        if ref_date is None:
+            ref_date = dt_date.today()
+
+        w = ref_date.weekday()  # Monday is 0, Sunday is 6
+        if w == 4:  # Friday -> Monday (+3 days)
+            days_ahead = 3
+            day_key = "monday"
+        elif w == 5:  # Saturday -> Monday (+2 days)
+            days_ahead = 2
+            day_key = "monday"
+        elif w == 6:  # Sunday -> Monday (+1 day)
+            days_ahead = 1
+            day_key = "monday"
+        else:  # Monday (0) -> Tue, etc.
+            day_keys = ["monday", "tuesday", "wednesday", "thursday", "friday"]
+            days_ahead = 1
+            day_key = day_keys[w + 1]
+
+        target_date = ref_date + timedelta(days=days_ahead)
+        return day_key, target_date
+
+    def get_next_school_day_subjects(self, ref_date: dt_date | None = None) -> list[str]:
+        """Return unique list of subjects on the timetable for the next school day."""
+        day_key, _ = self.get_next_school_day_date(ref_date)
+        timetable = self.timetable or {}
+        slots = timetable.get("slots", [])
+        schedule = timetable.get("schedule", {})
+
+        needed: list[str] = []
+        slot_ids = [s.get("id") for s in slots if s.get("type") != "break"]
+        for sid in schedule.keys():
+            if sid not in slot_ids:
+                slot_ids.append(sid)
+
+        for slot_id in slot_ids:
+            cell = schedule.get(slot_id, {}).get(day_key, {})
+            subj = str(cell.get("subject", "")).strip()
+            if subj and subj not in needed:
+                needed.append(subj)
+        return needed
+
+    def check_and_reset_preparation_daily(
+        self, ref_date: dt_date | None = None, target_date_str: str = ""
     ) -> bool:
-        """Toggle or set preparation status for a single subject."""
-        clean_subj = subject.strip()
-        if target_date_str and self.prepared_subjects_date != target_date_str:
+        """Reset preparation status if target school date has changed."""
+        if not target_date_str:
+            _, target_date = self.get_next_school_day_date(ref_date)
+            target_date_str = target_date.isoformat()
+
+        if self.prepared_subjects_date != target_date_str:
             self.prepared_subjects = {}
             self.prepared_subjects_date = target_date_str
+            self.preparation_done = False
+            return True
+        return False
+
+    def set_preparation_done(
+        self, state: bool, ref_date: dt_date | None = None, target_date_str: str = ""
+    ) -> None:
+        """Set overall preparation done status programmatically."""
+        self.check_and_reset_preparation_daily(ref_date, target_date_str)
+        self.preparation_done = bool(state)
+        # Sync all timetable subjects for the target school day
+        needed = self.get_next_school_day_subjects(ref_date)
+        for s in needed:
+            self.prepared_subjects[s] = bool(state)
+
+    def toggle_prepared_subject(
+        self,
+        subject: str,
+        state: bool | None = None,
+        target_date_str: str = "",
+        ref_date: dt_date | None = None,
+    ) -> bool:
+        """Toggle or set preparation status for a single subject and auto-update overall status."""
+        self.check_and_reset_preparation_daily(ref_date, target_date_str)
+
+        clean_subj = subject.strip()
+        if not clean_subj:
+            return False
 
         if state is None:
             new_val = not self.prepared_subjects.get(clean_subj, False)
@@ -133,6 +206,16 @@ class SchoolGradesData:
             new_val = bool(state)
 
         self.prepared_subjects[clean_subj] = new_val
+
+        # Check if all needed subjects for next school day are prepared
+        needed_subjects = self.get_next_school_day_subjects(ref_date)
+        if needed_subjects:
+            self.preparation_done = all(
+                self.prepared_subjects.get(s, False) for s in needed_subjects
+            )
+        else:
+            self.preparation_done = new_val
+
         return new_val
 
 

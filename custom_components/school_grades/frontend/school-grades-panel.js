@@ -1729,11 +1729,18 @@ class SchoolGradesPanel extends HTMLElement {
       item.addEventListener('click', async (e) => {
         const subject = e.currentTarget.dataset.subject;
         if (subject) {
+          const currentChild = this._getSchoolGradesData()[this._selectedChild];
+          if (currentChild) {
+            if (!currentChild.preparedSubjects) currentChild.preparedSubjects = {};
+            currentChild.preparedSubjects[subject] = !currentChild.preparedSubjects[subject];
+            this.render();
+          }
           await this._hass.callService('school_grades', 'toggle_prepared_subject', {
             child_name: this._selectedChild,
             subject: subject,
           });
-          setTimeout(() => this.render(), 200);
+          setTimeout(() => this.render(), 100);
+          setTimeout(() => this.render(), 300);
         }
       });
     });
@@ -2524,6 +2531,17 @@ class SchoolGradesPanel extends HTMLElement {
       .prep-item.has-exam {
         background: rgba(239, 68, 68, 0.12) !important;
         border-color: rgba(239, 68, 68, 0.4) !important;
+      }
+
+      .prep-item.prepared-subject {
+        border: 2px solid #22c55e !important;
+        background: rgba(34, 197, 94, 0.14) !important;
+      }
+
+      .prep-item.prepared-subject.has-exam {
+        border: 2px solid #22c55e !important;
+        background: rgba(34, 197, 94, 0.14) !important;
+        box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.6);
       }
 
       .prep-item-top {

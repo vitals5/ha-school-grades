@@ -325,7 +325,7 @@ class SchoolGradePreparationDoneBinarySensor(BinarySensorEntity):
     """Binary sensor indicating if preparation for next school day is completed."""
 
     _attr_has_entity_name = False
-    _attr_should_poll = False
+    _attr_should_poll = True
 
     def __init__(self, storage: SchoolGradesStorage, entry_id: str) -> None:
         """Initialize preparation done binary sensor."""
@@ -356,12 +356,28 @@ class SchoolGradePreparationDoneBinarySensor(BinarySensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return extra state attributes."""
+        """Return extra state attributes for automations and notifications."""
+        today = dt_util.now().date()
+        needed = self.storage.data.get_next_school_day_subjects(today)
+        prepared = [s for s in needed if self.storage.data.prepared_subjects.get(s, False)]
+        missing = [s for s in needed if not self.storage.data.prepared_subjects.get(s, False)]
+        day_key, target_date = self.storage.data.get_next_school_day_date(today)
         return {
             "kind_name": self.storage.child_name,
+            "target_school_day": day_key,
+            "target_date": target_date.isoformat(),
+            "needed_subjects": needed,
+            "prepared_subjects_list": prepared,
+            "missing_subjects": missing,
             "prepared_subjects": self.storage.data.prepared_subjects,
             "prepared_subjects_date": self.storage.data.prepared_subjects_date,
         }
+
+    async def async_update(self) -> None:
+        """Perform daily reset check if target school day has changed."""
+        today = dt_util.now().date()
+        if self.storage.data.check_and_reset_preparation_daily(today):
+            await self.storage.async_save()
 
     async def async_added_to_hass(self) -> None:
         """Register update listener when added to Home Assistant."""

@@ -2,6 +2,7 @@ import sys
 import unittest
 import json
 import importlib.util
+from datetime import date
 from pathlib import Path
 
 project_root = Path(__file__).parent.parent
@@ -128,18 +129,66 @@ class TestSchoolGradesLogic(unittest.TestCase):
         data.set_homework_done(True)
         self.assertTrue(data.homework_done)
 
-        # Preparation default
+        # Timetable setup for Tuesday (e.g. ref date Monday 2026-09-21)
+        monday_ref = date(2026, 9, 21)
+        day_key, target_date = data.get_next_school_day_date(monday_ref)
+        self.assertEqual(day_key, "tuesday")
+        self.assertEqual(target_date, date(2026, 9, 22))
+
+        # Weekend test: Friday 2026-09-25 -> Monday 2026-09-28
+        fri_ref = date(2026, 9, 25)
+        fri_day_key, fri_target_date = data.get_next_school_day_date(fri_ref)
+        self.assertEqual(fri_day_key, "monday")
+        self.assertEqual(fri_target_date, date(2026, 9, 28))
+
+        # Add timetable schedule for Tuesday: Mathematik and Deutsch
+        data.update_timetable_cell("slot_1", "tuesday", "Mathematik")
+        data.update_timetable_cell("slot_2", "tuesday", "Deutsch")
+        needed = data.get_next_school_day_subjects(monday_ref)
+        self.assertEqual(needed, ["Mathematik", "Deutsch"])
+
+        # Initially, preparation is not done
         self.assertFalse(data.preparation_done)
-        data.set_preparation_done(True)
+
+        # Toggle first subject (Mathematik)
+        res1 = data.toggle_prepared_subject("Mathematik", ref_date=monday_ref)
+        self.assertTrue(res1)
+        self.assertTrue(data.prepared_subjects.get("Mathematik"))
+        # Only 1 of 2 subjects is prepared -> preparation_done MUST be False
+        self.assertFalse(data.preparation_done)
+
+        # Toggle second subject (Deutsch) -> all subjects for Tuesday are prepared!
+        res2 = data.toggle_prepared_subject("Deutsch", ref_date=monday_ref)
+        self.assertTrue(res2)
+        self.assertTrue(data.prepared_subjects.get("Deutsch"))
+        # All subjects prepared -> preparation_done MUST automatically become True!
         self.assertTrue(data.preparation_done)
 
-        # Subject preparation toggling
-        res = data.toggle_prepared_subject("Mathematik")
-        self.assertTrue(res)
+        # Uncheck Deutsch -> preparation_done MUST revert to False!
+        res3 = data.toggle_prepared_subject("Deutsch", ref_date=monday_ref)
+        self.assertFalse(res3)
+        self.assertFalse(data.preparation_done)
+
+        # Programmatic set_preparation_done(True) marks overall done and all subjects prepared
+        data.set_preparation_done(True, ref_date=monday_ref)
+        self.assertTrue(data.preparation_done)
         self.assertTrue(data.prepared_subjects.get("Mathematik"))
-        res2 = data.toggle_prepared_subject("Mathematik")
-        self.assertFalse(res2)
+        self.assertTrue(data.prepared_subjects.get("Deutsch"))
+
+        # Programmatic set_preparation_done(False) clears overall done and unmarks subjects
+        data.set_preparation_done(False, ref_date=monday_ref)
+        self.assertFalse(data.preparation_done)
         self.assertFalse(data.prepared_subjects.get("Mathematik"))
+        self.assertFalse(data.prepared_subjects.get("Deutsch"))
+
+        # Daily reset when date advances to Tuesday (ref_date = 2026-09-22 -> prepares for Wednesday)
+        data.set_preparation_done(True, ref_date=monday_ref)
+        self.assertTrue(data.preparation_done)
+        tue_ref = date(2026, 9, 22)
+        has_reset = data.check_and_reset_preparation_daily(ref_date=tue_ref)
+        self.assertTrue(has_reset)
+        self.assertFalse(data.preparation_done)
+        self.assertEqual(data.prepared_subjects, {})
 
     def test_section_visibility_settings(self):
         data = SchoolGradesData("Nicole")

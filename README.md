@@ -137,13 +137,13 @@ Regeln:
 Die Integration erstellt für jedes Kind automatisch folgende Binary Sensoren:
 - `binary_sensor.<kind_name>_anstehende_termine_morgen`
 - `binary_sensor.<kind_name>_hausaufgaben_erledigt`
-- `binary_sensor.<kind_name>_vorbereitung_erledigt`
+- `binary_sensor.<kind_name>_vorbereitung_erledigt`: Schaltet automatisch auf `on`, sobald alle Schulfächer für den nächsten Schultag als vorbereitet angeklickt wurden (oder programmatisch per Service). Stellt nützliche Attribute wie `missing_subjects`, `needed_subjects` und `target_school_day` für Automationen bereit.
 
 #### 🤖 Beispiel-Automatisierungen
 
-##### 1. Internet-Sperre aktivieren, bis die Schultaschen-Vorbereitung erledigt ist
+##### 1. Internet-Sperre & Benachrichtigung bei unerledigter Schultaschen-Vorbereitung
 
-Sperrt um 17:00 Uhr das WLAN/Internet der Spielekonsole oder des Kinder-Handys, bis der Binary Sensor `binary_sensor.richard_vorbereitung_erledigt` auf `on` steht:
+Sperrt um 17:00 Uhr das WLAN/Internet der Spielekonsole oder des Kinder-Handys und sendet eine Erinnerung mit den noch fehlenden Fächern, bis der Binary Sensor `binary_sensor.richard_vorbereitung_erledigt` auf `on` steht:
 
 ```yaml
 alias: "Schulnoten - Internet-Sperre bei unerledigter Schultaschen-Vorbereitung"
@@ -161,10 +161,15 @@ action:
   - service: notify.mobile_app_richard
     data:
       title: "🎒 Schultasche vorbereiten!"
-      message: "Dein Internet wurde gesperrt. Bitte packe deine Schultasche für morgen und hake die Fächer ab!"
+      message: >-
+        Dein Internet wurde gesperrt. Bitte packe deine Schultasche für morgen und hake die Fächer ab!
+        {% set missing = state_attr('binary_sensor.richard_vorbereitung_erledigt', 'missing_subjects') %}
+        {% if missing %}
+        Noch fehlend: {{ missing | join(', ') }}
+        {% endif %}
 ```
 
-Automatisches Freischalten, sobald alle Fächer abgehakt wurden:
+Automatisches Freischalten & Lob, sobald alle Fächer im Panel abgehakt wurden:
 
 ```yaml
 alias: "Schulnoten - Internet wieder freigeben"
@@ -180,6 +185,15 @@ action:
     data:
       title: "✅ Super gemacht!"
       message: "Alle Fächer sind vorbereitet. Das Internet wurde wieder freigeschaltet."
+```
+
+Programmatisches Setzen per Home Assistant Service (z. B. für Sprachassistenten oder Schalter):
+
+```yaml
+service: school_grades.set_preparation_done
+data:
+  child_name: "Richard"
+  preparation_done: true
 ```
 
 ##### 2. Benachrichtigungs-Erinnerung für Hausaufgaben & Klausuren
@@ -330,13 +344,13 @@ Rules:
 The integration automatically creates binary sensors for each child:
 - `binary_sensor.<child_name>_upcoming_events_tomorrow` / `binary_sensor.<kind_name>_anstehende_termine_morgen`
 - `binary_sensor.<child_name>_homework_done` / `binary_sensor.<kind_name>_hausaufgaben_erledigt`
-- `binary_sensor.<child_name>_preparation_done` / `binary_sensor.<kind_name>_vorbereitung_erledigt`
+- `binary_sensor.<kind_name>_vorbereitung_erledigt`: Automatically switches to `on` once all subjects scheduled for the next school day have been checked off in the panel (or programmatically via service). Provides useful attributes like `missing_subjects`, `needed_subjects`, and `target_school_day` for automations.
 
 #### 🤖 Example Automations
 
-##### 1. Activate Internet Block Until School Bag Preparation Is Completed
+##### 1. Activate Internet Block & Notification Until School Bag Preparation Is Completed
 
-Blocks internet access at 17:00 until `binary_sensor.richard_preparation_done` is `on`:
+Blocks internet access at 17:00 and sends a reminder with the still missing subjects until `binary_sensor.richard_vorbereitung_erledigt` is `on`:
 
 ```yaml
 alias: "School Grades - Internet Block on Unprepared School Bag"
@@ -345,7 +359,7 @@ trigger:
     at: "17:00:00"
 condition:
   - condition: state
-    entity_id: binary_sensor.richard_preparation_done
+    entity_id: binary_sensor.richard_vorbereitung_erledigt
     state: "off"
 action:
   - service: switch.turn_off
@@ -354,16 +368,21 @@ action:
   - service: notify.mobile_app_richard
     data:
       title: "🎒 Prepare School Bag!"
-      message: "Your internet access has been paused. Please pack your school bag for tomorrow and check off your subjects!"
+      message: >-
+        Your internet access has been paused. Please pack your school bag for tomorrow and check off your subjects!
+        {% set missing = state_attr('binary_sensor.richard_vorbereitung_erledigt', 'missing_subjects') %}
+        {% if missing %}
+        Still missing: {{ missing | join(', ') }}
+        {% endif %}
 ```
 
-Unblocks internet automatically as soon as all subjects are checked off:
+Unblocks internet automatically and praises the child as soon as all subjects are checked off:
 
 ```yaml
 alias: "School Grades - Unblock Internet Access"
 trigger:
   - platform: state
-    entity_id: binary_sensor.richard_preparation_done
+    entity_id: binary_sensor.richard_vorbereitung_erledigt
     to: "on"
 action:
   - service: switch.turn_on
@@ -373,6 +392,15 @@ action:
     data:
       title: "✅ Great Job!"
       message: "All subjects are prepared. Internet access has been restored."
+```
+
+Programmatic update via Home Assistant Service (e.g. for voice assistants or smart buttons):
+
+```yaml
+service: school_grades.set_preparation_done
+data:
+  child_name: "Richard"
+  preparation_done: true
 ```
 
 ##### 2. Notification Reminder for Unfinished Homework
