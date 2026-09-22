@@ -225,6 +225,78 @@ class TestSchoolGradesLogic(unittest.TestCase):
             "show_overview_card": True,
         })
 
+    def test_school_time_status(self):
+        """Test SchoolGradesData.get_current_school_status for active lesson, break, free period, etc."""
+        from datetime import datetime
+
+        data = SchoolGradesData("Richard")
+        data.timetable = {
+            "slots": [
+                {"id": "slot_1", "type": "lesson", "label": "1. Stunde", "start": "08:00", "end": "08:45"},
+                {"id": "slot_2", "type": "lesson", "label": "2. Stunde", "start": "08:45", "end": "09:30"},
+                {"id": "break_1", "type": "break", "label": "1. Pause", "start": "09:30", "end": "09:45"},
+                {"id": "slot_3", "type": "lesson", "label": "3. Stunde", "start": "09:45", "end": "10:30"},
+                {"id": "slot_4", "type": "lesson", "label": "4. Stunde", "start": "10:30", "end": "11:15"},
+            ],
+            "schedule": {
+                "slot_1": {"monday": {"subject": "Mathematik", "room": "R101", "teacher": "Fr. Müller"}},
+                "slot_2": {"monday": {"subject": "Deutsch", "room": "R102", "teacher": "Hr. Weber"}},
+                "slot_3": {"monday": {"subject": ""}},  # Freistunde
+                "slot_4": {"monday": {"subject": "Englisch", "room": "R103", "teacher": "Fr. Bauer"}},
+            }
+        }
+
+        # 2026-09-21 is a Monday
+        # 1. Before school (07:45)
+        is_on, attrs = data.get_current_school_status(datetime(2026, 9, 21, 7, 45))
+        self.assertFalse(is_on)
+        self.assertTrue(attrs["before_school"])
+        self.assertEqual(attrs["next_subject"], "Mathematik")
+        self.assertEqual(attrs["next_slot_start"], "08:00")
+        self.assertEqual(attrs["school_day_start"], "08:00")
+        self.assertEqual(attrs["school_day_end"], "11:15")
+
+        # 2. During 1st lesson (08:15)
+        is_on, attrs = data.get_current_school_status(datetime(2026, 9, 21, 8, 15))
+        self.assertTrue(is_on)
+        self.assertEqual(attrs["current_subject"], "Mathematik")
+        self.assertEqual(attrs["current_room"], "R101")
+        self.assertEqual(attrs["current_teacher"], "Fr. Müller")
+        self.assertEqual(attrs["current_slot"], "1. Stunde")
+        self.assertEqual(attrs["current_slot_end"], "08:45")
+        self.assertEqual(attrs["next_subject"], "Deutsch")
+
+        # 3. During break (09:35) -> must be False
+        is_on, attrs = data.get_current_school_status(datetime(2026, 9, 21, 9, 35))
+        self.assertFalse(is_on)
+        self.assertTrue(attrs["is_break"])
+        self.assertEqual(attrs["current_slot"], "1. Pause")
+        self.assertEqual(attrs["next_subject"], "Englisch")
+        self.assertEqual(attrs["next_slot_start"], "10:30")
+
+        # 4. During free period (10:00) -> must be False
+        is_on, attrs = data.get_current_school_status(datetime(2026, 9, 21, 10, 0))
+        self.assertFalse(is_on)
+        self.assertTrue(attrs["is_free_period"])
+        self.assertEqual(attrs["current_slot"], "3. Stunde")
+        self.assertEqual(attrs["next_subject"], "Englisch")
+
+        # 5. During 4th lesson (10:50) -> must be True
+        is_on, attrs = data.get_current_school_status(datetime(2026, 9, 21, 10, 50))
+        self.assertTrue(is_on)
+        self.assertEqual(attrs["current_subject"], "Englisch")
+
+        # 6. School finished (11:30) -> must be False
+        is_on, attrs = data.get_current_school_status(datetime(2026, 9, 21, 11, 30))
+        self.assertFalse(is_on)
+        self.assertTrue(attrs["school_finished"])
+
+        # 7. Weekend: Saturday 2026-09-26 -> must be False
+        is_on, attrs = data.get_current_school_status(datetime(2026, 9, 26, 10, 0))
+        self.assertFalse(is_on)
+        self.assertFalse(attrs["is_school_day"])
+
+
 
 class TestCalendarServicesLogic(unittest.TestCase):
     """Test suite for calendar event datetime parsing, action discovery, and deletion logic."""

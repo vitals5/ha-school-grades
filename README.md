@@ -142,6 +142,7 @@ Die Integration erstellt für jedes Kind automatisch folgende Binary Sensoren:
 - `binary_sensor.<kind_name>_anstehende_termine_morgen`
 - `binary_sensor.<kind_name>_hausaufgaben_erledigt`
 - `binary_sensor.<kind_name>_vorbereitung_erledigt`: Schaltet automatisch auf `on`, sobald alle Schulfächer für den nächsten Schultag als vorbereitet angeklickt wurden (oder programmatisch per Service). Stellt nützliche Attribute wie `missing_subjects`, `needed_subjects` und `target_school_day` für Automationen bereit.
+- `binary_sensor.<kind_name>_schulzeit`: Steht auf `on` (`true`), solange sich das Kind aktuell in einer regulären Unterrichtsstunde befindet. Wechselt auf `off` (`false`) bei Pausen, Freistunden, vor der Schule, nach Schulende sowie am Wochenende. Bietet viele Attribute wie `current_subject`, `current_room`, `current_teacher`, `current_slot`, `current_slot_start`, `current_slot_end`, `is_break`, `is_free_period`, `school_finished`, `next_subject`, `next_slot_start` u.v.m.
 
 #### 🤖 Beispiel-Automatisierungen
 
@@ -216,6 +217,41 @@ action:
     data:
       title: "📝 Hausaufgaben-Erinnerung"
       message: "Du hast deine Hausaufgaben für heute noch nicht als erledigt markiert!"
+```
+
+##### 3. Smartphone-Einschränkung während der Schulzeit (z. B. mit Google Family Link)
+
+Sperrt während des Unterrichts das Smartphone (oder aktiviert den Schulmodus) und gibt es in Pausen oder nach Schulschluss automatisch wieder frei:
+
+```yaml
+alias: "Schulnoten - Smartphone während der Unterrichtszeit sperren"
+trigger:
+  - platform: state
+    entity_id: binary_sensor.richard_schulzeit
+action:
+  - choose:
+      - conditions:
+          - condition: state
+            entity_id: binary_sensor.richard_schulzeit
+            state: "on"
+        sequence:
+          # Beispiel Google Family Link Sperre / Fokusmodus
+          - service: switch.turn_on
+            target:
+              entity_id: switch.richard_handy_schulmodus_oder_family_link_sperre
+          - service: notify.mobile_app_richard
+            data:
+              title: "🏫 Unterrichtszeit"
+              message: "Unterricht ({{ state_attr('binary_sensor.richard_schulzeit', 'current_subject') }}) läuft. Das Handy ist stummgeschaltet."
+      - conditions:
+          - condition: state
+            entity_id: binary_sensor.richard_schulzeit
+            state: "off"
+        sequence:
+          # Freigabe in Pause oder nach Schulende
+          - service: switch.turn_off
+            target:
+              entity_id: switch.richard_handy_schulmodus_oder_family_link_sperre
 ```
 
 ---
@@ -349,6 +385,7 @@ The integration automatically creates binary sensors for each child:
 - `binary_sensor.<child_name>_upcoming_events_tomorrow` / `binary_sensor.<kind_name>_anstehende_termine_morgen`
 - `binary_sensor.<child_name>_homework_done` / `binary_sensor.<kind_name>_hausaufgaben_erledigt`
 - `binary_sensor.<kind_name>_vorbereitung_erledigt`: Automatically switches to `on` once all subjects scheduled for the next school day have been checked off in the panel (or programmatically via service). Provides useful attributes like `missing_subjects`, `needed_subjects`, and `target_school_day` for automations.
+- `binary_sensor.<kind_name>_schulzeit`: Stays `on` (`true`) as long as the child is currently in an active school lesson period. Switches to `off` (`false`) during breaks, free periods, before school, after school ends, and on weekends. Exposes rich attributes like `current_subject`, `current_room`, `current_teacher`, `current_slot`, `current_slot_start`, `current_slot_end`, `is_break`, `is_free_period`, `school_finished`, `next_subject`, `next_slot_start`, and more.
 
 #### 🤖 Example Automations
 
@@ -423,6 +460,41 @@ action:
     data:
       title: "📝 Homework Reminder"
       message: "You haven't marked your homework as completed today yet!"
+```
+
+##### 3. Restrict Smartphone Usage During School Lessons (e.g. Google Family Link / Focus Mode)
+
+Locks the child's smartphone during active lessons and automatically restores access during breaks or after school:
+
+```yaml
+alias: "School Grades - Lock Phone During School Lessons"
+trigger:
+  - platform: state
+    entity_id: binary_sensor.richard_schulzeit
+action:
+  - choose:
+      - conditions:
+          - condition: state
+            entity_id: binary_sensor.richard_schulzeit
+            state: "on"
+        sequence:
+          # Enable Google Family Link lock / School Focus mode
+          - service: switch.turn_on
+            target:
+              entity_id: switch.richard_phone_school_mode_or_family_link_lock
+          - service: notify.mobile_app_richard
+            data:
+              title: "🏫 School Time"
+              message: "Class ({{ state_attr('binary_sensor.richard_schulzeit', 'current_subject') }}) is in session. Phone is muted."
+      - conditions:
+          - condition: state
+            entity_id: binary_sensor.richard_schulzeit
+            state: "off"
+        sequence:
+          # Restore access during recess/breaks or after school ends
+          - service: switch.turn_off
+            target:
+              entity_id: switch.richard_phone_school_mode_or_family_link_lock
 ```
 
 ---

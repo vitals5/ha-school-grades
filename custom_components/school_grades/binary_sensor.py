@@ -51,6 +51,7 @@ async def async_setup_entry(
         SchoolGradeNextDayExamsBinarySensor(storage, entry.entry_id),
         SchoolGradeHomeworkDoneBinarySensor(storage, entry.entry_id),
         SchoolGradePreparationDoneBinarySensor(storage, entry.entry_id),
+        SchoolGradeSchoolTimeBinarySensor(storage, entry.entry_id),
     ])
 
 
@@ -393,4 +394,91 @@ class SchoolGradePreparationDoneBinarySensor(BinarySensorEntity):
     def _handle_update(self) -> None:
         """Handle signal update and write state to Home Assistant."""
         self.async_schedule_update_ha_state(True)
+
+
+class SchoolGradeSchoolTimeBinarySensor(BinarySensorEntity):
+    """Binary sensor indicating if a school lesson is currently in session."""
+
+    _attr_has_entity_name = False
+    _attr_should_poll = True
+
+    def __init__(self, storage: SchoolGradesStorage, entry_id: str) -> None:
+        """Initialize school time binary sensor."""
+        self.storage = storage
+        self.entry_id = entry_id
+        self._attr_name = f"{storage.child_name} Schulzeit"
+        self._attr_unique_id = f"school_grades_{entry_id}_school_time"
+        self._is_on: bool = False
+        self._attributes: dict[str, Any] = {}
+        self._update_state()
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info to group entities under child device."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self.entry_id)},
+            name=f"Schulnoten ({self.storage.child_name})",
+            manufacturer="Schulnoten",
+            model="Notenverwaltung",
+        )
+
+    @property
+    def is_on(self) -> bool:
+        """Return True if school lesson is currently in session."""
+        return self._is_on
+
+    @property
+    def icon(self) -> str:
+        """Return dynamic icon based on state."""
+        return "mdi:school" if self._is_on else "mdi:school-outline"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra state attributes."""
+        return self._attributes
+
+    def _update_state(self) -> None:
+        """Compute school time status."""
+        now_dt = dt_util.now() if hasattr(dt_util, "now") else datetime.now()
+        is_on, attrs = self.storage.data.get_current_school_status(now_dt)
+        self._is_on = is_on
+        self._attributes = attrs
+
+    async def async_update(self) -> None:
+        """Update sensor state during polling."""
+        self._update_state()
+
+    async def async_added_to_hass(self) -> None:
+        """Register listeners when added to Home Assistant."""
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                SIGNAL_UPDATE_GRADES.format(entry_id=self.entry_id),
+                self._handle_update,
+            )
+        )
+        try:
+            from homeassistant.helpers.event import async_track_time_interval
+            self.async_on_remove(
+                async_track_time_interval(
+                    self.hass,
+                    self._handle_timer_tick,
+                    timedelta(seconds=30),
+                )
+            )
+        except Exception as err:
+            _LOGGER.debug("Could not track time interval in SchoolGradeSchoolTimeBinarySensor: %s", err)
+
+    @callback
+    def _handle_timer_tick(self, now: Any = None) -> None:
+        """Handle interval timer tick to update sensor on slot boundaries."""
+        self._update_state()
+        self.async_write_ha_state()
+
+    @callback
+    def _handle_update(self) -> None:
+        """Handle signal update and write state to Home Assistant."""
+        self._update_state()
+        self.async_schedule_update_ha_state(True)
+
 

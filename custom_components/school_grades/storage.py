@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import date as dt_date, timedelta
+from datetime import date as dt_date, datetime as dt_datetime, timedelta
 from typing import Any
 
 from .const import (
@@ -221,6 +221,191 @@ class SchoolGradesData:
 
         return new_val
 
+    def get_current_school_status(
+        self, ref_dt: dt_datetime | None = None
+    ) -> tuple[bool, dict[str, Any]]:
+        """Determine if a school lesson is currently active and return detailed status.
+
+        Returns:
+            (is_school_time, attributes_dict)
+            is_school_time is True only if a lesson with a scheduled subject is currently running.
+            is_school_time is False during breaks, free periods, after/before school, or on weekends.
+        """
+        if ref_dt is None:
+            ref_dt = dt_datetime.now()
+
+        weekday = ref_dt.weekday()
+        day_keys = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+        day_key = day_keys[weekday]
+
+        base_attrs: dict[str, Any] = {
+            "kind_name": self.child_name,
+            "is_school_time": False,
+            "current_subject": None,
+            "current_room": None,
+            "current_teacher": None,
+            "current_slot": None,
+            "current_slot_start": None,
+            "current_slot_end": None,
+            "is_break": False,
+            "is_free_period": False,
+            "is_school_day": False,
+            "school_finished": False,
+            "before_school": False,
+            "school_day_start": None,
+            "school_day_end": None,
+            "next_subject": None,
+            "next_slot": None,
+            "next_slot_start": None,
+            "lessons_today": [],
+            "weekday": day_key,
+        }
+
+        # Weekend: Saturday (5) or Sunday (6)
+        if weekday >= 5:
+            return False, base_attrs
+
+        timetable = self.timetable if isinstance(self.timetable, dict) else {}
+        slots = timetable.get("slots", [])
+        schedule = timetable.get("schedule", {})
+
+        if not slots or not isinstance(slots, list):
+            return False, base_attrs
+
+        def _to_mins(time_str: Any) -> int | None:
+            if not isinstance(time_str, str) or ":" not in time_str:
+                return None
+            try:
+                parts = time_str.strip().split(":")
+                return int(parts[0]) * 60 + int(parts[1])
+            except (ValueError, IndexError):
+                return None
+
+        current_minutes = ref_dt.hour * 60 + ref_dt.minute
+
+        # Parse slots and sort by start time
+        parsed_slots: list[dict[str, Any]] = []
+        for slot in slots:
+            if not isinstance(slot, dict):
+                continue
+            s_min = _to_mins(slot.get("start"))
+            e_min = _to_mins(slot.get("end"))
+            if s_min is not None and e_min is not None and s_min < e_min:
+                parsed_slots.append({
+                    "id": str(slot.get("id", "")),
+                    "type": str(slot.get("type", "lesson")),
+                    "label": str(slot.get("label", "")),
+                    "number": str(slot.get("number", "")),
+                    "start": str(slot.get("start", "")),
+                    "end": str(slot.get("end", "")),
+                    "start_m": s_min,
+                    "end_m": e_min,
+                })
+        parsed_slots.sort(key=lambda s: s["start_m"])
+
+        if not parsed_slots:
+            return False, base_attrs
+
+        # Gather scheduled lessons for today
+        lessons_today: list[dict[str, Any]] = []
+        earliest_lesson_start: int | None = None
+        latest_lesson_end: int | None = None
+
+        for s in parsed_slots:
+            slot_id = s["id"]
+            is_break_type = (s["type"] == "break") or ("pause" in s["label"].lower())
+            cell = schedule.get(slot_id, {}).get(day_key, {}) if isinstance(schedule, dict) else {}
+            subj = str(cell.get("subject", "")).strip()
+            room = str(cell.get("room", "")).strip()
+            teacher = str(cell.get("teacher", "")).strip()
+
+            if not is_break_type and subj:
+                lessons_today.append({
+                    "slot_id": slot_id,
+                    "slot_label": s["label"],
+                    "subject": subj,
+                    "room": room,
+                    "teacher": teacher,
+                    "start": s["start"],
+                    "end": s["end"],
+                    "start_m": s["start_m"],
+                    "end_m": s["end_m"],
+                })
+                if earliest_lesson_start is None or s["start_m"] < earliest_lesson_start:
+                    earliest_lesson_start = s["start_m"]
+                if latest_lesson_end is None or s["end_m"] > latest_lesson_end:
+                    latest_lesson_end = s["end_m"]
+
+        is_school_day = len(lessons_today) > 0
+        base_attrs["is_school_day"] = is_school_day
+        base_attrs["lessons_today"] = [l["subject"] for l in lessons_today]
+
+        if earliest_lesson_start is not None:
+            base_attrs["school_day_start"] = f"{earliest_lesson_start // 60:02d}:{earliest_lesson_start % 60:02d}"
+        if latest_lesson_end is not None:
+            base_attrs["school_day_end"] = f"{latest_lesson_end // 60:02d}:{latest_lesson_end % 60:02d}"
+
+        # If no lessons today at all
+        if not is_school_day:
+            return False, base_attrs
+
+        # Check if before earliest lesson
+        if earliest_lesson_start is not None and current_minutes < earliest_lesson_start:
+            base_attrs["before_school"] = True
+            base_attrs["next_subject"] = lessons_today[0]["subject"]
+            base_attrs["next_slot"] = lessons_today[0]["slot_label"]
+            base_attrs["next_slot_start"] = lessons_today[0]["start"]
+            return False, base_attrs
+
+        # Check if after latest lesson
+        if latest_lesson_end is not None and current_minutes >= latest_lesson_end:
+            base_attrs["school_finished"] = True
+            return False, base_attrs
+
+        # Find current slot
+        current_slot_info: dict[str, Any] | None = None
+        for s in parsed_slots:
+            if s["start_m"] <= current_minutes < s["end_m"]:
+                current_slot_info = s
+                break
+
+        # Find next upcoming lesson today
+        for lesson in lessons_today:
+            if lesson["start_m"] > current_minutes:
+                base_attrs["next_subject"] = lesson["subject"]
+                base_attrs["next_slot"] = lesson["slot_label"]
+                base_attrs["next_slot_start"] = lesson["start"]
+                break
+
+        if current_slot_info is not None:
+            slot_id = current_slot_info["id"]
+            is_break_type = (current_slot_info["type"] == "break") or ("pause" in current_slot_info["label"].lower())
+            base_attrs["current_slot"] = current_slot_info["label"]
+            base_attrs["current_slot_start"] = current_slot_info["start"]
+            base_attrs["current_slot_end"] = current_slot_info["end"]
+
+            if is_break_type:
+                base_attrs["is_break"] = True
+                base_attrs["is_school_time"] = False
+                return False, base_attrs
+
+            cell = schedule.get(slot_id, {}).get(day_key, {}) if isinstance(schedule, dict) else {}
+            subj = str(cell.get("subject", "")).strip()
+            if subj:
+                base_attrs["is_school_time"] = True
+                base_attrs["current_subject"] = subj
+                base_attrs["current_room"] = str(cell.get("room", "")).strip() or None
+                base_attrs["current_teacher"] = str(cell.get("teacher", "")).strip() or None
+                return True, base_attrs
+            else:
+                # Free period (Freistunde)
+                base_attrs["is_free_period"] = True
+                base_attrs["is_school_time"] = False
+                return False, base_attrs
+
+        # If between slots (e.g. gap)
+        base_attrs["is_school_time"] = False
+        return False, base_attrs
 
     def set_section_visibility(self, visibility_dict: dict[str, Any]) -> None:
         """Update section visibility toggles."""
