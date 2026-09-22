@@ -1,7 +1,7 @@
 # 🎓 Schulnoten & Stundenplan - Home Assistant Integration (HACS)
 
 <p align="center">
-  <img src="brand/logo.png" alt="Schulnoten Logo" width="450">
+  <img src="custom_components/school_grades/brand/logo.png" alt="Schulnoten Logo" width="450">
 </p>
 
 [ 🇩🇪 **Deutsch** ](#-deutsch) | [ 🇬🇧 **English** ](#-english)
