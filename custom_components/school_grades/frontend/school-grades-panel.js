@@ -271,8 +271,6 @@ const I18N = {
     no_children_text1: "Es wurden noch keine Kinder-Instanzen in Home Assistant konfiguriert.",
     no_children_text2: "Bitte gehe zu Einstellungen ➔ Geräte & Dienste ➔ Integration hinzufügen ➔ Schulnoten.",
     total_avg: "Gesamtdurchschnitt",
-    subjects_count: "Fächer",
-    total_grades: "Gesamte Noten",
     
     // Prep card
     prep_title: "🎒 Vorbereitung für den nächsten Schultag",
@@ -344,7 +342,6 @@ const I18N = {
     // Subjects overview
     overview_title: "📘 Fächer & Notenübersicht",
     avg_label: "Schnitt",
-    grades_tag: "{count} Noten",
     no_grades_yet: "Noch keine Noten eingetragen",
     table_grade: "Note",
     table_weight: "Gewichtung",
@@ -409,8 +406,6 @@ const I18N = {
     no_children_text1: "No child instances have been configured in Home Assistant yet.",
     no_children_text2: "Please go to Settings ➔ Devices & Services ➔ Add Integration ➔ Schulnoten.",
     total_avg: "Overall Average",
-    subjects_count: "Subjects",
-    total_grades: "Total Grades",
     
     // Prep card
     prep_title: "🎒 Preparation for the Next School Day",
@@ -482,7 +477,6 @@ const I18N = {
     // Subjects overview
     overview_title: "📘 Subjects & Grades Overview",
     avg_label: "Avg",
-    grades_tag: "{count} grades",
     no_grades_yet: "No grades recorded yet",
     table_grade: "Grade",
     table_weight: "Weight",
@@ -1348,9 +1342,8 @@ class SchoolGradesPanel extends HTMLElement {
                   <div class="subject-header">
                     <div class="subject-title">
                       <h3>${subjName}</h3>
-                      <span class="badge avg-badge ${this._getGradeColorClass(avg, childCountry)}">${this._t('avg_label')}: ${avg}</span>
                     </div>
-                    <span class="count-tag">${this._t('grades_tag', { count: subj.grades.length })}</span>
+                    <span class="badge avg-badge ${this._getGradeColorClass(avg, childCountry)}">${this._t('avg_label')}: ${avg}</span>
                   </div>
 
                   <div class="grades-list">
@@ -3138,7 +3131,7 @@ class SchoolGradesPanel extends HTMLElement {
       }
 
       .subject-title h3 {
-        margin: 0 0 4px 0;
+        margin: 0;
         font-size: 18px;
         font-weight: 700;
       }
@@ -3148,14 +3141,6 @@ class SchoolGradesPanel extends HTMLElement {
         border-radius: 8px;
         font-size: 12px;
         font-weight: 700;
-      }
-
-      .count-tag {
-        font-size: 12px;
-        color: var(--secondary-text-color, #9ca3af);
-        background: rgba(255, 255, 255, 0.05);
-        padding: 4px 8px;
-        border-radius: 6px;
       }
 
       .empty-grades {
