@@ -234,6 +234,14 @@ async def _async_setup_frontend(hass: HomeAssistant) -> None:
     else:
         hass.http.register_static_path(URL_BASE, FRONTEND_DIR, cache_headers=False)
 
+    version_str = "1.1.1"
+    try:
+        js_file = os.path.join(FRONTEND_DIR, "school-grades-panel.js")
+        if os.path.exists(js_file):
+            version_str = f"{version_str}.{int(os.path.getmtime(js_file))}"
+    except Exception:
+        pass
+
     if not hass.data.get(f"{DOMAIN}_panel_registered"):
         hass.data[f"{DOMAIN}_panel_registered"] = True
         try:
@@ -243,11 +251,11 @@ async def _async_setup_frontend(hass: HomeAssistant) -> None:
                 webcomponent_name="school-grades-panel",
                 sidebar_title="Schulnoten",
                 sidebar_icon="mdi:school",
-                module_url=f"{URL_BASE}/school-grades-panel.js",
+                module_url=f"{URL_BASE}/school-grades-panel.js?v={version_str}",
                 embed_iframe=False,
                 require_admin=False,
             )
-            _LOGGER.info("Successfully registered Schulnoten sidebar panel at /schulnoten")
+            _LOGGER.info("Successfully registered Schulnoten sidebar panel at /schulnoten (v=%s)", version_str)
         except Exception as err:
             _LOGGER.error("Failed to register Schulnoten panel: %s", err)
 
