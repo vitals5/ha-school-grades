@@ -1229,10 +1229,16 @@ class SchoolGradesPanel extends HTMLElement {
                 </button>
               `;
             }).join('')}
+            <button class="settings-badge-btn" id="open-settings-btn" aria-label="${this._t('settings_btn')}" title="${this._t('settings_btn')}">
+              <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              </svg>
+            </button>
           </div>
         </header>
 
-        <!-- Summary Banner (Avg, Homework, Preparation, Settings Button) -->
+        <!-- Summary Banner (Avg, Homework, Preparation) -->
         <div class="summary-banner">
           <div class="stat-card primary">
             <span class="stat-label">${this._t('total_avg')}</span>
@@ -1249,9 +1255,6 @@ class SchoolGradesPanel extends HTMLElement {
             <span class="stat-value" style="font-size: 20px; font-weight: 700; ${currentChild && currentChild.preparationDone ? 'color: #22c55e;' : 'color: #9ca3af;'}">
               ${currentChild && currentChild.preparationDone ? this._t('prep_done_badge') : this._t('prep_open_badge')}
             </span>
-          </div>
-          <div class="stat-card action-stat-card" id="open-settings-banner-btn" style="cursor: pointer; justify-content: center;" title="${this._t('settings_btn')}">
-            <span class="stat-value" style="font-size: 18px; font-weight: 700;">⚙️ ${this._t('settings_btn')}</span>
           </div>
         </div>
 
@@ -2157,7 +2160,7 @@ class SchoolGradesPanel extends HTMLElement {
     });
 
     // Open Settings Modal
-    const openSettingsBtn = root.querySelector('#open-settings-banner-btn');
+    const openSettingsBtn = root.querySelector('#open-settings-btn') || root.querySelector('#open-settings-banner-btn');
     if (openSettingsBtn) {
       openSettingsBtn.addEventListener('click', () => {
         this._showSettingsModal = true;
@@ -2786,9 +2789,11 @@ class SchoolGradesPanel extends HTMLElement {
       .child-tabs {
         display: flex;
         gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
       }
 
-      .tab-btn, .settings-tab-btn {
+      .tab-btn {
         background: var(--card-background-color, #1f2937);
         border: 1px solid rgba(255, 255, 255, 0.1);
         color: var(--primary-text-color, #e5e7eb);
@@ -2800,7 +2805,7 @@ class SchoolGradesPanel extends HTMLElement {
         transition: all 0.2s ease;
       }
 
-      .tab-btn:hover, .settings-tab-btn:hover {
+      .tab-btn:hover {
         border-color: #3b82f6;
         background: rgba(59, 130, 246, 0.1);
       }
@@ -2810,6 +2815,43 @@ class SchoolGradesPanel extends HTMLElement {
         color: #ffffff;
         border-color: transparent;
         box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+      }
+
+      .settings-badge-btn {
+        background: var(--card-background-color, #1f2937);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: var(--secondary-text-color, #9ca3af);
+        width: 40px;
+        height: 40px;
+        min-width: 40px;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        padding: 0;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .settings-badge-btn:hover {
+        border-color: var(--primary-color, #3b82f6);
+        background: rgba(59, 130, 246, 0.15);
+        color: var(--primary-color, #60a5fa);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 10px rgba(59, 130, 246, 0.25);
+      }
+
+      .settings-badge-btn:active {
+        transform: translateY(0);
+        background: rgba(59, 130, 246, 0.25);
+      }
+
+      .settings-badge-btn svg {
+        display: block;
+        pointer-events: none;
       }
 
       .summary-banner {
