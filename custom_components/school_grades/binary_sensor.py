@@ -48,7 +48,9 @@ async def async_setup_entry(
     storage: SchoolGradesStorage = hass.data[DOMAIN][entry.entry_id]
 
     async_add_entities([
-        SchoolGradeNextDayExamsBinarySensor(storage, entry.entry_id)
+        SchoolGradeNextDayExamsBinarySensor(storage, entry.entry_id),
+        SchoolGradeHomeworkDoneBinarySensor(storage, entry.entry_id),
+        SchoolGradePreparationDoneBinarySensor(storage, entry.entry_id),
     ])
 
 
@@ -254,3 +256,125 @@ class SchoolGradeNextDayExamsBinarySensor(BinarySensorEntity):
     def _handle_update(self) -> None:
         """Handle signal update and write state to Home Assistant."""
         self.async_schedule_update_ha_state(True)
+
+
+class SchoolGradeHomeworkDoneBinarySensor(BinarySensorEntity):
+    """Binary sensor indicating if homework is completed for the current day."""
+
+    _attr_has_entity_name = False
+    _attr_should_poll = True
+
+    def __init__(self, storage: SchoolGradesStorage, entry_id: str) -> None:
+        """Initialize homework done binary sensor."""
+        self.storage = storage
+        self.entry_id = entry_id
+        self._attr_name = f"{storage.child_name} Hausaufgaben Erledigt"
+        self._attr_unique_id = f"school_grades_{entry_id}_homework_done"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info to group entities under child device."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self.entry_id)},
+            name=f"Schulnoten ({self.storage.child_name})",
+            manufacturer="Schulnoten",
+            model="Notenverwaltung",
+        )
+
+    @property
+    def is_on(self) -> bool:
+        """Return True if homework is marked as done."""
+        return self.storage.data.homework_done
+
+    @property
+    def icon(self) -> str:
+        """Return dynamic icon based on state."""
+        return "mdi:book-check" if self.is_on else "mdi:book-open-variant"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra state attributes."""
+        return {
+            "kind_name": self.storage.child_name,
+            "homework_last_reset": self.storage.data.homework_last_reset,
+        }
+
+    async def async_update(self) -> None:
+        """Perform daily reset check if new school day has started."""
+        today_str = dt_util.now().date().isoformat()
+        if self.storage.data.check_and_reset_homework_daily(today_str):
+            await self.storage.async_save()
+
+    async def async_added_to_hass(self) -> None:
+        """Register update listener when added to Home Assistant."""
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                SIGNAL_UPDATE_GRADES.format(entry_id=self.entry_id),
+                self._handle_update,
+            )
+        )
+
+    @callback
+    def _handle_update(self) -> None:
+        """Handle signal update and write state to Home Assistant."""
+        self.async_schedule_update_ha_state(True)
+
+
+class SchoolGradePreparationDoneBinarySensor(BinarySensorEntity):
+    """Binary sensor indicating if preparation for next school day is completed."""
+
+    _attr_has_entity_name = False
+    _attr_should_poll = False
+
+    def __init__(self, storage: SchoolGradesStorage, entry_id: str) -> None:
+        """Initialize preparation done binary sensor."""
+        self.storage = storage
+        self.entry_id = entry_id
+        self._attr_name = f"{storage.child_name} Vorbereitung Erledigt"
+        self._attr_unique_id = f"school_grades_{entry_id}_preparation_done"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info to group entities under child device."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self.entry_id)},
+            name=f"Schulnoten ({self.storage.child_name})",
+            manufacturer="Schulnoten",
+            model="Notenverwaltung",
+        )
+
+    @property
+    def is_on(self) -> bool:
+        """Return True if preparation is marked as done."""
+        return self.storage.data.preparation_done
+
+    @property
+    def icon(self) -> str:
+        """Return dynamic icon based on state."""
+        return "mdi:checkbox-marked-circle-outline" if self.is_on else "mdi:checkbox-blank-circle-outline"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra state attributes."""
+        return {
+            "kind_name": self.storage.child_name,
+            "prepared_subjects": self.storage.data.prepared_subjects,
+            "prepared_subjects_date": self.storage.data.prepared_subjects_date,
+        }
+
+    async def async_added_to_hass(self) -> None:
+        """Register update listener when added to Home Assistant."""
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                SIGNAL_UPDATE_GRADES.format(entry_id=self.entry_id),
+                self._handle_update,
+            )
+        )
+
+    @callback
+    def _handle_update(self) -> None:
+        """Handle signal update and write state to Home Assistant."""
+        self.async_schedule_update_ha_state(True)
+

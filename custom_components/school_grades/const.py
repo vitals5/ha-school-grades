@@ -170,5 +170,14 @@ CONF_SUMMARY = "summary"
 CONF_START_TIME = "start_time"
 CONF_DESCRIPTION = "description"
 
+CONF_GRADE_LEVEL = "grade_level"
+CONF_HOMEWORK_DONE = "homework_done"
+CONF_PREPARATION_DONE = "preparation_done"
+CONF_PREPARED_SUBJECTS = "prepared_subjects"
+
+SERVICE_SET_HOMEWORK_DONE = "set_homework_done"
+SERVICE_SET_PREPARATION_DONE = "set_preparation_done"
+SERVICE_TOGGLE_PREPARED_SUBJECT = "toggle_prepared_subject"
+
 
 

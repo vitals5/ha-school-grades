@@ -40,6 +40,12 @@ class SchoolGradesData:
 
         if data is None:
             self.country: str = DEFAULT_COUNTRY
+            self.grade_level: str = ""
+            self.homework_done: bool = False
+            self.homework_last_reset: str = ""
+            self.preparation_done: bool = False
+            self.prepared_subjects: dict[str, bool] = {}
+            self.prepared_subjects_date: str = ""
             self.calendar_entity: str | None = None
             self._subjects: list[str] = list(DEFAULT_SUBJECTS)
             self._grades: dict[str, list[dict[str, Any]]] = {
@@ -54,6 +60,12 @@ class SchoolGradesData:
             self.country = str(data.get("country", DEFAULT_COUNTRY)).upper()
             if self.country not in COUNTRY_GRADING_SYSTEMS:
                 self.country = DEFAULT_COUNTRY
+            self.grade_level = str(data.get("grade_level", "")).strip()
+            self.homework_done = bool(data.get("homework_done", False))
+            self.homework_last_reset = str(data.get("homework_last_reset", ""))
+            self.preparation_done = bool(data.get("preparation_done", False))
+            self.prepared_subjects = data.get("prepared_subjects", {}) if isinstance(data.get("prepared_subjects"), dict) else {}
+            self.prepared_subjects_date = str(data.get("prepared_subjects_date", ""))
             if "section_visibility" in data and isinstance(data["section_visibility"], dict):
                 self.section_visibility.update(data["section_visibility"])
             self.calendar_entity = data.get("calendar_entity")
@@ -73,12 +85,56 @@ class SchoolGradesData:
         return {
             "child_name": self.child_name,
             "country": self.country,
+            "grade_level": self.grade_level,
+            "homework_done": self.homework_done,
+            "homework_last_reset": self.homework_last_reset,
+            "preparation_done": self.preparation_done,
+            "prepared_subjects": self.prepared_subjects,
+            "prepared_subjects_date": self.prepared_subjects_date,
             "section_visibility": self.section_visibility,
             "calendar_entity": self.calendar_entity,
             "subjects": self._subjects,
             "grades": self._grades,
             "timetable": self.timetable,
         }
+
+    def set_grade_level(self, grade_level: str) -> None:
+        """Set or update class / grade level."""
+        self.grade_level = str(grade_level).strip()
+
+    def set_homework_done(self, state: bool) -> None:
+        """Set homework done status."""
+        self.homework_done = bool(state)
+
+    def check_and_reset_homework_daily(self, current_date_str: str) -> bool:
+        """Reset homework status daily if on a new date."""
+        if self.homework_last_reset != current_date_str:
+            self.homework_done = False
+            self.homework_last_reset = current_date_str
+            return True
+        return False
+
+    def set_preparation_done(self, state: bool) -> None:
+        """Set overall preparation done status."""
+        self.preparation_done = bool(state)
+
+    def toggle_prepared_subject(
+        self, subject: str, state: bool | None = None, target_date_str: str = ""
+    ) -> bool:
+        """Toggle or set preparation status for a single subject."""
+        clean_subj = subject.strip()
+        if target_date_str and self.prepared_subjects_date != target_date_str:
+            self.prepared_subjects = {}
+            self.prepared_subjects_date = target_date_str
+
+        if state is None:
+            new_val = not self.prepared_subjects.get(clean_subj, False)
+        else:
+            new_val = bool(state)
+
+        self.prepared_subjects[clean_subj] = new_val
+        return new_val
+
 
     def set_section_visibility(self, visibility_dict: dict[str, Any]) -> None:
         """Update section visibility toggles."""

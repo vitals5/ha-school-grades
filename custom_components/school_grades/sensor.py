@@ -210,6 +210,11 @@ class SchoolGradeTotalSensor(SensorEntity):
         return {
             "kind_name": self.storage.child_name,
             "country": self.storage.data.country,
+            "grade_level": self.storage.data.grade_level,
+            "homework_done": self.storage.data.homework_done,
+            "preparation_done": self.storage.data.preparation_done,
+            "prepared_subjects": self.storage.data.prepared_subjects,
+            "prepared_subjects_date": self.storage.data.prepared_subjects_date,
             "section_visibility": self.storage.data.section_visibility,
             "calendar_entity": self.storage.data.calendar_entity,
             "timetable": self.storage.data.timetable,

@@ -22,7 +22,10 @@ from .const import (
     CONF_DESCRIPTION,
     CONF_GRADE,
     CONF_GRADE_ID,
+    CONF_GRADE_LEVEL,
+    CONF_HOMEWORK_DONE,
     CONF_NAME,
+    CONF_PREPARATION_DONE,
     CONF_ROOM,
     CONF_SHOW_CALENDAR,
     CONF_SHOW_OVERVIEW,
@@ -45,6 +48,9 @@ from .const import (
     SERVICE_REMOVE_GRADE,
     SERVICE_REMOVE_SUBJECT,
     SERVICE_SET_CALENDAR,
+    SERVICE_SET_HOMEWORK_DONE,
+    SERVICE_SET_PREPARATION_DONE,
+    SERVICE_TOGGLE_PREPARED_SUBJECT,
     SERVICE_UPDATE_CALENDAR_EVENT,
     SERVICE_UPDATE_SETTINGS,
     SERVICE_UPDATE_TIMETABLE_CELL,
@@ -88,8 +94,8 @@ SCHEMA_ADD_GRADE = vol.Schema(
 SCHEMA_REMOVE_GRADE = vol.Schema(
     {
         vol.Optional(CONF_CHILD_NAME): cv.string,
-        vol.Required(CONF_SUBJECT): cv.string,
         vol.Required(CONF_GRADE_ID): cv.string,
+        vol.Required(CONF_SUBJECT): cv.string,
     }
 )
 
@@ -123,11 +129,35 @@ SCHEMA_UPDATE_SETTINGS = vol.Schema(
     {
         vol.Optional(CONF_CHILD_NAME): cv.string,
         vol.Optional(CONF_COUNTRY): cv.string,
+        vol.Optional(CONF_GRADE_LEVEL): cv.string,
         vol.Optional(CONF_CALENDAR): cv.string,
         vol.Optional(CONF_SHOW_PREP): cv.boolean,
         vol.Optional(CONF_SHOW_CALENDAR): cv.boolean,
         vol.Optional(CONF_SHOW_TIMETABLE): cv.boolean,
         vol.Optional(CONF_SHOW_OVERVIEW): cv.boolean,
+    }
+)
+
+SCHEMA_SET_HOMEWORK_DONE = vol.Schema(
+    {
+        vol.Optional(CONF_CHILD_NAME): cv.string,
+        vol.Required(CONF_HOMEWORK_DONE): cv.boolean,
+    }
+)
+
+SCHEMA_SET_PREPARATION_DONE = vol.Schema(
+    {
+        vol.Optional(CONF_CHILD_NAME): cv.string,
+        vol.Required(CONF_PREPARATION_DONE): cv.boolean,
+    }
+)
+
+SCHEMA_TOGGLE_PREPARED_SUBJECT = vol.Schema(
+    {
+        vol.Optional(CONF_CHILD_NAME): cv.string,
+        vol.Required(CONF_SUBJECT): cv.string,
+        vol.Optional("state"): cv.boolean,
+        vol.Optional("target_date"): cv.string,
     }
 )
 
@@ -384,6 +414,7 @@ def _register_services(hass: HomeAssistant) -> None:
         """Handle update_settings action call."""
         child_name = call.data.get(CONF_CHILD_NAME)
         country = call.data.get(CONF_COUNTRY)
+        grade_level = call.data.get(CONF_GRADE_LEVEL)
         calendar_entity = call.data.get(CONF_CALENDAR)
 
         storage = _get_storage(hass, child_name)
@@ -396,6 +427,9 @@ def _register_services(hass: HomeAssistant) -> None:
                     if entry:
                         new_data = {**entry.data, CONF_COUNTRY: country}
                         hass.config_entries.async_update_entry(entry, data=new_data)
+            if grade_level is not None:
+                storage.data.set_grade_level(grade_level)
+                updated = True
             if CONF_CALENDAR in call.data:
                 storage.data.set_calendar_entity(calendar_entity)
                 updated = True
@@ -411,6 +445,44 @@ def _register_services(hass: HomeAssistant) -> None:
                 async_dispatcher_send(
                     hass, SIGNAL_UPDATE_GRADES.format(entry_id=storage.entry_id)
                 )
+
+    async def handle_set_homework_done(call: ServiceCall) -> None:
+        """Handle set_homework_done action call."""
+        child_name = call.data.get(CONF_CHILD_NAME)
+        state = call.data[CONF_HOMEWORK_DONE]
+        storage = _get_storage(hass, child_name)
+        if storage:
+            storage.data.set_homework_done(state)
+            await storage.async_save()
+            async_dispatcher_send(
+                hass, SIGNAL_UPDATE_GRADES.format(entry_id=storage.entry_id)
+            )
+
+    async def handle_set_preparation_done(call: ServiceCall) -> None:
+        """Handle set_preparation_done action call."""
+        child_name = call.data.get(CONF_CHILD_NAME)
+        state = call.data[CONF_PREPARATION_DONE]
+        storage = _get_storage(hass, child_name)
+        if storage:
+            storage.data.set_preparation_done(state)
+            await storage.async_save()
+            async_dispatcher_send(
+                hass, SIGNAL_UPDATE_GRADES.format(entry_id=storage.entry_id)
+            )
+
+    async def handle_toggle_prepared_subject(call: ServiceCall) -> None:
+        """Handle toggle_prepared_subject action call."""
+        child_name = call.data.get(CONF_CHILD_NAME)
+        subject = call.data[CONF_SUBJECT]
+        state = call.data.get("state")
+        target_date = call.data.get("target_date", "")
+        storage = _get_storage(hass, child_name)
+        if storage:
+            storage.data.toggle_prepared_subject(subject, state, target_date)
+            await storage.async_save()
+            async_dispatcher_send(
+                hass, SIGNAL_UPDATE_GRADES.format(entry_id=storage.entry_id)
+            )
 
     def _parse_event_datetime(d_str: str, t_str: str) -> tuple[str, str]:
         from datetime import datetime, timedelta
@@ -731,6 +803,15 @@ def _register_services(hass: HomeAssistant) -> None:
     hass.services.async_register(
         DOMAIN, SERVICE_REMOVE_CALENDAR_EVENT, handle_remove_calendar_event, schema=SCHEMA_REMOVE_CALENDAR_EVENT
     )
+    hass.services.async_register(
+        DOMAIN, SERVICE_SET_HOMEWORK_DONE, handle_set_homework_done, schema=SCHEMA_SET_HOMEWORK_DONE
+    )
+    hass.services.async_register(
+        DOMAIN, SERVICE_SET_PREPARATION_DONE, handle_set_preparation_done, schema=SCHEMA_SET_PREPARATION_DONE
+    )
+    hass.services.async_register(
+        DOMAIN, SERVICE_TOGGLE_PREPARED_SUBJECT, handle_toggle_prepared_subject, schema=SCHEMA_TOGGLE_PREPARED_SUBJECT
+    )
 
 
 def _unregister_services(hass: HomeAssistant) -> None:
@@ -746,4 +827,7 @@ def _unregister_services(hass: HomeAssistant) -> None:
     hass.services.async_remove(DOMAIN, SERVICE_ADD_CALENDAR_EVENT)
     hass.services.async_remove(DOMAIN, SERVICE_UPDATE_CALENDAR_EVENT)
     hass.services.async_remove(DOMAIN, SERVICE_REMOVE_CALENDAR_EVENT)
+    hass.services.async_remove(DOMAIN, SERVICE_SET_HOMEWORK_DONE)
+    hass.services.async_remove(DOMAIN, SERVICE_SET_PREPARATION_DONE)
+    hass.services.async_remove(DOMAIN, SERVICE_TOGGLE_PREPARED_SUBJECT)
 

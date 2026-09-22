@@ -284,9 +284,9 @@ const I18N = {
     
     // Calendar card
     calendar_title: "📅 Anstehende Klausuren & Termine ({count})",
-    calendar_select_label: "Kalender für {child}:",
+    calendar_select_label: "Schul-Kalender:",
     no_calendar_assigned: "-- Kein Kalender zugewiesen --",
-    calendar_hint: "💡 Wähle oben einen Schul-Kalender (z. B. Google Kalender, Local HA Calendar, CalDAV), um anstehende Klausuren und Termine einzublenden.",
+    calendar_hint: "💡 Wähle in den Einstellungen einen Schul-Kalender (z. B. Google Kalender, Local HA Calendar, CalDAV), um anstehende Klausuren einzublenden.",
     no_events: "🎉 Keine anstehenden Klausuren oder Termine im Kalender eingetragen!",
     time_at: "um {time} Uhr",
     all_day: "(Ganztägig)",
@@ -354,10 +354,19 @@ const I18N = {
     delete_grade_confirm: "Möchtest du diese Note wirklich löschen?",
     
     // Settings
-    settings_btn: "⚙️ Einstellungen",
+    settings_btn: "Einstellungen",
     settings_title: "⚙️ Einstellungen ({child})",
     settings_tab_general: "⚙️ Allgemein",
     settings_tab_subjects: "📘 Fächer verwalten",
+    settings_tab_timetable: "📅 Stundenplan",
+    grade_level_label: "Klasse / Jahrgangsstufe",
+    grade_level_placeholder: "z. B. 5a, 7b",
+    homework_card: "Hausaufgaben",
+    homework_done_badge: "✓ Erledigt",
+    homework_open_badge: "Offen",
+    prep_card_status: "Vorbereitung",
+    prep_done_badge: "✓ Erledigt",
+    prep_open_badge: "Offen",
     country_label: "Land / Schulsystem",
     country_hint: "Bestimmt die Notenskala und Bewertung für diese Instanz.",
     section_visibility_title: "Bereiche des Panels aus/einblenden",
@@ -413,9 +422,9 @@ const I18N = {
     
     // Calendar card
     calendar_title: "📅 Upcoming Exams & Events ({count})",
-    calendar_select_label: "Calendar for {child}:",
+    calendar_select_label: "School Calendar:",
     no_calendar_assigned: "-- No calendar assigned --",
-    calendar_hint: "💡 Select a school calendar above (e.g., Google Calendar, Local HA Calendar, CalDAV) to display upcoming exams and events.",
+    calendar_hint: "💡 Select a school calendar in Settings (e.g., Google Calendar, Local HA Calendar, CalDAV) to display upcoming exams.",
     no_events: "🎉 No upcoming exams or events recorded in the calendar!",
     time_at: "at {time}",
     all_day: "(All day)",
@@ -483,10 +492,19 @@ const I18N = {
     delete_grade_confirm: "Are you sure you want to delete this grade?",
     
     // Settings
-    settings_btn: "⚙️ Settings",
+    settings_btn: "Settings",
     settings_title: "⚙️ Settings ({child})",
     settings_tab_general: "⚙️ General",
     settings_tab_subjects: "📘 Manage Subjects",
+    settings_tab_timetable: "📅 Timetable",
+    grade_level_label: "Class / Grade Level",
+    grade_level_placeholder: "e.g. 5a, 7b",
+    homework_card: "Homework",
+    homework_done_badge: "✓ Done",
+    homework_open_badge: "Pending",
+    prep_card_status: "Preparation",
+    prep_done_badge: "✓ Done",
+    prep_open_badge: "Pending",
     country_label: "Country / Grading System",
     country_hint: "Determines the grading scale and evaluation system for this child.",
     section_visibility_title: "Show/hide panel sections",
@@ -602,6 +620,11 @@ class SchoolGradesPanel extends HTMLElement {
           name: kindName,
           totalAverage: null,
           country: 'DE',
+          gradeLevel: '',
+          homeworkDone: false,
+          preparationDone: false,
+          preparedSubjects: {},
+          preparedSubjectsDate: '',
           calendarEntity: null,
           timetable: null,
           subjects: {},
@@ -616,6 +639,21 @@ class SchoolGradesPanel extends HTMLElement {
 
       if (attrs.country) {
         children[kindName].country = String(attrs.country).toUpperCase();
+      }
+      if (attrs.grade_level !== undefined) {
+        children[kindName].gradeLevel = String(attrs.grade_level || '');
+      }
+      if (attrs.homework_done !== undefined) {
+        children[kindName].homeworkDone = Boolean(attrs.homework_done);
+      }
+      if (attrs.preparation_done !== undefined) {
+        children[kindName].preparationDone = Boolean(attrs.preparation_done);
+      }
+      if (attrs.prepared_subjects && typeof attrs.prepared_subjects === 'object') {
+        children[kindName].preparedSubjects = attrs.prepared_subjects;
+      }
+      if (attrs.prepared_subjects_date) {
+        children[kindName].preparedSubjectsDate = String(attrs.prepared_subjects_date);
       }
       if (attrs.calendar_entity !== undefined) {
         children[kindName].calendarEntity = attrs.calendar_entity;
@@ -927,45 +965,48 @@ class SchoolGradesPanel extends HTMLElement {
     this.shadowRoot.innerHTML = `
       <style>${this._getStyles()}</style>
       <div class="container">
-        <!-- Header & Child Selector -->
+        <!-- Header & Child Selector (Without Subtitle, Without Flag, With Grade Level) -->
         <header class="header">
           <div class="title-section">
             <h1>${this._t('panel_title')}</h1>
-            <p class="subtitle">${this._t('panel_subtitle')}</p>
           </div>
           <div class="child-tabs">
             ${childNames.map(name => {
               const cData = data[name];
-              const sys = COUNTRY_SYSTEMS[cData ? cData.country : 'DE'] || COUNTRY_SYSTEMS.DE;
+              const gradeLevelStr = cData && cData.gradeLevel ? ` (${cData.gradeLevel})` : '';
               return `
                 <button class="tab-btn ${name === this._selectedChild ? 'active' : ''}" data-child="${name}">
-                  👤 ${name} ${sys.flag}
+                  👤 ${name}${gradeLevelStr}
                 </button>
               `;
             }).join('')}
           </div>
         </header>
 
-        <!-- Summary Banner -->
+        <!-- Summary Banner (Avg, Homework, Preparation, Settings Button) -->
         <div class="summary-banner">
           <div class="stat-card primary">
             <span class="stat-label">${this._t('total_avg')}</span>
             <span class="stat-value">${currentChild && currentChild.totalAverage && !isNaN(currentChild.totalAverage) ? currentChild.totalAverage : '–'}</span>
           </div>
-          <div class="stat-card">
-            <span class="stat-label">${this._t('subjects_count')}</span>
-            <span class="stat-value">${subjectList.length}</span>
+          <div class="stat-card ${currentChild && currentChild.homeworkDone ? 'done-card' : ''}" id="toggle-homework-btn" style="cursor: pointer; ${currentChild && currentChild.homeworkDone ? 'border: 2px solid #22c55e; background: rgba(34, 197, 94, 0.12);' : ''}">
+            <span class="stat-label">${this._t('homework_card')}</span>
+            <span class="stat-value" style="font-size: 20px; font-weight: 700; ${currentChild && currentChild.homeworkDone ? 'color: #22c55e;' : 'color: #9ca3af;'}">
+              ${currentChild && currentChild.homeworkDone ? this._t('homework_done_badge') : this._t('homework_open_badge')}
+            </span>
           </div>
-          <div class="stat-card">
-            <span class="stat-label">${this._t('total_grades')}</span>
-            <span class="stat-value">${Object.values(subjects).reduce((acc, s) => acc + s.grades.length, 0)}</span>
+          <div class="stat-card ${currentChild && currentChild.preparationDone ? 'done-card' : ''}" id="toggle-prep-btn" style="cursor: pointer; ${currentChild && currentChild.preparationDone ? 'border: 2px solid #22c55e; background: rgba(34, 197, 94, 0.12);' : ''}">
+            <span class="stat-label">${this._t('prep_card_status')}</span>
+            <span class="stat-value" style="font-size: 20px; font-weight: 700; ${currentChild && currentChild.preparationDone ? 'color: #22c55e;' : 'color: #9ca3af;'}">
+              ${currentChild && currentChild.preparationDone ? this._t('prep_done_badge') : this._t('prep_open_badge')}
+            </span>
           </div>
           <div class="stat-card action-stat-card" id="open-settings-banner-btn" style="cursor: pointer; justify-content: center;" title="${this._t('settings_btn')}">
-            <span class="stat-value" style="font-size: 16px; font-weight: 600;">${this._t('settings_btn')}</span>
+            <span class="stat-value" style="font-size: 18px; font-weight: 700;">⚙️ ${this._t('settings_btn')}</span>
           </div>
         </div>
 
-        <!-- Preparation Card for Next School Day -->
+        <!-- Preparation Card for Next School Day (Interactive Clickable Subjects) -->
         ${secVis.show_prep_card ? (() => {
           const nextDay = this._getNextSchoolDayInfo(timetable, upcomingEvents);
           return `
@@ -1004,13 +1045,20 @@ class SchoolGradesPanel extends HTMLElement {
                         e.summary.toLowerCase().includes(l.subject.toLowerCase()) ||
                         l.subject.toLowerCase().includes(e.summary.toLowerCase())
                       );
+                      const prepSubjectsMap = (currentChild && currentChild.preparedSubjects) || {};
+                      const isPrepared = Boolean(prepSubjectsMap[l.subject]);
                       return `
-                        <div class="prep-item ${isExamSubject ? 'has-exam' : ''}">
+                        <div class="prep-item prep-item-clickable ${isPrepared ? 'prepared-subject' : ''} ${isExamSubject ? 'has-exam' : ''}"
+                             data-subject="${l.subject}"
+                             style="cursor: pointer; ${isPrepared ? 'border: 2px solid #22c55e; background: rgba(34, 197, 94, 0.12);' : ''}">
                           <div class="prep-item-top">
                             <span class="prep-slot-badge">${l.slotLabel}</span>
                             <span class="prep-slot-time">${l.slotTime}</span>
                           </div>
-                          <div class="prep-subject-name">${l.subject}</div>
+                          <div class="prep-subject-name" style="display: flex; align-items: center; justify-content: space-between;">
+                            <span>${l.subject}</span>
+                            ${isPrepared ? '<span style="color: #22c55e; font-size: 16px; font-weight: bold;">✓</span>' : ''}
+                          </div>
                           <div class="prep-meta">
                             ${l.room ? `<span class="prep-meta-tag">📍 ${l.room}</span>` : ''}
                             ${l.teacher ? `<span class="prep-meta-tag">👨‍🏫 ${l.teacher}</span>` : ''}
@@ -1026,7 +1074,7 @@ class SchoolGradesPanel extends HTMLElement {
           `;
         })() : ''}
 
-        <!-- Upcoming Calendar Events Card -->
+        <!-- Upcoming Calendar Events Card (With Urgency Color Borders) -->
         ${secVis.show_calendar_card ? `
           <div class="card calendar-card" style="margin-bottom: 24px;">
             <div class="calendar-header">
@@ -1037,17 +1085,6 @@ class SchoolGradesPanel extends HTMLElement {
                     ${this._showAddEventCard ? this._t('close_add_grade_btn') : this._t('add_event_btn')}
                   </button>
                 ` : ''}
-              </div>
-              <div class="calendar-select-group">
-                <label>${this._t('calendar_select_label', { child: this._selectedChild })}</label>
-                <select id="calendar-select">
-                  <option value="">${this._t('no_calendar_assigned')}</option>
-                  ${availableCalendars.map(c => `
-                    <option value="${c.entityId}" ${currentChild && currentChild.calendarEntity === c.entityId ? 'selected' : ''}>
-                      📅 ${c.name} (${c.entityId})
-                    </option>
-                  `).join('')}
-                </select>
               </div>
             </div>
 
@@ -1110,8 +1147,24 @@ class SchoolGradesPanel extends HTMLElement {
                     const formattedTime = startDate.toLocaleTimeString(this._getLocale(), { hour: '2-digit', minute: '2-digit' });
                     const isAllDay = (typeof evt.start === 'string' && evt.start.length === 10) || formattedTime === '00:00';
                     const countdownText = this._getCountdownBadge(startDate);
+                    
+                    const now = new Date();
+                    now.setHours(0,0,0,0);
+                    const target = new Date(startDate);
+                    target.setHours(0,0,0,0);
+                    const diffDays = Math.round((target - now) / (1000 * 60 * 60 * 24));
+
+                    let borderStyle = '';
+                    if (diffDays <= 1) {
+                      borderStyle = 'border-left: 5px solid #ef4444; border-top: 1px solid rgba(239, 68, 68, 0.3); border-right: 1px solid rgba(239, 68, 68, 0.3); border-bottom: 1px solid rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.08);';
+                    } else if (diffDays >= 2 && diffDays <= 3) {
+                      borderStyle = 'border-left: 5px solid #f97316; border-top: 1px solid rgba(249, 115, 22, 0.3); border-right: 1px solid rgba(249, 115, 22, 0.3); border-bottom: 1px solid rgba(249, 115, 22, 0.3); background: rgba(249, 115, 22, 0.08);';
+                    } else if (diffDays >= 4 && diffDays <= 7) {
+                      borderStyle = 'border-left: 5px solid #eab308; border-top: 1px solid rgba(234, 179, 8, 0.3); border-right: 1px solid rgba(234, 179, 8, 0.3); border-bottom: 1px solid rgba(234, 179, 8, 0.3); background: rgba(234, 179, 8, 0.08);';
+                    }
+
                     return `
-                      <div class="event-item clickable-event" data-uid="${evt.uid || ''}" data-summary="${evt.summary || ''}" data-start="${evt.start || ''}" data-desc="${evt.description || ''}" style="cursor: pointer;" title="${this._t('edit_event_title')}">
+                      <div class="event-item clickable-event" data-uid="${evt.uid || ''}" data-summary="${evt.summary || ''}" data-start="${evt.start || ''}" data-desc="${evt.description || ''}" style="cursor: pointer; ${borderStyle}" title="${this._t('edit_event_title')}">
                         <div class="event-badge-row">
                           <span class="event-countdown ${countdownText.cls}">${countdownText.text}</span>
                           <span class="event-time">${formattedDate} ${!isAllDay ? this._t('time_at', { time: formattedTime }) : this._t('all_day')}</span>
@@ -1418,10 +1471,10 @@ class SchoolGradesPanel extends HTMLElement {
         </div>
       ` : ''}
 
-      <!-- General Settings Modal -->
+      <!-- 3-Tab Settings Modal -->
       ${this._showSettingsModal ? `
         <div class="modal-backdrop" id="settings-modal-backdrop">
-          <div class="modal-card" style="max-width: 520px; width: 100%;">
+          <div class="modal-card" style="max-width: 560px; width: 100%;">
             <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
               <div>
                 <h3 style="margin: 0; font-size: 18px;">⚙️ ${this._t('settings_title', { child: this._selectedChild })}</h3>
@@ -1431,20 +1484,23 @@ class SchoolGradesPanel extends HTMLElement {
 
             <!-- Settings Tabs Header -->
             <div class="settings-tabs-header" style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--divider-color, rgba(255,255,255,0.1)); padding-bottom: 10px;">
-              <button class="modal-tab-btn ${this._settingsTab === 'general' ? 'active' : ''}" id="settings-tab-btn-general" style="padding: 8px 16px; border-radius: 8px; border: 1px solid ${this._settingsTab === 'general' ? 'var(--primary-color, #3b82f6)' : 'rgba(255,255,255,0.1)'}; background: ${this._settingsTab === 'general' ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.05)'}; color: #fff; cursor: pointer; font-weight: 600; font-size: 14px; transition: all 0.2s;">
+              <button class="modal-tab-btn ${this._settingsTab === 'general' ? 'active' : ''}" id="settings-tab-btn-general" style="padding: 8px 14px; border-radius: 8px; border: 1px solid ${this._settingsTab === 'general' ? 'var(--primary-color, #3b82f6)' : 'rgba(255,255,255,0.1)'}; background: ${this._settingsTab === 'general' ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.05)'}; color: #fff; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.2s;">
                 ${this._t('settings_tab_general')}
               </button>
-              <button class="modal-tab-btn ${this._settingsTab === 'subjects' ? 'active' : ''}" id="settings-tab-btn-subjects" style="padding: 8px 16px; border-radius: 8px; border: 1px solid ${this._settingsTab === 'subjects' ? 'var(--primary-color, #3b82f6)' : 'rgba(255,255,255,0.1)'}; background: ${this._settingsTab === 'subjects' ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.05)'}; color: #fff; cursor: pointer; font-weight: 600; font-size: 14px; transition: all 0.2s;">
+              <button class="modal-tab-btn ${this._settingsTab === 'subjects' ? 'active' : ''}" id="settings-tab-btn-subjects" style="padding: 8px 14px; border-radius: 8px; border: 1px solid ${this._settingsTab === 'subjects' ? 'var(--primary-color, #3b82f6)' : 'rgba(255,255,255,0.1)'}; background: ${this._settingsTab === 'subjects' ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.05)'}; color: #fff; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.2s;">
                 ${this._t('settings_tab_subjects')}
+              </button>
+              <button class="modal-tab-btn ${this._settingsTab === 'timetable' ? 'active' : ''}" id="settings-tab-btn-timetable" style="padding: 8px 14px; border-radius: 8px; border: 1px solid ${this._settingsTab === 'timetable' ? 'var(--primary-color, #3b82f6)' : 'rgba(255,255,255,0.1)'}; background: ${this._settingsTab === 'timetable' ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.05)'}; color: #fff; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.2s;">
+                ${this._t('settings_tab_timetable')}
               </button>
             </div>
 
             ${this._settingsTab === 'general' ? `
               <!-- General Settings Tab -->
               <form id="settings-form">
-                <div class="form-group" style="margin-bottom: 20px;">
-                  <label style="display: block; margin-bottom: 8px; font-weight: 500;">🌍 ${this._t('country_label')}</label>
-                  <select id="settings-country-select" style="width: 100%; padding: 12px 14px; border-radius: 8px; background: var(--card-background-color, rgba(0,0,0,0.25)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 14px; cursor: pointer;">
+                <div class="form-group" style="margin-bottom: 16px;">
+                  <label style="display: block; margin-bottom: 6px; font-weight: 500;">🌍 ${this._t('country_label')}</label>
+                  <select id="settings-country-select" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: var(--card-background-color, rgba(0,0,0,0.25)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 13px; cursor: pointer;">
                     ${Object.entries(COUNTRY_SYSTEMS).map(([code, sys]) => `
                       <option value="${code}" ${code === childCountry ? 'selected' : ''}>
                         ${sys.flag} ${sys.name} (${sys.scale})
@@ -1453,34 +1509,44 @@ class SchoolGradesPanel extends HTMLElement {
                   </select>
                 </div>
 
-                <div class="form-group" style="margin-bottom: 20px;">
-                  <div class="country-info-badge" style="padding: 12px 16px; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); font-size: 13px; line-height: 1.5;">
-                    <strong>${countrySys.flag} ${countrySys.name}</strong> • Skala: ${countrySys.scale} 
-                    <br><small style="opacity: 0.8;">${countrySys.lower_is_better ? '📉 1.0 = Beste Note' : '📈 Höchste Note ist am besten'}</small>
-                  </div>
+                <div class="form-group" style="margin-bottom: 16px;">
+                  <label style="display: block; margin-bottom: 6px; font-weight: 500;">🎒 ${this._t('grade_level_label')}</label>
+                  <input type="text" id="settings-grade-level-input" placeholder="${this._t('grade_level_placeholder')}" value="${currentChild.gradeLevel || ''}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.25); color: #fff; border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 13px; box-sizing: border-box;">
                 </div>
 
-                <hr style="margin: 20px 0; border: none; border-top: 1px solid var(--divider-color, rgba(255,255,255,0.1));">
+                <div class="form-group" style="margin-bottom: 16px;">
+                  <label style="display: block; margin-bottom: 6px; font-weight: 500;">📅 ${this._t('calendar_select_label', { child: this._selectedChild })}</label>
+                  <select id="settings-calendar-select" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.25); color: #fff; border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 13px; cursor: pointer;">
+                    <option value="">${this._t('no_calendar_assigned')}</option>
+                    ${availableCalendars.map(c => `
+                      <option value="${c.entityId}" ${currentChild && currentChild.calendarEntity === c.entityId ? 'selected' : ''}>
+                        📅 ${c.name} (${c.entityId})
+                      </option>
+                    `).join('')}
+                  </select>
+                </div>
+
+                <hr style="margin: 16px 0; border: none; border-top: 1px solid var(--divider-color, rgba(255,255,255,0.1));">
 
                 <div class="form-group" style="margin-bottom: 20px;">
-                  <label style="display: block; margin-bottom: 12px; font-weight: 600; font-size: 14px; color: var(--primary-text-color, #fff);">
+                  <label style="display: block; margin-bottom: 10px; font-weight: 600; font-size: 13px; color: var(--primary-text-color, #fff);">
                     👁️ ${this._t('section_visibility_title')}
                   </label>
-                  <div style="display: flex; flex-direction: column; gap: 10px;">
-                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px;">
-                      <input type="checkbox" id="settings-show-prep" ${secVis.show_prep_card ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary-color, #4ea8de);">
+                  <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13px;">
+                      <input type="checkbox" id="settings-show-prep" ${secVis.show_prep_card ? 'checked' : ''} style="width: 16px; height: 16px; cursor: pointer; accent-color: var(--primary-color, #4ea8de);">
                       <span>${this._t('section_prep')}</span>
                     </label>
-                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px;">
-                      <input type="checkbox" id="settings-show-calendar" ${secVis.show_calendar_card ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary-color, #4ea8de);">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13px;">
+                      <input type="checkbox" id="settings-show-calendar" ${secVis.show_calendar_card ? 'checked' : ''} style="width: 16px; height: 16px; cursor: pointer; accent-color: var(--primary-color, #4ea8de);">
                       <span>${this._t('section_calendar')}</span>
                     </label>
-                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px;">
-                      <input type="checkbox" id="settings-show-timetable" ${secVis.show_timetable_card ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary-color, #4ea8de);">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13px;">
+                      <input type="checkbox" id="settings-show-timetable" ${secVis.show_timetable_card ? 'checked' : ''} style="width: 16px; height: 16px; cursor: pointer; accent-color: var(--primary-color, #4ea8de);">
                       <span>${this._t('section_timetable')}</span>
                     </label>
-                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px;">
-                      <input type="checkbox" id="settings-show-overview" ${secVis.show_overview_card ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary-color, #4ea8de);">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13px;">
+                      <input type="checkbox" id="settings-show-overview" ${secVis.show_overview_card ? 'checked' : ''} style="width: 16px; height: 16px; cursor: pointer; accent-color: var(--primary-color, #4ea8de);">
                       <span>${this._t('section_overview')}</span>
                     </label>
                   </div>
@@ -1491,7 +1557,7 @@ class SchoolGradesPanel extends HTMLElement {
                   <button type="submit" class="submit-btn">${this._t('save_btn')}</button>
                 </div>
               </form>
-            ` : `
+            ` : this._settingsTab === 'subjects' ? `
               <!-- Manage Subjects Tab -->
               <div class="settings-subjects-tab">
                 <form id="settings-add-subject-form" style="margin-bottom: 24px;">
@@ -1523,6 +1589,24 @@ class SchoolGradesPanel extends HTMLElement {
                 <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
                   <button type="button" class="submit-btn secondary" id="settings-cancel-btn">${this._t('cancel_btn')}</button>
                 </div>
+              </div>
+            ` : `
+              <!-- Timetable Tab in Settings -->
+              <div class="settings-timetable-tab">
+                <form id="settings-yaml-import-form">
+                  <div class="form-group" style="margin-bottom: 16px;">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 13px; color: #fff;">${this._t('yaml_textarea_label', { child: this._selectedChild })}</label>
+                    <textarea id="settings-yaml-textarea" rows="10" style="font-family: monospace; font-size: 12px; line-height: 1.4; resize: vertical; tab-size: 2; width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 10px;">${this._timetableToYaml(timetable)}</textarea>
+                  </div>
+
+                  <div class="modal-actions" style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                    <button type="button" class="submit-btn secondary" id="settings-yaml-copy-btn" style="width: auto; padding: 8px 16px; font-size: 13px;">${this._t('copy_btn')}</button>
+                    <div style="display: flex; gap: 8px;">
+                      <button type="button" class="submit-btn secondary" id="settings-cancel-btn" style="width: auto; padding: 8px 16px; font-size: 13px;">${this._t('cancel_btn')}</button>
+                      <button type="submit" class="submit-btn" style="width: auto; padding: 8px 18px; font-size: 13px;">${this._t('import_btn')}</button>
+                    </div>
+                  </div>
+                </form>
               </div>
             `}
           </div>
@@ -1620,6 +1704,47 @@ class SchoolGradesPanel extends HTMLElement {
       });
     });
 
+    // Summary Banner Interactive Toggles
+    const toggleHomeworkBtn = root.querySelector('#toggle-homework-btn');
+    if (toggleHomeworkBtn) {
+      toggleHomeworkBtn.addEventListener('click', async () => {
+        const currentChild = this._getSchoolGradesData()[this._selectedChild];
+        const newStatus = !(currentChild && currentChild.homeworkDone);
+        await this._hass.callService('school_grades', 'set_homework_done', {
+          child_name: this._selectedChild,
+          homework_done: newStatus,
+        });
+        setTimeout(() => this.render(), 200);
+      });
+    }
+
+    const togglePrepBtn = root.querySelector('#toggle-prep-btn');
+    if (togglePrepBtn) {
+      togglePrepBtn.addEventListener('click', async () => {
+        const currentChild = this._getSchoolGradesData()[this._selectedChild];
+        const newStatus = !(currentChild && currentChild.preparationDone);
+        await this._hass.callService('school_grades', 'set_preparation_done', {
+          child_name: this._selectedChild,
+          preparation_done: newStatus,
+        });
+        setTimeout(() => this.render(), 200);
+      });
+    }
+
+    // Next-day prep clickable subjects
+    root.querySelectorAll('.prep-item-clickable').forEach(item => {
+      item.addEventListener('click', async (e) => {
+        const subject = e.currentTarget.dataset.subject;
+        if (subject) {
+          await this._hass.callService('school_grades', 'toggle_prepared_subject', {
+            child_name: this._selectedChild,
+            subject: subject,
+          });
+          setTimeout(() => this.render(), 200);
+        }
+      });
+    });
+
     // Open Settings Modal
     const openSettingsBtn = root.querySelector('#open-settings-banner-btn');
     if (openSettingsBtn) {
@@ -1630,7 +1755,7 @@ class SchoolGradesPanel extends HTMLElement {
       });
     }
 
-    // Settings Modal Backdrop & Form
+    // Settings Modal Backdrop & Forms
     const settingsBackdrop = root.querySelector('#settings-modal-backdrop');
     if (settingsBackdrop) {
       settingsBackdrop.addEventListener('click', (e) => {
@@ -1648,13 +1773,12 @@ class SchoolGradesPanel extends HTMLElement {
         });
       }
 
-      const cancelSettingsBtn = root.querySelector('#settings-cancel-btn');
-      if (cancelSettingsBtn) {
-        cancelSettingsBtn.addEventListener('click', () => {
+      root.querySelectorAll('#settings-cancel-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
           this._showSettingsModal = false;
           this.render();
         });
-      }
+      });
 
       // Settings Tab Switchers
       const tabBtnGeneral = root.querySelector('#settings-tab-btn-general');
@@ -1673,11 +1797,21 @@ class SchoolGradesPanel extends HTMLElement {
         });
       }
 
+      const tabBtnTimetable = root.querySelector('#settings-tab-btn-timetable');
+      if (tabBtnTimetable) {
+        tabBtnTimetable.addEventListener('click', () => {
+          this._settingsTab = 'timetable';
+          this.render();
+        });
+      }
+
       const settingsForm = root.querySelector('#settings-form');
       if (settingsForm) {
         settingsForm.addEventListener('submit', async (e) => {
           e.preventDefault();
           const selectedCountry = root.querySelector('#settings-country-select').value;
+          const gradeLevelVal = root.querySelector('#settings-grade-level-input').value.trim();
+          const calEntity = root.querySelector('#settings-calendar-select').value;
           const showPrep = root.querySelector('#settings-show-prep').checked;
           const showCal = root.querySelector('#settings-show-calendar').checked;
           const showTt = root.querySelector('#settings-show-timetable').checked;
@@ -1694,6 +1828,8 @@ class SchoolGradesPanel extends HTMLElement {
           await this._hass.callService('school_grades', 'update_settings', {
             child_name: this._selectedChild,
             country: selectedCountry,
+            grade_level: gradeLevelVal,
+            calendar_entity: calEntity,
             show_prep_card: showPrep,
             show_calendar_card: showCal,
             show_timetable_card: showTt,
@@ -1701,8 +1837,9 @@ class SchoolGradesPanel extends HTMLElement {
           });
           this._showSettingsModal = false;
           this.render();
-          setTimeout(() => this.render(), 200);
-          setTimeout(() => this.render(), 600);
+          this._fetchUpcomingCalendarEvents();
+          setTimeout(() => this.render(), 300);
+          setTimeout(() => this.render(), 700);
         });
       }
 
@@ -1741,19 +1878,43 @@ class SchoolGradesPanel extends HTMLElement {
           }
         });
       }
-    }
 
-    // Calendar Select
-    const calSelect = root.querySelector('#calendar-select');
-    if (calSelect) {
-      calSelect.addEventListener('change', async (e) => {
-        const calEntity = e.target.value;
-        await this._hass.callService('school_grades', 'set_calendar', {
-          child_name: this._selectedChild,
-          calendar_entity: calEntity,
+      // Timetable Tab Copy & Import inside Settings
+      const settingsYamlCopyBtn = root.querySelector('#settings-yaml-copy-btn');
+      if (settingsYamlCopyBtn) {
+        settingsYamlCopyBtn.addEventListener('click', async () => {
+          const textarea = root.querySelector('#settings-yaml-textarea');
+          if (textarea) {
+            try {
+              if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(textarea.value);
+              } else {
+                throw new Error('Clipboard API unavailable');
+              }
+            } catch (err) {
+              textarea.select();
+              document.execCommand('copy');
+            }
+            settingsYamlCopyBtn.textContent = this._t('copied_btn');
+            setTimeout(() => { settingsYamlCopyBtn.textContent = this._t('copy_btn'); }, 2000);
+          }
         });
-        setTimeout(() => this._fetchUpcomingCalendarEvents(), 300);
-      });
+      }
+
+      const settingsYamlForm = root.querySelector('#settings-yaml-import-form');
+      if (settingsYamlForm) {
+        settingsYamlForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const yamlText = root.querySelector('#settings-yaml-textarea').value;
+          await this._hass.callService('school_grades', 'import_timetable', {
+            child_name: this._selectedChild,
+            yaml_content: yamlText,
+          });
+          this._showSettingsModal = false;
+          setTimeout(() => this.render(), 300);
+          setTimeout(() => this.render(), 700);
+        });
+      }
     }
 
     // Toggle Add Calendar Event Form
@@ -1938,10 +2099,19 @@ class SchoolGradesPanel extends HTMLElement {
 
       const copyYamlBtn = root.querySelector('#yaml-copy-btn');
       if (copyYamlBtn) {
-        copyYamlBtn.addEventListener('click', () => {
+        copyYamlBtn.addEventListener('click', async () => {
           const textarea = root.querySelector('#yaml-textarea');
           if (textarea) {
-            navigator.clipboard.writeText(textarea.value);
+            try {
+              if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(textarea.value);
+              } else {
+                throw new Error('Clipboard API unavailable');
+              }
+            } catch (err) {
+              textarea.select();
+              document.execCommand('copy');
+            }
             copyYamlBtn.textContent = this._t('copied_btn');
             setTimeout(() => { copyYamlBtn.textContent = this._t('copy_btn'); }, 2000);
           }
@@ -2039,6 +2209,16 @@ class SchoolGradesPanel extends HTMLElement {
           }
           const roomVal = root.querySelector('#modal-room').value.trim();
           const teacherVal = root.querySelector('#modal-teacher').value.trim();
+
+          // Auto-add new custom subject to integration if not present
+          const currentChild = this._getSchoolGradesData()[this._selectedChild];
+          const existingSubjects = currentChild ? Object.keys(currentChild.subjects) : [];
+          if (subjectVal && !existingSubjects.includes(subjectVal)) {
+            await this._hass.callService('school_grades', 'add_subject', {
+              child_name: this._selectedChild,
+              subject: subjectVal,
+            });
+          }
 
           await this._hass.callService('school_grades', 'update_timetable_cell', {
             child_name: this._selectedChild,
@@ -2223,6 +2403,7 @@ class SchoolGradesPanel extends HTMLElement {
         flex-direction: column;
         align-items: center;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        transition: all 0.2s ease;
       }
 
       .stat-card.primary {

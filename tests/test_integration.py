@@ -115,6 +115,32 @@ class TestSchoolGradesLogic(unittest.TestCase):
         self.assertFalse(data.set_country("INVALID_CODE"))
         self.assertEqual(data.country, "US")
 
+    def test_grade_level_setting(self):
+        data = SchoolGradesData("Richard")
+        self.assertEqual(data.grade_level, "")
+        data.set_grade_level("5a")
+        self.assertEqual(data.grade_level, "5a")
+
+    def test_homework_and_preparation_logic(self):
+        data = SchoolGradesData("Richard")
+        # Homework default
+        self.assertFalse(data.homework_done)
+        data.set_homework_done(True)
+        self.assertTrue(data.homework_done)
+
+        # Preparation default
+        self.assertFalse(data.preparation_done)
+        data.set_preparation_done(True)
+        self.assertTrue(data.preparation_done)
+
+        # Subject preparation toggling
+        res = data.toggle_prepared_subject("Mathematik")
+        self.assertTrue(res)
+        self.assertTrue(data.prepared_subjects.get("Mathematik"))
+        res2 = data.toggle_prepared_subject("Mathematik")
+        self.assertFalse(res2)
+        self.assertFalse(data.prepared_subjects.get("Mathematik"))
+
     def test_section_visibility_settings(self):
         data = SchoolGradesData("Nicole")
         self.assertEqual(data.section_visibility, {

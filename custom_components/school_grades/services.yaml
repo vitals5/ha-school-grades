@@ -216,6 +216,12 @@ update_settings:
       example: "Max"
       selector:
         text:
+    grade_level:
+      name: "Klasse / Jahrgangsstufe"
+      description: "Klassenbezeichnung des Kindes (z. B. 5a, 7b, 10c)."
+      example: "5a"
+      selector:
+        text:
     country:
       name: "Land / Schulsystem"
       description: "Ländercode für die Notenskala (DE, AT, CH, FR, IT, ES, NL, PL, UK, US, RU, CN)."
@@ -404,6 +410,67 @@ remove_calendar_event:
       example: "Mathe Schulaufgabe"
       selector:
         text:
+
+set_homework_done:
+  name: "Hausaufgaben Status setzen"
+  description: "Setzt den Tagesstatus der Hausaufgaben für ein Kind (true = erledigt)."
+  fields:
+    child_name:
+      name: "Name des Kindes"
+      description: "Name des Kindes (optional)."
+      example: "Max"
+      selector:
+        text:
+    homework_done:
+      name: "Hausaufgaben erledigt"
+      description: "Status (true / false)."
+      required: true
+      example: true
+      selector:
+        boolean:
+
+set_preparation_done:
+  name: "Vorbereitung Status setzen"
+  description: "Setzt den Gesamtstatus der Vorbereitung für den nächsten Schultag (true = erledigt)."
+  fields:
+    child_name:
+      name: "Name des Kindes"
+      description: "Name des Kindes (optional)."
+      example: "Max"
+      selector:
+        text:
+    preparation_done:
+      name: "Vorbereitung erledigt"
+      description: "Status (true / false)."
+      required: true
+      example: true
+      selector:
+        boolean:
+
+toggle_prepared_subject:
+  name: "Fach-Vorbereitung umschalten"
+  description: "Markiert ein bestimmtes Schulfach als für morgen vorbereitet oder nicht."
+  fields:
+    child_name:
+      name: "Name des Kindes"
+      description: "Name des Kindes (optional)."
+      example: "Max"
+      selector:
+        text:
+    subject:
+      name: "Schulfach"
+      description: "Name des Schulfachs."
+      required: true
+      example: "Mathematik"
+      selector:
+        text:
+    state:
+      name: "Status"
+      description: "Vorbereitungsstatus (optional, falls nicht angegeben wird umgeschaltet)."
+      example: true
+      selector:
+        boolean:
+
 
 
 
