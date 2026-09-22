@@ -272,6 +272,7 @@ const I18N = {
     no_children_text2: "Bitte gehe zu Einstellungen ➔ Geräte & Dienste ➔ Integration hinzufügen ➔ Schulnoten.",
     total_avg: "Gesamtdurchschnitt",
     menu_toggle: "Seitenleiste öffnen / schließen",
+    back_btn_tooltip: "Zurück zum vorherigen Dashboard / Panel",
     
     // Prep card
     prep_title: "🎒 Vorbereitung für den nächsten Schultag",
@@ -372,6 +373,7 @@ const I18N = {
     section_calendar: "Anstehende Klausuren Termine",
     section_timetable: "Wochenstundenplan",
     section_overview: "Fächer Notenübersicht",
+    section_back_btn: "Zurück-Button in der Kopfzeile anzeigen",
 
     // Modals
     modal_cell_title: "✏️ Stundenplan bearbeiten",
@@ -408,6 +410,7 @@ const I18N = {
     no_children_text2: "Please go to Settings ➔ Devices & Services ➔ Add Integration ➔ Schulnoten.",
     total_avg: "Overall Average",
     menu_toggle: "Open / close sidebar",
+    back_btn_tooltip: "Back to previous dashboard / panel",
     
     // Prep card
     prep_title: "🎒 Preparation for the Next School Day",
@@ -508,6 +511,7 @@ const I18N = {
     section_calendar: "Upcoming exams & events",
     section_timetable: "Weekly timetable",
     section_overview: "Subjects & grades overview",
+    section_back_btn: "Show Back button in header",
 
     // Modals
     modal_cell_title: "✏️ Edit Timetable Cell",
@@ -634,6 +638,7 @@ class SchoolGradesPanel extends HTMLElement {
             show_calendar_card: true,
             show_timetable_card: true,
             show_overview_card: true,
+            show_back_button: false,
           },
         };
       }
@@ -700,6 +705,7 @@ class SchoolGradesPanel extends HTMLElement {
           show_calendar_card: attrs.section_visibility.show_calendar_card ?? true,
           show_timetable_card: attrs.section_visibility.show_timetable_card ?? true,
           show_overview_card: attrs.section_visibility.show_overview_card ?? true,
+          show_back_button: attrs.section_visibility.show_back_button ?? false,
         };
       }
 
@@ -1158,6 +1164,12 @@ class SchoolGradesPanel extends HTMLElement {
                   <line x1="3" y1="18" x2="21" y2="18"></line>
                 </svg>
               </button>
+              <button class="menu-btn back-btn" id="header-back-btn" aria-label="${this._t('back_btn_tooltip')}" title="${this._t('back_btn_tooltip')}">
+                <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="19" y1="12" x2="5" y2="12"></line>
+                  <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+              </button>
               <div class="title-section">
                 <h1>${this._t('panel_title')}</h1>
               </div>
@@ -1186,6 +1198,7 @@ class SchoolGradesPanel extends HTMLElement {
       show_calendar_card: true,
       show_timetable_card: true,
       show_overview_card: true,
+      show_back_button: false,
     };
     const subjects = currentChild ? currentChild.subjects : {};
     const subjectList = Object.keys(subjects).sort();
@@ -1208,6 +1221,14 @@ class SchoolGradesPanel extends HTMLElement {
                 <line x1="3" y1="18" x2="21" y2="18"></line>
               </svg>
             </button>
+            ${secVis.show_back_button ? `
+              <button class="menu-btn back-btn" id="header-back-btn" aria-label="${this._t('back_btn_tooltip')}" title="${this._t('back_btn_tooltip')}">
+                <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="19" y1="12" x2="5" y2="12"></line>
+                  <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+              </button>
+            ` : ''}
             <div class="title-section">
               <h1>${this._t('panel_title')}</h1>
             </div>
@@ -1790,6 +1811,10 @@ class SchoolGradesPanel extends HTMLElement {
                       <input type="checkbox" id="settings-show-overview" ${secVis.show_overview_card ? 'checked' : ''} style="width: 16px; height: 16px; cursor: pointer; accent-color: var(--primary-color, #4ea8de);">
                       <span>${this._t('section_overview')}</span>
                     </label>
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13px;">
+                      <input type="checkbox" id="settings-show-back" ${secVis.show_back_button ? 'checked' : ''} style="width: 16px; height: 16px; cursor: pointer; accent-color: var(--primary-color, #4ea8de);">
+                      <span>${this._t('section_back_btn')}</span>
+                    </label>
                   </div>
                 </div>
 
@@ -1957,6 +1982,20 @@ class SchoolGradesPanel extends HTMLElement {
           try {
             window.parent.dispatchEvent(new CustomEvent('hass-toggle-menu', { bubbles: true, composed: true, detail: { open: true } }));
           } catch (err) {}
+        }
+      });
+    }
+
+    // Back Button (navigates back to previous panel or dashboard)
+    const backBtn = root.querySelector('#header-back-btn');
+    if (backBtn) {
+      backBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (window.history.length > 1) {
+          window.history.back();
+        } else {
+          window.location.href = '/lovelace';
         }
       });
     }
@@ -2234,6 +2273,7 @@ class SchoolGradesPanel extends HTMLElement {
           const showCal = root.querySelector('#settings-show-calendar').checked;
           const showTt = root.querySelector('#settings-show-timetable').checked;
           const showOv = root.querySelector('#settings-show-overview').checked;
+          const showBack = root.querySelector('#settings-show-back') ? root.querySelector('#settings-show-back').checked : false;
 
           if (!this._localSectionVisibility) this._localSectionVisibility = {};
           this._localSectionVisibility[this._selectedChild] = {
@@ -2241,6 +2281,7 @@ class SchoolGradesPanel extends HTMLElement {
             show_calendar_card: showCal,
             show_timetable_card: showTt,
             show_overview_card: showOv,
+            show_back_button: showBack,
           };
 
           await this._hass.callService('school_grades', 'update_settings', {
@@ -2252,6 +2293,7 @@ class SchoolGradesPanel extends HTMLElement {
             show_calendar_card: showCal,
             show_timetable_card: showTt,
             show_overview_card: showOv,
+            show_back_button: showBack,
           });
           this._showSettingsModal = false;
           this.render();

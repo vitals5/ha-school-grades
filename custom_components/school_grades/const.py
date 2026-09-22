@@ -24,6 +24,7 @@ CONF_SHOW_PREP = "show_prep_card"
 CONF_SHOW_CALENDAR = "show_calendar_card"
 CONF_SHOW_TIMETABLE = "show_timetable_card"
 CONF_SHOW_OVERVIEW = "show_overview_card"
+CONF_SHOW_BACK_BUTTON = "show_back_button"
 
 # Defaults
 DEFAULT_WEIGHT = 1
@@ -34,6 +35,7 @@ DEFAULT_SECTION_VISIBILITY = {
     "show_calendar_card": True,
     "show_timetable_card": True,
     "show_overview_card": True,
+    "show_back_button": False,
 }
 
 # Country grading systems specification

@@ -27,6 +27,7 @@ from .const import (
     CONF_NAME,
     CONF_PREPARATION_DONE,
     CONF_ROOM,
+    CONF_SHOW_BACK_BUTTON,
     CONF_SHOW_CALENDAR,
     CONF_SHOW_OVERVIEW,
     CONF_SHOW_PREP,
@@ -135,6 +136,7 @@ SCHEMA_UPDATE_SETTINGS = vol.Schema(
         vol.Optional(CONF_SHOW_CALENDAR): cv.boolean,
         vol.Optional(CONF_SHOW_TIMETABLE): cv.boolean,
         vol.Optional(CONF_SHOW_OVERVIEW): cv.boolean,
+        vol.Optional(CONF_SHOW_BACK_BUTTON): cv.boolean,
     }
 )
 
@@ -234,7 +236,7 @@ async def _async_setup_frontend(hass: HomeAssistant) -> None:
     else:
         hass.http.register_static_path(URL_BASE, FRONTEND_DIR, cache_headers=False)
 
-    version_str = "1.1.6"
+    version_str = "1.1.7"
     try:
         js_file = os.path.join(FRONTEND_DIR, "school-grades-panel.js")
         if os.path.exists(js_file):
@@ -442,7 +444,13 @@ def _register_services(hass: HomeAssistant) -> None:
                 storage.data.set_calendar_entity(calendar_entity)
                 updated = True
 
-            vis_keys = [CONF_SHOW_PREP, CONF_SHOW_CALENDAR, CONF_SHOW_TIMETABLE, CONF_SHOW_OVERVIEW]
+            vis_keys = [
+                CONF_SHOW_PREP,
+                CONF_SHOW_CALENDAR,
+                CONF_SHOW_TIMETABLE,
+                CONF_SHOW_OVERVIEW,
+                CONF_SHOW_BACK_BUTTON,
+            ]
             vis_updates = {k: call.data[k] for k in vis_keys if k in call.data}
             if vis_updates:
                 storage.data.set_section_visibility(vis_updates)
