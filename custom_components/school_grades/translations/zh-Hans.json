@@ -1,0 +1,78 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "添加孩子",
+        "description": "创建一个新实例以管理孩子的学校成绩。",
+        "data": {
+          "child_name": "孩子姓名（例如 Richard、Emma）",
+          "country": "国家 / 评分体系"
+        }
+      }
+    },
+    "error": {
+      "already_configured": "该孩子的成绩管理已经配置过了。"
+    },
+    "abort": {
+      "already_configured": "该孩子的成绩管理已经存在。"
+    }
+  },
+  "services": {
+    "add_subject": {
+      "name": "添加学科",
+      "description": "添加新的学校学科到成绩概览中。"
+    },
+    "remove_subject": {
+      "name": "删除学科",
+      "description": "删除学科及其所有相关成绩记录。"
+    },
+    "add_grade": {
+      "name": "添加成绩",
+      "description": "记录带有选定权重的新成绩。"
+    },
+    "remove_grade": {
+      "name": "删除成绩",
+      "description": "根据ID删除现有成绩记录。"
+    },
+    "set_calendar": {
+      "name": "分配日历",
+      "description": "将 Home Assistant 日历关联到孩子以显示即将到来的考试。"
+    },
+    "update_timetable_cell": {
+      "name": "更新课程表单元格",
+      "description": "更新指定时段和日期的学科、教室及任课教师。"
+    },
+    "import_timetable": {
+      "name": "通过 YAML 导入课程表",
+      "description": "以 YAML 文本或数据结构导入完整的课程表。"
+    },
+    "update_settings": {
+      "name": "更新常规设置",
+      "description": "更新评分标准、面板卡片可见性或关联日历。"
+    },
+    "add_calendar_event": {
+      "name": "在日历中创建考试 / 日程",
+      "description": "在关联日历中创建新的考试或日程。"
+    },
+    "update_calendar_event": {
+      "name": "编辑日历中的考试 / 日程",
+      "description": "更新关联日历中现有的考试或日程。"
+    },
+    "remove_calendar_event": {
+      "name": "从日历中删除考试 / 日程",
+      "description": "从关联日历中删除考试或日程。"
+    },
+    "set_homework_done": {
+      "name": "设置作业状态",
+      "description": "设置孩子的每日家庭作业状态（true = 已完成）。"
+    },
+    "set_preparation_done": {
+      "name": "设置书包准备状态",
+      "description": "设置准备下一个上学日书包的总状态。"
+    },
+    "toggle_prepared_subject": {
+      "name": "切换学科准备状态",
+      "description": "标记明天特定学科是否已准备完成。"
+    }
+  }
+}

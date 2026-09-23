@@ -1,0 +1,78 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Añadir hijo/a",
+        "description": "Crea una nueva instancia para gestionar las notas escolares de un hijo/a.",
+        "data": {
+          "child_name": "Nombre del hijo/a (p. ej. Richard, Emma)",
+          "country": "País / Sistema de calificaciones"
+        }
+      }
+    },
+    "error": {
+      "already_configured": "La gestión de notas para este hijo/a ya está configurada."
+    },
+    "abort": {
+      "already_configured": "La gestión de notas para este hijo/a ya existe."
+    }
+  },
+  "services": {
+    "add_subject": {
+      "name": "Añadir asignatura",
+      "description": "Añade una nueva asignatura escolar al resumen de notas."
+    },
+    "remove_subject": {
+      "name": "Eliminar asignatura",
+      "description": "Elimina una asignatura escolar y todas sus calificaciones asociadas."
+    },
+    "add_grade": {
+      "name": "Añadir nota",
+      "description": "Registra una nueva calificación con la ponderación seleccionada."
+    },
+    "remove_grade": {
+      "name": "Eliminar nota",
+      "description": "Elimina una nota existente por su identificador."
+    },
+    "set_calendar": {
+      "name": "Asignar calendario",
+      "description": "Enlaza un calendario de Home Assistant con un hijo/a para exámenes próximos."
+    },
+    "update_timetable_cell": {
+      "name": "Actualizar celda del horario",
+      "description": "Actualiza la asignatura, aula y profesor/a para una hora y día determinados."
+    },
+    "import_timetable": {
+      "name": "Importar horario mediante YAML",
+      "description": "Importa un horario completo en formato de texto o estructura YAML."
+    },
+    "update_settings": {
+      "name": "Actualizar ajustes generales",
+      "description": "Actualiza la escala de notas, la visibilidad de secciones o el calendario asignado."
+    },
+    "add_calendar_event": {
+      "name": "Crear examen / evento en el calendario",
+      "description": "Crea un nuevo examen o evento en el calendario asignado."
+    },
+    "update_calendar_event": {
+      "name": "Editar examen / evento en el calendario",
+      "description": "Actualiza un examen o evento existente en el calendario asignado."
+    },
+    "remove_calendar_event": {
+      "name": "Eliminar examen / evento del calendario",
+      "description": "Elimina un examen o evento del calendario asignado."
+    },
+    "set_homework_done": {
+      "name": "Establecer estado de deberes",
+      "description": "Establece el estado diario de deberes para un hijo/a (true = hechos)."
+    },
+    "set_preparation_done": {
+      "name": "Establecer estado de preparación",
+      "description": "Establece el estado global de preparación de la mochila para el próximo día escolar."
+    },
+    "toggle_prepared_subject": {
+      "name": "Alternar preparación de asignatura",
+      "description": "Marca una asignatura específica como preparada o no para mañana."
+    }
+  }
+}

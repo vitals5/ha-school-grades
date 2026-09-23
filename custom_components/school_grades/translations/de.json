@@ -61,6 +61,18 @@
     "remove_calendar_event": {
       "name": "Klausur / Termin aus Kalender löschen",
       "description": "Löscht einen Kalendereintrag aus dem verknüpften Kalender."
+    },
+    "set_homework_done": {
+      "name": "Hausaufgaben-Status setzen",
+      "description": "Setzt den Tagesstatus der Hausaufgaben für ein Kind (true = erledigt)."
+    },
+    "set_preparation_done": {
+      "name": "Vorbereitungs-Status setzen",
+      "description": "Setzt den Gesamtstatus der Vorbereitung für den nächsten Schultag (true = erledigt)."
+    },
+    "toggle_prepared_subject": {
+      "name": "Fach-Vorbereitung umschalten",
+      "description": "Markiert ein bestimmtes Schulfach als für morgen vorbereitet oder nicht."
     }
   }
 }

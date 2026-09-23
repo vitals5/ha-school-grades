@@ -19,24 +19,104 @@ from .storage import SchoolGradesStorage
 _LOGGER = logging.getLogger(__name__)
 
 DAY_KEYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
-DAY_NAMES_DE = {
-    "monday": "Montag",
-    "tuesday": "Dienstag",
-    "wednesday": "Mittwoch",
-    "thursday": "Donnerstag",
-    "friday": "Freitag",
-    "saturday": "Samstag",
-    "sunday": "Sonntag",
+
+DAY_NAMES: dict[str, dict[str, str]] = {
+    "de": {
+        "monday": "Montag",
+        "tuesday": "Dienstag",
+        "wednesday": "Mittwoch",
+        "thursday": "Donnerstag",
+        "friday": "Freitag",
+        "saturday": "Samstag",
+        "sunday": "Sonntag",
+    },
+    "en": {
+        "monday": "Monday",
+        "tuesday": "Tuesday",
+        "wednesday": "Wednesday",
+        "thursday": "Thursday",
+        "friday": "Friday",
+        "saturday": "Saturday",
+        "sunday": "Sunday",
+    },
+    "fr": {
+        "monday": "Lundi",
+        "tuesday": "Mardi",
+        "wednesday": "Mercredi",
+        "thursday": "Jeudi",
+        "friday": "Vendredi",
+        "saturday": "Samedi",
+        "sunday": "Dimanche",
+    },
+    "it": {
+        "monday": "Lunedì",
+        "tuesday": "Martedì",
+        "wednesday": "Mercoledì",
+        "thursday": "Giovedì",
+        "friday": "Venerdì",
+        "saturday": "Sabato",
+        "sunday": "Domenica",
+    },
+    "es": {
+        "monday": "Lunes",
+        "tuesday": "Martes",
+        "wednesday": "Miércoles",
+        "thursday": "Jueves",
+        "friday": "Viernes",
+        "saturday": "Sábado",
+        "sunday": "Domingo",
+    },
+    "nl": {
+        "monday": "Maandag",
+        "tuesday": "Dinsdag",
+        "wednesday": "Woensdag",
+        "thursday": "Donderdag",
+        "friday": "Vrijdag",
+        "saturday": "Zaterdag",
+        "sunday": "Zondag",
+    },
+    "pl": {
+        "monday": "Poniedziałek",
+        "tuesday": "Wtorek",
+        "wednesday": "Środa",
+        "thursday": "Czwartek",
+        "friday": "Piątek",
+        "saturday": "Sobota",
+        "sunday": "Niedziela",
+    },
+    "ru": {
+        "monday": "Понедельник",
+        "tuesday": "Вторник",
+        "wednesday": "Среда",
+        "thursday": "Четверг",
+        "friday": "Пятница",
+        "saturday": "Суббота",
+        "sunday": "Воскресенье",
+    },
+    "zh": {
+        "monday": "星期一",
+        "tuesday": "星期二",
+        "wednesday": "星期三",
+        "thursday": "星期四",
+        "friday": "星期五",
+        "saturday": "星期六",
+        "sunday": "星期日",
+    },
 }
-DAY_NAMES_EN = {
-    "monday": "Monday",
-    "tuesday": "Tuesday",
-    "wednesday": "Wednesday",
-    "thursday": "Thursday",
-    "friday": "Friday",
-    "saturday": "Saturday",
-    "sunday": "Sunday",
-}
+
+DAY_NAMES_DE = DAY_NAMES["de"]
+DAY_NAMES_EN = DAY_NAMES["en"]
+
+
+def _normalize_lang(raw_lang: str | None) -> str:
+    """Normalize language code to supported language key."""
+    if not raw_lang:
+        return "de"
+    code = str(raw_lang).lower().replace("_", "-")
+    for prefix in ("de", "en", "fr", "it", "es", "nl", "pl", "ru", "zh"):
+        if code.startswith(prefix):
+            return prefix
+    return "de"
 
 
 async def async_setup_entry(
@@ -174,29 +254,67 @@ class SchoolGradeNextDayExamsBinarySensor(BinarySensorEntity):
                 pass
 
         day_key = DAY_KEYS[primary_target_date.weekday()]
-        lang = getattr(getattr(self.hass, "config", None), "language", "de")
-        is_en = str(lang).lower().startswith("en")
-        day_name = DAY_NAMES_EN.get(day_key, day_key) if is_en else DAY_NAMES_DE.get(day_key, day_key)
+        raw_lang = getattr(getattr(self.hass, "config", None), "language", "de")
+        lang_code = _normalize_lang(raw_lang)
+        day_names_dict = DAY_NAMES.get(lang_code, DAY_NAMES["de"])
+        day_name = day_names_dict.get(day_key, day_key)
 
         event_names = [e["summary"] for e in unique_events]
+        and_words = {
+            "de": " und ",
+            "en": " and ",
+            "fr": " et ",
+            "it": " e ",
+            "es": " y ",
+            "nl": " en ",
+            "pl": " i ",
+            "ru": " и ",
+            "zh": " 和 ",
+        }
+        and_word = and_words.get(lang_code, " und ")
+
         if not event_names:
             event_titles = ""
-            if is_en:
-                message = f"No upcoming events for {day_name}."
-            else:
-                message = f"Keine anstehenden Termine für {day_name}."
+            empty_msgs = {
+                "de": f"Keine anstehenden Termine für {day_name}.",
+                "en": f"No upcoming events for {day_name}.",
+                "fr": f"Aucun événement à venir pour {day_name}.",
+                "it": f"Nessun evento in programma per {day_name}.",
+                "es": f"No hay eventos programados para {day_name}.",
+                "nl": f"Geen geplande afspraken voor {day_name}.",
+                "pl": f"Brak zaplanowanych terminów na {day_name}.",
+                "ru": f"Нет запланированных событий на {day_name}.",
+                "zh": f"{day_name}没有待办日程。",
+            }
+            message = empty_msgs.get(lang_code, empty_msgs["de"])
         elif len(event_names) == 1:
             event_titles = event_names[0]
-            if is_en:
-                message = f"Tomorrow ({day_name}) there is 1 upcoming event: {event_titles}."
-            else:
-                message = f"Am {day_name} steht 1 Termin an: {event_titles}."
+            single_msgs = {
+                "de": f"Am {day_name} steht 1 Termin an: {event_titles}.",
+                "en": f"Tomorrow ({day_name}) there is 1 upcoming event: {event_titles}.",
+                "fr": f"{day_name}, il y a 1 événement : {event_titles}.",
+                "it": f"{day_name} c'è 1 evento in programma: {event_titles}.",
+                "es": f"El {day_name} hay 1 evento programado: {event_titles}.",
+                "nl": f"Op {day_name} staat 1 afspraak gepland: {event_titles}.",
+                "pl": f"W {day_name} zaplanowano 1 termin: {event_titles}.",
+                "ru": f"В {day_name} запланировано 1 событие: {event_titles}.",
+                "zh": f"{day_name}有 1 个日程：{event_titles}。",
+            }
+            message = single_msgs.get(lang_code, single_msgs["de"])
         else:
-            event_titles = ", ".join(event_names[:-1]) + (" and " if is_en else " und ") + event_names[-1]
-            if is_en:
-                message = f"Tomorrow ({day_name}) there are {len(event_names)} upcoming events: {event_titles}."
-            else:
-                message = f"Am {day_name} stehen {len(event_names)} Termine an: {event_titles}."
+            event_titles = ", ".join(event_names[:-1]) + and_word + event_names[-1]
+            multi_msgs = {
+                "de": f"Am {day_name} stehen {len(event_names)} Termine an: {event_titles}.",
+                "en": f"Tomorrow ({day_name}) there are {len(event_names)} upcoming events: {event_titles}.",
+                "fr": f"{day_name}, il y a {len(event_names)} événements : {event_titles}.",
+                "it": f"{day_name} ci sono {len(event_names)} eventi in programma: {event_titles}.",
+                "es": f"El {day_name} hay {len(event_names)} eventos programados: {event_titles}.",
+                "nl": f"Op {day_name} staan {len(event_names)} afspraken gepland: {event_titles}.",
+                "pl": f"W {day_name} zaplanowano {len(event_names)} terminy: {event_titles}.",
+                "ru": f"В {day_name} запланировано {len(event_names)} событий: {event_titles}.",
+                "zh": f"{day_name}有 {len(event_names)} 个日程：{event_titles}。",
+            }
+            message = multi_msgs.get(lang_code, multi_msgs["de"])
 
         # Fetch timetable subjects for target day
         timetable_subjects = []

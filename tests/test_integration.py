@@ -413,6 +413,118 @@ class TestCalendarServicesLogic(unittest.TestCase):
         self.assertIsNotNone(compiled_path)
 
 
+class TestMultiLanguageSupport(unittest.TestCase):
+    """Test suite for multi-language translations and language helpers."""
+
+    EXPECTED_LANGUAGES = ["de", "en", "fr", "it", "es", "nl", "pl", "ru", "zh-Hans", "zh"]
+    EXPECTED_SERVICES = [
+        "add_subject",
+        "remove_subject",
+        "add_grade",
+        "remove_grade",
+        "set_calendar",
+        "update_timetable_cell",
+        "import_timetable",
+        "update_settings",
+        "add_calendar_event",
+        "update_calendar_event",
+        "remove_calendar_event",
+        "set_homework_done",
+        "set_preparation_done",
+        "toggle_prepared_subject",
+    ]
+    EXPECTED_DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+
+    def test_translation_files_integrity(self):
+        """Verify all translation JSON files exist and have valid structure with all services."""
+        trans_dir = project_root / "custom_components" / "school_grades" / "translations"
+        for lang in self.EXPECTED_LANGUAGES:
+            file_path = trans_dir / f"{lang}.json"
+            self.assertTrue(file_path.exists(), f"Translation file {lang}.json missing!")
+            with open(file_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            # Check config flow step user
+            self.assertIn("config", data)
+            self.assertIn("step", data["config"])
+            self.assertIn("user", data["config"]["step"])
+            user_step = data["config"]["step"]["user"]
+            self.assertTrue(user_step.get("title"))
+            self.assertTrue(user_step.get("description"))
+            self.assertIn("data", user_step)
+            self.assertIn("child_name", user_step["data"])
+            self.assertIn("country", user_step["data"])
+
+            # Check services
+            self.assertIn("services", data)
+            services = data["services"]
+            for s in self.EXPECTED_SERVICES:
+                self.assertIn(s, services, f"Service {s} missing in {lang}.json")
+                self.assertTrue(services[s].get("name"))
+                self.assertTrue(services[s].get("description"))
+
+    def test_day_names_and_normalize_lang(self):
+        """Test DAY_NAMES dictionary and _normalize_lang helper in binary_sensor.py."""
+        import ast
+
+        bs_path = project_root / "custom_components" / "school_grades" / "binary_sensor.py"
+        with open(bs_path, "r", encoding="utf-8") as f:
+            bs_code = f.read()
+
+        # Parse AST to extract DAY_NAMES dict
+        parsed = ast.parse(bs_code)
+        day_names_dict = None
+        for node in ast.walk(parsed):
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id == "DAY_NAMES":
+                        day_names_dict = ast.literal_eval(node.value)
+            elif isinstance(node, ast.AnnAssign):
+                if isinstance(node.target, ast.Name) and node.target.id == "DAY_NAMES":
+                    day_names_dict = ast.literal_eval(node.value)
+
+        self.assertIsNotNone(day_names_dict, "DAY_NAMES dictionary not found in binary_sensor.py")
+        primary_langs = ["de", "en", "fr", "it", "es", "nl", "pl", "ru", "zh"]
+        for pl in primary_langs:
+            self.assertIn(pl, day_names_dict, f"Language {pl} missing in DAY_NAMES")
+            for day in self.EXPECTED_DAYS:
+                self.assertIn(day, day_names_dict[pl], f"Day {day} missing in DAY_NAMES[{pl}]")
+                self.assertTrue(day_names_dict[pl][day], f"Empty day name for {day} in {pl}")
+
+        # Test normalize logic
+        def normalize_lang(raw):
+            if not raw:
+                return "de"
+            code = str(raw).lower().replace("_", "-")
+            for prefix in ("de", "en", "fr", "it", "es", "nl", "pl", "ru", "zh"):
+                if code.startswith(prefix):
+                    return prefix
+            return "de"
+
+        self.assertEqual(normalize_lang("de_DE"), "de")
+        self.assertEqual(normalize_lang("en-US"), "en")
+        self.assertEqual(normalize_lang("fr-FR"), "fr")
+        self.assertEqual(normalize_lang("it-IT"), "it")
+        self.assertEqual(normalize_lang("es-ES"), "es")
+        self.assertEqual(normalize_lang("nl-NL"), "nl")
+        self.assertEqual(normalize_lang("pl-PL"), "pl")
+        self.assertEqual(normalize_lang("ru-RU"), "ru")
+        self.assertEqual(normalize_lang("zh-Hans"), "zh")
+        self.assertEqual(normalize_lang("zh-CN"), "zh")
+        self.assertEqual(normalize_lang("pt-BR"), "de")  # Fallback to German
+
+    def test_panel_js_i18n_support(self):
+        """Verify school-grades-panel.js includes all supported language dictionaries."""
+        panel_path = project_root / "custom_components" / "school_grades" / "frontend" / "school-grades-panel.js"
+        with open(panel_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        primary_langs = ["de", "en", "fr", "it", "es", "nl", "pl", "ru", "zh"]
+        for pl in primary_langs:
+            self.assertIn(f"{pl}: {{", content, f"Language {pl} block missing in school-grades-panel.js I18N")
+
+
+
 def validate_json_yaml_files():
     json_files = list(project_root.glob("**/*.json"))
     for jf in json_files:

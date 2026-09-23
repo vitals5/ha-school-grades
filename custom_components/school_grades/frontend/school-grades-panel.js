@@ -1,6 +1,6 @@
 /**
  * Schulnoten Custom Sidebar Panel for Home Assistant
- * Multi-Language (i18n) Support: German (de) & English (en)
+ * Multi-Language (i18n) Support: de, en, fr, it, es, nl, pl, ru, zh
  */
 
 const DAYS = [
@@ -395,7 +395,9 @@ const I18N = {
       tuesday: "Dienstag",
       wednesday: "Mittwoch",
       thursday: "Donnerstag",
-      friday: "Freitag"
+      friday: "Freitag",
+      saturday: "Samstag",
+      sunday: "Sonntag"
     }
   },
   en: {
@@ -529,7 +531,961 @@ const I18N = {
       tuesday: "Tuesday",
       wednesday: "Wednesday",
       thursday: "Thursday",
-      friday: "Friday"
+      friday: "Friday",
+      saturday: "Saturday",
+      sunday: "Sunday"
+    }
+  },
+  fr: {
+    panel_title: "🎓 Notes scolaires & Emploi du temps",
+    panel_subtitle: "Aperçu des notes, calendrier des examens & emploi du temps pour vos enfants",
+    no_children_title: "🎓 Gestion des notes & de l'emploi du temps",
+    no_children_text1: "Aucune instance d'enfant n'a encore été configurée dans Home Assistant.",
+    no_children_text2: "Veuillez aller dans Paramètres ➔ Appareils et services ➔ Ajouter une intégration ➔ Schulnoten.",
+    total_avg: "Moyenne générale",
+    menu_toggle: "Ouvrir / fermer la barre latérale",
+    back_btn_tooltip: "Retour au tableau de bord / panneau précédent",
+    
+    // Prep card
+    prep_title: "🎒 Préparation du cartable pour demain",
+    prep_badge_weekday: "⏰ Programme de demain",
+    prep_badge_weekend: "📅 Préparation du week-end",
+    prep_exam_alert: "Attention ! Examens prévus ce jour-là :",
+    prep_empty: "Aucune matière prévue pour le {day} selon l'emploi du temps !",
+    exam_badge: "⚠️ EXAMEN / CONTRÔLE",
+    
+    // Calendar card
+    calendar_title: "📅 Examens & Événements à venir ({count})",
+    calendar_select_label: "Calendrier scolaire :",
+    no_calendar_assigned: "-- Aucun calendrier assigné --",
+    calendar_hint: "💡 Sélectionnez un calendrier scolaire dans les paramètres (ex. Google Calendar, Local HA Calendar, CalDAV) pour afficher les examens à venir.",
+    no_events: "🎉 Aucun examen ou événement enregistré dans le calendrier !",
+    time_at: "à {time}",
+    all_day: "(Toute la journée)",
+    countdown_past: "Passé",
+    countdown_today: "⚡ AUJOURD'HUI",
+    countdown_tomorrow: "⚠️ Demain",
+    countdown_days: "Dans {days} jours",
+    add_event_btn: "➕ Ajouter un examen / événement",
+    add_event_title: "📅 Créer un examen / événement dans le calendrier",
+    edit_event_title: "✏️ Modifier l'examen / l'événement",
+    event_summary_label: "Nom de l'examen / de l'événement",
+    event_summary_placeholder: "ex. Contrôle de maths, Test de SVT",
+    event_date_label: "Date",
+    event_time_label: "Heure",
+    event_desc_label: "Description / Salle (optionnel)",
+    event_desc_placeholder: "ex. Salle 101, Réviser chap. 3",
+    submit_add_event: "💾 Enregistrer dans le calendrier",
+    submit_update_event: "💾 Enregistrer les modifications",
+    delete_event_btn: "🗑️ Supprimer l'événement",
+    delete_event_confirm: "Êtes-vous sûr de vouloir supprimer l'événement \"{summary}\" du calendrier ?",
+    
+    // Timetable card
+    timetable_title: "📅 Emploi du temps hebdomadaire",
+    timetable_subtitle: "Cliquez sur une case pour la modifier",
+    legend_now: "⚡ EN CE MOMENT",
+    legend_today: "Aujourd'hui",
+    time_hour_col: "Heure / Créneau",
+    break_label: "Pause",
+    today_badge: "AUJOURD'HUI",
+    now_badge: "⚡ EN COURS",
+    
+    // Add grade form
+    add_grade_title: "➕ Ajouter une note",
+    subject_label: "Matière",
+    grade_label: "Note",
+    weight_label: "Coefficient",
+    weight_times: "coef. {weight}",
+    grade_name_label: "Description (ex. 1er contrôle)",
+    grade_name_placeholder: "ex. Devoir surveillé, Oral, Quiz",
+    date_label: "Date",
+    submit_add_grade: "➕ Enregistrer la note",
+    toggle_add_grade_btn: "➕ Ajouter une note",
+    close_add_grade_btn: "✖ Masquer le formulaire",
+    
+    // Manage subjects form
+    manage_subjects_title: "📘 Gérer les matières",
+    new_subject_label: "Ajouter une nouvelle matière",
+    new_subject_placeholder: "ex. Physique, Arts, Musique",
+    submit_add_subject: "➕ Créer la matière",
+    delete_subject_label: "Supprimer une matière existante",
+    delete_btn: "🗑️ Supprimer",
+    delete_subject_confirm: "Êtes-vous sûr de vouloir supprimer la matière \"{subject}\" ainsi que toutes ses notes ?",
+    
+    // Subjects overview
+    overview_title: "📘 Aperçu des matières & notes",
+    avg_label: "Moy.",
+    no_grades_yet: "Aucune note enregistrée pour l'instant",
+    table_grade: "Note",
+    table_weight: "Coefficient",
+    table_date: "Date",
+    table_name: "Intitulé",
+    table_action: "Action",
+    delete_grade_confirm: "Êtes-vous sûr de vouloir supprimer cette note ?",
+    
+    // Settings
+    settings_btn: "Paramètres",
+    settings_title: "⚙️ Paramètres ({child})",
+    settings_tab_general: "⚙️ Général",
+    settings_tab_subjects: "📘 Gérer les matières",
+    settings_tab_timetable: "📅 Emploi du temps",
+    grade_level_label: "Classe / Niveau scolaire",
+    grade_level_placeholder: "ex. 6ème A, 4ème B",
+    homework_card: "Devoirs",
+    homework_done_badge: "✓ Terminés",
+    homework_open_badge: "En attente",
+    prep_card_status: "Préparation",
+    prep_done_badge: "✓ Terminée",
+    prep_open_badge: "En attente",
+    country_label: "Pays / Système de notation",
+    country_hint: "Définit l'échelle de notation et le barème pour cette instance.",
+    section_visibility_title: "Afficher / masquer les sections",
+    section_prep: "Préparation du cartable pour demain",
+    section_calendar: "Examens et événements à venir",
+    section_timetable: "Emploi du temps hebdomadaire",
+    section_overview: "Aperçu des matières et notes",
+
+    // Modals
+    modal_cell_title: "✏️ Modifier la case de l'emploi du temps",
+    no_subject_free: "-- Aucune matière (Heure libre) --",
+    custom_subject_opt: "➕ Saisir une autre matière...",
+    custom_subject_placeholder: "Saisir une matière personnalisée",
+    room_label: "Salle (optionnel)",
+    room_placeholder: "ex. S102",
+    teacher_label: "Enseignant(e) (optionnel)",
+    teacher_placeholder: "ex. M. Dupont",
+    cancel_btn: "Annuler",
+    save_btn: "💾 Enregistrer",
+    
+    yaml_textarea_label: "Configuration YAML de l'emploi du temps ({child})",
+    copy_btn: "📋 Copier",
+    copied_btn: "✅ Copié !",
+    import_btn: "📥 Importer YAML",
+
+    days: {
+      monday: "Lundi",
+      tuesday: "Mardi",
+      wednesday: "Mercredi",
+      thursday: "Jeudi",
+      friday: "Vendredi",
+      saturday: "Samedi",
+      sunday: "Dimanche"
+    }
+  },
+  it: {
+    panel_title: "🎓 Voti scolastici & Orario",
+    panel_subtitle: "Riepilogo voti, calendario verifiche & orario settimanale dei tuoi figli",
+    no_children_title: "🎓 Gestione voti & orario scolastico",
+    no_children_text1: "Nessun bambino è stato ancora configurato in Home Assistant.",
+    no_children_text2: "Vai su Impostazioni ➔ Dispositivi e servizi ➔ Aggiungi integrazione ➔ Schulnoten.",
+    total_avg: "Media generale",
+    menu_toggle: "Apri / chiudi barra laterale",
+    back_btn_tooltip: "Torna alla dashboard / pannello precedente",
+    
+    // Prep card
+    prep_title: "🎒 Preparazione cartella per domani",
+    prep_badge_weekday: "⏰ Materie di domani",
+    prep_badge_weekend: "📅 Preparazione del fine settimana",
+    prep_exam_alert: "Attenzione! Verifiche in programma per questo giorno:",
+    prep_empty: "Nessuna materia in programma per {day} secondo l'orario!",
+    exam_badge: "⚠️ VERIFICA / TEST",
+    
+    // Calendar card
+    calendar_title: "📅 Prossime verifiche & eventi ({count})",
+    calendar_select_label: "Calendario scolastico:",
+    no_calendar_assigned: "-- Nessun calendario assegnato --",
+    calendar_hint: "💡 Seleziona un calendario nelle impostazioni (es. Google Calendar, Local HA Calendar, CalDAV) per visualizzare le verifiche.",
+    no_events: "🎉 Nessuna verifica o evento in programma nel calendario!",
+    time_at: "alle ore {time}",
+    all_day: "(Tutto il giorno)",
+    countdown_past: "Passato",
+    countdown_today: "⚡ OGGI",
+    countdown_tomorrow: "⚠️ Domani",
+    countdown_days: "Tra {days} giorni",
+    add_event_btn: "➕ Aggiungi verifica / evento",
+    add_event_title: "📅 Crea verifica / evento nel calendario",
+    edit_event_title: "✏️ Modifica verifica / evento",
+    event_summary_label: "Titolo / Nome verifica",
+    event_summary_placeholder: "es. Verifica di matematica, Test di scienze",
+    event_date_label: "Data",
+    event_time_label: "Ora",
+    event_desc_label: "Descrizione / Aula (opzionale)",
+    event_desc_placeholder: "es. Aula 101, Capitoli 3-4",
+    submit_add_event: "💾 Salva nel calendario",
+    submit_update_event: "💾 Salva modifiche",
+    delete_event_btn: "🗑️ Elimina evento",
+    delete_event_confirm: "Sei sicuro di voler eliminare l'evento \"{summary}\" dal calendario?",
+    
+    // Timetable card
+    timetable_title: "📅 Orario settimanale",
+    timetable_subtitle: "Clicca su una casella per modificarla",
+    legend_now: "⚡ ORA",
+    legend_today: "Oggi",
+    time_hour_col: "Ora / Periodo",
+    break_label: "Ricreazione",
+    today_badge: "OGGI",
+    now_badge: "⚡ ORA",
+    
+    // Add grade form
+    add_grade_title: "➕ Aggiungi voto",
+    subject_label: "Materia",
+    grade_label: "Voto",
+    weight_label: "Peso",
+    weight_times: "peso {weight}x",
+    grade_name_label: "Descrizione (es. 1ª verifica)",
+    grade_name_placeholder: "es. Verifica scritta, Interrogazione, Test",
+    date_label: "Data",
+    submit_add_grade: "➕ Registra voto",
+    toggle_add_grade_btn: "➕ Aggiungi voto",
+    close_add_grade_btn: "✖ Nascondi modulo",
+    
+    // Manage subjects form
+    manage_subjects_title: "📘 Gestisci materie",
+    new_subject_label: "Aggiungi nuova materia",
+    new_subject_placeholder: "es. Fisica, Arte, Musica",
+    submit_add_subject: "➕ Crea materia",
+    delete_subject_label: "Elimina materia esistente",
+    delete_btn: "🗑️ Elimina",
+    delete_subject_confirm: "Sei sicuro di voler eliminare la materia \"{subject}\" e tutti i voti associati?",
+    
+    // Subjects overview
+    overview_title: "📘 Riepilogo materie & voti",
+    avg_label: "Media",
+    no_grades_yet: "Nessun voto registrato finora",
+    table_grade: "Voto",
+    table_weight: "Peso",
+    table_date: "Data",
+    table_name: "Descrizione",
+    table_action: "Azione",
+    delete_grade_confirm: "Sei sicuro di voler eliminare questo voto?",
+    
+    // Settings
+    settings_btn: "Impostazioni",
+    settings_title: "⚙️ Impostazioni ({child})",
+    settings_tab_general: "⚙️ Generale",
+    settings_tab_subjects: "📘 Gestisci materie",
+    settings_tab_timetable: "📅 Orario",
+    grade_level_label: "Classe / Anno scolastico",
+    grade_level_placeholder: "es. 1ª A, 3ª B",
+    homework_card: "Compiti",
+    homework_done_badge: "✓ Fatti",
+    homework_open_badge: "In sospeso",
+    prep_card_status: "Preparazione",
+    prep_done_badge: "✓ Fatta",
+    prep_open_badge: "In sospeso",
+    country_label: "Paese / Sistema di valutazione",
+    country_hint: "Determina la scala dei voti e il metodo di valutazione.",
+    section_visibility_title: "Mostra / nascondi sezioni del pannello",
+    section_prep: "Preparazione cartella per domani",
+    section_calendar: "Prossime verifiche ed eventi",
+    section_timetable: "Orario settimanale",
+    section_overview: "Riepilogo materie e voti",
+
+    // Modals
+    modal_cell_title: "✏️ Modifica casella dell'orario",
+    no_subject_free: "-- Nessuna materia (Ora buca) --",
+    custom_subject_opt: "➕ Inserisci altra materia...",
+    custom_subject_placeholder: "Nome materia personalizzata",
+    room_label: "Aula (opzionale)",
+    room_placeholder: "es. Aula 102",
+    teacher_label: "Insegnante (opzionale)",
+    teacher_placeholder: "es. Prof. Rossi",
+    cancel_btn: "Annulla",
+    save_btn: "💾 Salva",
+    
+    yaml_textarea_label: "Configurazione YAML dell'orario ({child})",
+    copy_btn: "📋 Copia",
+    copied_btn: "✅ Copiato!",
+    import_btn: "📥 Importa YAML",
+
+    days: {
+      monday: "Lunedì",
+      tuesday: "Martedì",
+      wednesday: "Mercoledì",
+      thursday: "Giovedì",
+      friday: "Venerdì",
+      saturday: "Sabato",
+      sunday: "Domenica"
+    }
+  },
+  es: {
+    panel_title: "🎓 Notas escolares & Horario",
+    panel_subtitle: "Resumen de notas, calendario de exámenes y horario semanal de tus hijos",
+    no_children_title: "🎓 Gestión de notas & horario escolar",
+    no_children_text1: "Aún no se ha configurado ninguna instancia de hijo/a en Home Assistant.",
+    no_children_text2: "Por favor, ve a Ajustes ➔ Dispositivos y servicios ➔ Añadir integración ➔ Schulnoten.",
+    total_avg: "Promedio general",
+    menu_toggle: "Abrir / cerrar barra lateral",
+    back_btn_tooltip: "Volver al panel / cuadro de mando anterior",
+    
+    // Prep card
+    prep_title: "🎒 Preparar la mochila para mañana",
+    prep_badge_weekday: "⏰ Asignaturas de mañana",
+    prep_badge_weekend: "📅 Preparación del fin de semana",
+    prep_exam_alert: "¡Atención! Exámenes previstos para este día:",
+    prep_empty: "¡No hay asignaturas programadas para el {day} según el horario!",
+    exam_badge: "⚠️ EXAMEN / CONTROL",
+    
+    // Calendar card
+    calendar_title: "📅 Próximos exámenes & eventos ({count})",
+    calendar_select_label: "Calendario escolar:",
+    no_calendar_assigned: "-- Ningún calendario asignado --",
+    calendar_hint: "💡 Selecciona un calendario escolar en los ajustes (p. ej. Google Calendar, Local HA Calendar, CalDAV) para mostrar los exámenes.",
+    no_events: "🎉 ¡No hay exámenes ni eventos programados en el calendario!",
+    time_at: "a las {time}",
+    all_day: "(Todo el día)",
+    countdown_past: "Pasado",
+    countdown_today: "⚡ HOY",
+    countdown_tomorrow: "⚠️ Mañana",
+    countdown_days: "En {days} días",
+    add_event_btn: "➕ Añadir examen / evento",
+    add_event_title: "📅 Crear examen / evento en el calendario",
+    edit_event_title: "✏️ Editar examen / evento",
+    event_summary_label: "Título / Nombre del examen",
+    event_summary_placeholder: "p. ej. Examen de matemáticas, Test de biología",
+    event_date_label: "Fecha",
+    event_time_label: "Hora",
+    event_desc_label: "Descripción / Aula (opcional)",
+    event_desc_placeholder: "p. ej. Aula 101, Temas tema 3",
+    submit_add_event: "💾 Guardar en el calendario",
+    submit_update_event: "💾 Guardar cambios",
+    delete_event_btn: "🗑️ Eliminar evento",
+    delete_event_confirm: "¿Seguro que quieres eliminar el evento \"{summary}\" del calendario?",
+    
+    // Timetable card
+    timetable_title: "📅 Horario semanal",
+    timetable_subtitle: "Haz clic en una casilla para editarla",
+    legend_now: "⚡ AHORA",
+    legend_today: "Hoy",
+    time_hour_col: "Hora / Sesión",
+    break_label: "Recreo",
+    today_badge: "HOY",
+    now_badge: "⚡ AHORA",
+    
+    // Add grade form
+    add_grade_title: "➕ Registrar nueva nota",
+    subject_label: "Asignatura",
+    grade_label: "Nota",
+    weight_label: "Ponderación",
+    weight_times: "{weight}x",
+    grade_name_label: "Descripción (p. ej. 1er examen)",
+    grade_name_placeholder: "p. ej. Examen parcial, Oral, Trabajo",
+    date_label: "Fecha",
+    submit_add_grade: "➕ Registrar nota",
+    toggle_add_grade_btn: "➕ Registrar nueva nota",
+    close_add_grade_btn: "✖ Ocultar formulario",
+    
+    // Manage subjects form
+    manage_subjects_title: "📘 Gestionar asignaturas",
+    new_subject_label: "Añadir nueva asignatura",
+    new_subject_placeholder: "p. ej. Física, Arte, Música",
+    submit_add_subject: "➕ Crear asignatura",
+    delete_subject_label: "Eliminar asignatura existente",
+    delete_btn: "🗑️ Eliminar",
+    delete_subject_confirm: "¿Seguro que quieres eliminar la asignatura \"{subject}\" y todas sus notas?",
+    
+    // Subjects overview
+    overview_title: "📘 Resumen de asignaturas y notas",
+    avg_label: "Media",
+    no_grades_yet: "Aún no se han registrado notas",
+    table_grade: "Nota",
+    table_weight: "Ponderación",
+    table_date: "Fecha",
+    table_name: "Descripción",
+    table_action: "Acción",
+    delete_grade_confirm: "¿Seguro que quieres eliminar esta nota?",
+    
+    // Settings
+    settings_btn: "Ajustes",
+    settings_title: "⚙️ Ajustes ({child})",
+    settings_tab_general: "⚙️ General",
+    settings_tab_subjects: "📘 Gestionar asignaturas",
+    settings_tab_timetable: "📅 Horario",
+    grade_level_label: "Curso / Nivel escolar",
+    grade_level_placeholder: "p. ej. 5º A, 1º ESO",
+    homework_card: "Deberes",
+    homework_done_badge: "✓ Hechos",
+    homework_open_badge: "Pendiente",
+    prep_card_status: "Preparación",
+    prep_done_badge: "✓ Lista",
+    prep_open_badge: "Pendiente",
+    country_label: "País / Sistema de calificaciones",
+    country_hint: "Determina la escala de notas y el sistema de evaluación.",
+    section_visibility_title: "Mostrar / ocultar secciones del panel",
+    section_prep: "Preparación de la mochila para mañana",
+    section_calendar: "Próximos exámenes y eventos",
+    section_timetable: "Horario semanal",
+    section_overview: "Resumen de asignaturas y notas",
+
+    // Modals
+    modal_cell_title: "✏️ Editar casilla del horario",
+    no_subject_free: "-- Sin asignatura (Hora libre) --",
+    custom_subject_opt: "➕ Escribir otra asignatura...",
+    custom_subject_placeholder: "Nombre de asignatura personalizada",
+    room_label: "Aula (opcional)",
+    room_placeholder: "p. ej. Aula 102",
+    teacher_label: "Profesor/a (opcional)",
+    teacher_placeholder: "p. ej. Sra. García",
+    cancel_btn: "Cancelar",
+    save_btn: "💾 Guardar",
+    
+    yaml_textarea_label: "Configuración YAML del horario ({child})",
+    copy_btn: "📋 Copiar",
+    copied_btn: "✅ ¡Copiado!",
+    import_btn: "📥 Importar YAML",
+
+    days: {
+      monday: "Lunes",
+      tuesday: "Martes",
+      wednesday: "Miércoles",
+      thursday: "Jueves",
+      friday: "Viernes",
+      saturday: "Sábado",
+      sunday: "Domingo"
+    }
+  },
+  nl: {
+    panel_title: "🎓 Schoolcijfers & Lesrooster",
+    panel_subtitle: "Cijferoverzicht, toetsenkalender & lesrooster voor je kinderen",
+    no_children_title: "🎓 Beheer van schoolcijfers & lesroosters",
+    no_children_text1: "Er zijn nog geen kinderen geconfigureerd in Home Assistant.",
+    no_children_text2: "Ga naar Instellingen ➔ Apparaten en diensten ➔ Integratie toevoegen ➔ Schulnoten.",
+    total_avg: "Totale gemiddelde",
+    menu_toggle: "Zijbalk openen / sluiten",
+    back_btn_tooltip: "Terug naar vorig dashboard / paneel",
+    
+    // Prep card
+    prep_title: "🎒 Schooltas klaarmaken voor morgen",
+    prep_badge_weekday: "⏰ Lessen van morgen",
+    prep_badge_weekend: "📅 Weekendvoorbereiding",
+    prep_exam_alert: "Let op! Toetsen of proefwerken op deze dag:",
+    prep_empty: "Geen vakken ingepland voor {day} volgens het lesrooster!",
+    exam_badge: "⚠️ TOETS / PROEFWERK",
+    
+    // Calendar card
+    calendar_title: "📅 Komende toetsen & afspraken ({count})",
+    calendar_select_label: "Schoolagenda:",
+    no_calendar_assigned: "-- Geen agenda toegewezen --",
+    calendar_hint: "💡 Kies een schoolagenda in Instellingen (bijv. Google Agenda, Local HA Calendar, CalDAV) om toetsen te tonen.",
+    no_events: "🎉 Geen aankomende toetsen of afspraken in de agenda!",
+    time_at: "om {time} uur",
+    all_day: "(Hele dag)",
+    countdown_past: "Voorbij",
+    countdown_today: "⚡ VANDAAG",
+    countdown_tomorrow: "⚠️ Morgen",
+    countdown_days: "Over {days} dagen",
+    add_event_btn: "➕ Toets / afspraak toevoegen",
+    add_event_title: "📅 Nieuwe toets / afspraak in agenda maken",
+    edit_event_title: "✏️ Toets / afspraak bewerken",
+    event_summary_label: "Titel / Naam van toets",
+    event_summary_placeholder: "bijv. Wiskunde proefwerk, Biologie toets",
+    event_date_label: "Datum",
+    event_time_label: "Tijd",
+    event_desc_label: "Beschrijving / Lokaal (optioneel)",
+    event_desc_placeholder: "bijv. Lokaal 101, Hoofdstuk 3",
+    submit_add_event: "💾 Opslaan in agenda",
+    submit_update_event: "💾 Wijzigingen opslaan",
+    delete_event_btn: "🗑️ Afspraak verwijderen",
+    delete_event_confirm: "Weet je zeker dat je de afspraak \"{summary}\" uit de agenda wilt verwijderen?",
+    
+    // Timetable card
+    timetable_title: "📅 Weekrooster",
+    timetable_subtitle: "Klik op een vakje om te bewerken",
+    legend_now: "⚡ NU",
+    legend_today: "Vandaag",
+    time_hour_col: "Tijd / Lesuur",
+    break_label: "Pauze",
+    today_badge: "VANDAAG",
+    now_badge: "⚡ NU",
+    
+    // Add grade form
+    add_grade_title: "➕ Nieuw cijfer invoeren",
+    subject_label: "Vak",
+    grade_label: "Cijfer",
+    weight_label: "Weging",
+    weight_times: "{weight}x weging",
+    grade_name_label: "Omschrijving (bijv. 1e toets)",
+    grade_name_placeholder: "bijv. Proefwerk, Overhoring, Mondeling",
+    date_label: "Datum",
+    submit_add_grade: "➕ Cijfer opslaan",
+    toggle_add_grade_btn: "➕ Nieuw cijfer invoeren",
+    close_add_grade_btn: "✖ Formulier verbergen",
+    
+    // Manage subjects form
+    manage_subjects_title: "📘 Schoolvakken beheren",
+    new_subject_label: "Nieuw vak toevoegen",
+    new_subject_placeholder: "bijv. Natuurkunde, Kunst, Muziek",
+    submit_add_subject: "➕ Vak aanmaken",
+    delete_subject_label: "Bestaand vak verwijderen",
+    delete_btn: "🗑️ Verwijderen",
+    delete_subject_confirm: "Weet je zeker dat je het vak \"{subject}\" en alle bijbehorende cijfers wilt verwijderen?",
+    
+    // Subjects overview
+    overview_title: "📘 Vakken- & cijferoverzicht",
+    avg_label: "Gem.",
+    no_grades_yet: "Nog geen cijfers ingevoerd",
+    table_grade: "Cijfer",
+    table_weight: "Weging",
+    table_date: "Datum",
+    table_name: "Omschrijving",
+    table_action: "Actie",
+    delete_grade_confirm: "Weet je zeker dat je dit cijfer wilt verwijderen?",
+    
+    // Settings
+    settings_btn: "Instellingen",
+    settings_title: "⚙️ Instellingen ({child})",
+    settings_tab_general: "⚙️ Algemeen",
+    settings_tab_subjects: "📘 Vakken beheren",
+    settings_tab_timetable: "📅 Lesrooster",
+    grade_level_label: "Klas / Leerjaar",
+    grade_level_placeholder: "bijv. 2VWO, Groep 8",
+    homework_card: "Huiswerk",
+    homework_done_badge: "✓ Klaar",
+    homework_open_badge: "Open",
+    prep_card_status: "Voorbereiding",
+    prep_done_badge: "✓ Klaar",
+    prep_open_badge: "Open",
+    country_label: "Land / Cijfersysteem",
+    country_hint: "Bepaalt de cijferschaal en beoordeling voor dit kind.",
+    section_visibility_title: "Onderdelen van het paneel tonen / verbergen",
+    section_prep: "Schooltas klaarmaken voor morgen",
+    section_calendar: "Aankomende toetsen en afspraken",
+    section_timetable: "Weekrooster",
+    section_overview: "Vakken en cijferoverzicht",
+
+    // Modals
+    modal_cell_title: "✏️ Lesrooster-vakje bewerken",
+    no_subject_free: "-- Geen vak (Tussenur) --",
+    custom_subject_opt: "➕ Ander vak invoeren...",
+    custom_subject_placeholder: "Eigen vak invoeren",
+    room_label: "Lokaal (optioneel)",
+    room_placeholder: "bijv. L102",
+    teacher_label: "Docent (optioneel)",
+    teacher_placeholder: "bijv. Dhr. De Vries",
+    cancel_btn: "Annuleren",
+    save_btn: "💾 Opslaan",
+    
+    yaml_textarea_label: "Lesrooster YAML-configuratie ({child})",
+    copy_btn: "📋 Kopiëren",
+    copied_btn: "✅ Gekopieerd!",
+    import_btn: "📥 YAML importeren",
+
+    days: {
+      monday: "Maandag",
+      tuesday: "Dinsdag",
+      wednesday: "Woensdag",
+      thursday: "Donderdag",
+      friday: "Vrijdag",
+      saturday: "Zaterdag",
+      sunday: "Zondag"
+    }
+  },
+  pl: {
+    panel_title: "🎓 Oceny szkolne & Plan lekcji",
+    panel_subtitle: "Zestawienie ocen, kalendarz sprawdzianów i plan lekcji Twoich dzieci",
+    no_children_title: "🎓 Zarządzanie ocenami i planem lekcji",
+    no_children_text1: "W Home Assistant nie skonfigurowano jeszcze żadnego dziecka.",
+    no_children_text2: "Przejdź do Ustawienia ➔ Urządzenia i usługi ➔ Dodaj integrację ➔ Schulnoten.",
+    total_avg: "Średnia ogólna",
+    menu_toggle: "Otwórz / zamknij pasek boczny",
+    back_btn_tooltip: "Wróć do poprzedniego pulpitu / panelu",
+    
+    // Prep card
+    prep_title: "🎒 Spakuj plecak na jutro",
+    prep_badge_weekday: "⏰ Lekcje na jutro",
+    prep_badge_weekend: "📅 Przygotowanie weekendowe",
+    prep_exam_alert: "Uwaga! Sprawdziany zaplanowane na ten dzień:",
+    prep_empty: "Brak lekcji w planie na dzień: {day}!",
+    exam_badge: "⚠️ SPRAWDZIAN / TEST",
+    
+    // Calendar card
+    calendar_title: "📅 Nadchodzące sprawdziany i terminy ({count})",
+    calendar_select_label: "Kalendarz szkolny:",
+    no_calendar_assigned: "-- Brak przypisanego kalendarza --",
+    calendar_hint: "💡 Wybierz kalendarz szkolny w Ustawieniach (np. Google Calendar, Local HA Calendar, CalDAV), aby wyświetlić sprawdziany.",
+    no_events: "🎉 Brak nadchodzących sprawdzianów w kalendarzu!",
+    time_at: "o godz. {time}",
+    all_day: "(Cały dzień)",
+    countdown_past: "Minęło",
+    countdown_today: "⚡ DZISIAJ",
+    countdown_tomorrow: "⚠️ Jutro",
+    countdown_days: "Za {days} dni",
+    add_event_btn: "➕ Dodaj sprawdzian / termin",
+    add_event_title: "📅 Dodaj sprawdzian / termin do kalendarza",
+    edit_event_title: "✏️ Edytuj sprawdzian / termin",
+    event_summary_label: "Tytuł / Nazwa sprawdzianu",
+    event_summary_placeholder: "np. Sprawdzian z matematyki, Kartkówka z biologii",
+    event_date_label: "Data",
+    event_time_label: "Godzina",
+    event_desc_label: "Opis / Sala (opcjonalnie)",
+    event_desc_placeholder: "np. Sala 101, Rozdziały 3-4",
+    submit_add_event: "💾 Zapisz w kalendarzu",
+    submit_update_event: "💾 Zapisz zmiany",
+    delete_event_btn: "🗑️ Usuń termin",
+    delete_event_confirm: "Czy na pewno chcesz usunąć termin \"{summary}\" z kalendarza?",
+    
+    // Timetable card
+    timetable_title: "📅 Tygodniowy plan lekcji",
+    timetable_subtitle: "Kliknij na komórkę, aby ją edytować",
+    legend_now: "⚡ TERAZ",
+    legend_today: "Dzisiaj",
+    time_hour_col: "Godzina / Lekcja",
+    break_label: "Przerwa",
+    today_badge: "DZISIAJ",
+    now_badge: "⚡ TERAZ",
+    
+    // Add grade form
+    add_grade_title: "➕ Wpisz nową ocenę",
+    subject_label: "Przedmiot",
+    grade_label: "Ocena",
+    weight_label: "Waga",
+    weight_times: "waga {weight}",
+    grade_name_label: "Opis (np. 1. sprawdzian)",
+    grade_name_placeholder: "np. Sprawdzian, Kartkówka, Odpowiedź",
+    date_label: "Data",
+    submit_add_grade: "➕ Dodaj ocenę",
+    toggle_add_grade_btn: "➕ Wpisz nową ocenę",
+    close_add_grade_btn: "✖ Ukryj formularz",
+    
+    // Manage subjects form
+    manage_subjects_title: "📘 Zarządzaj przedmiotami",
+    new_subject_label: "Dodaj nowy przedmiot",
+    new_subject_placeholder: "np. Fizyka, Plastyka, Muzyka",
+    submit_add_subject: "➕ Utwórz przedmiot",
+    delete_subject_label: "Usuń istniejący przedmiot",
+    delete_btn: "🗑️ Usuń",
+    delete_subject_confirm: "Czy na pewno chcesz usunąć przedmiot \"{subject}\" wraz ze wszystkimi ocenami?",
+    
+    // Subjects overview
+    overview_title: "📘 Zestawienie przedmiotów i ocen",
+    avg_label: "Średnia",
+    no_grades_yet: "Brak wpisanych ocen",
+    table_grade: "Ocena",
+    table_weight: "Waga",
+    table_date: "Data",
+    table_name: "Opis",
+    table_action: "Akcja",
+    delete_grade_confirm: "Czy na pewno chcesz usunąć tę ocenę?",
+    
+    // Settings
+    settings_btn: "Ustawienia",
+    settings_title: "⚙️ Ustawienia ({child})",
+    settings_tab_general: "⚙️ Ogólne",
+    settings_tab_subjects: "📘 Przedmioty",
+    settings_tab_timetable: "📅 Plan lekcji",
+    grade_level_label: "Klasa / Poziom nauczania",
+    grade_level_placeholder: "np. 5A, 7B",
+    homework_card: "Zadania domowe",
+    homework_done_badge: "✓ Zrobione",
+    homework_open_badge: "Do zrobienia",
+    prep_card_status: "Przygotowanie",
+    prep_done_badge: "✓ Spakowane",
+    prep_open_badge: "Do zrobienia",
+    country_label: "Kraj / System oceniania",
+    country_hint: "Określa skalę ocen i sposób wyliczania średniej.",
+    section_visibility_title: "Pokaż / ukryj sekcje panelu",
+    section_prep: "Przygotowanie plecaka na kolejny dzień",
+    section_calendar: "Nadchodzące sprawdziany i terminy",
+    section_timetable: "Tygodniowy plan lekcji",
+    section_overview: "Zestawienie przedmiotów i ocen",
+
+    // Modals
+    modal_cell_title: "✏️ Edytuj lekcję w planie",
+    no_subject_free: "-- Brak lekcji (Okienko) --",
+    custom_subject_opt: "➕ Wpisz inny przedmiot...",
+    custom_subject_placeholder: "Wpisz nazwę przedmiotu",
+    room_label: "Sala (opcjonalnie)",
+    room_placeholder: "np. S102",
+    teacher_label: "Nauczyciel (opcjonalnie)",
+    teacher_placeholder: "np. mgr Kowalski",
+    cancel_btn: "Anuluj",
+    save_btn: "💾 Zapisz",
+    
+    yaml_textarea_label: "Konfiguracja YAML planu lekcji ({child})",
+    copy_btn: "📋 Kopiuj",
+    copied_btn: "✅ Skopiowano!",
+    import_btn: "📥 Importuj YAML",
+
+    days: {
+      monday: "Poniedziałek",
+      tuesday: "Wtorek",
+      wednesday: "Środa",
+      thursday: "Czwartek",
+      friday: "Piątek",
+      saturday: "Sobota",
+      sunday: "Niedziela"
+    }
+  },
+  ru: {
+    panel_title: "🎓 Школьные оценки & Расписание",
+    panel_subtitle: "Сводка оценок, календарь контрольных и расписание уроков ваших детей",
+    no_children_title: "🎓 Управление оценками и расписанием",
+    no_children_text1: "В Home Assistant ещё не настроено ни одного профиля ребёнка.",
+    no_children_text2: "Перейдите в Настройки ➔ Устройства и службы ➔ Добавить интеграцию ➔ Schulnoten.",
+    total_avg: "Общий средний балл",
+    menu_toggle: "Открыть / закрыть боковую панель",
+    back_btn_tooltip: "Вернуться на предыдущую панель",
+    
+    // Prep card
+    prep_title: "🎒 Подготовка портфеля на завтра",
+    prep_badge_weekday: "⏰ Уроки на завтра",
+    prep_badge_weekend: "📅 Подготовка на выходных",
+    prep_exam_alert: "Внимание! Контрольные работы в этот день:",
+    prep_empty: "На {day} уроков в расписании не найдено!",
+    exam_badge: "⚠️ КОНТРОЛЬНАЯ / ТЕСТ",
+    
+    // Calendar card
+    calendar_title: "📅 Предстоящие контрольные и события ({count})",
+    calendar_select_label: "Школьный календарь:",
+    no_calendar_assigned: "-- Календарь не назначен --",
+    calendar_hint: "💡 Выберите школьный календарь в настройках (напр., Google Календарь, Local HA Calendar, CalDAV), чтобы видеть контрольные.",
+    no_events: "🎉 В календаре нет предстоящих контрольных или событий!",
+    time_at: "в {time}",
+    all_day: "(Весь день)",
+    countdown_past: "Прошло",
+    countdown_today: "⚡ СЕГОДНЯ",
+    countdown_tomorrow: "⚠️ Завтра",
+    countdown_days: "Через {days} дн.",
+    add_event_btn: "➕ Добавить контрольную / событие",
+    add_event_title: "📅 Создать контрольную / событие в календаре",
+    edit_event_title: "✏️ Редактировать контрольную / событие",
+    event_summary_label: "Название контрольной / события",
+    event_summary_placeholder: "напр., Контрольная по математике, Тест по биологии",
+    event_date_label: "Дата",
+    event_time_label: "Время",
+    event_desc_label: "Описание / Кабинет (необязательно)",
+    event_desc_placeholder: "напр., Кабинет 101, Параграфы 3-4",
+    submit_add_event: "💾 Сохранить в календаре",
+    submit_update_event: "💾 Сохранить изменения",
+    delete_event_btn: "🗑️ Удалить событие",
+    delete_event_confirm: "Вы уверены, что хотите удалить событие \"{summary}\" из календаря?",
+    
+    // Timetable card
+    timetable_title: "📅 Расписание уроков на неделю",
+    timetable_subtitle: "Нажмите на ячейку для редактирования",
+    legend_now: "⚡ СЕЙЧАС",
+    legend_today: "Сегодня",
+    time_hour_col: "Время / Урок",
+    break_label: "Перемена",
+    today_badge: "СЕГОДНЯ",
+    now_badge: "⚡ СЕЙЧАС",
+    
+    // Add grade form
+    add_grade_title: "➕ Добавить оценку",
+    subject_label: "Предмет",
+    grade_label: "Оценка",
+    weight_label: "Вес оценки",
+    weight_times: "вес {weight}x",
+    grade_name_label: "Описание (напр., 1-я контрольная)",
+    grade_name_placeholder: "напр., Контрольная, Самостоятельная, Ответ у доски",
+    date_label: "Дата",
+    submit_add_grade: "➕ Записать оценку",
+    toggle_add_grade_btn: "➕ Добавить оценку",
+    close_add_grade_btn: "✖ Скрыть форму",
+    
+    // Manage subjects form
+    manage_subjects_title: "📘 Управление предметами",
+    new_subject_label: "Добавить новый предмет",
+    new_subject_placeholder: "напр., Физика, ИЗО, Музыка",
+    submit_add_subject: "➕ Создать предмет",
+    delete_subject_label: "Удалить предмет",
+    delete_btn: "🗑️ Удалить",
+    delete_subject_confirm: "Вы уверены, что хотите удалить предмет \"{subject}\" со всеми оценками?",
+    
+    // Subjects overview
+    overview_title: "📘 Обзор предметов и оценок",
+    avg_label: "Ср. балл",
+    no_grades_yet: "Оценок пока нет",
+    table_grade: "Оценка",
+    table_weight: "Вес",
+    table_date: "Дата",
+    table_name: "Описание",
+    table_action: "Действие",
+    delete_grade_confirm: "Вы уверены, что хотите удалить эту оценку?",
+    
+    // Settings
+    settings_btn: "Настройки",
+    settings_title: "⚙️ Настройки ({child})",
+    settings_tab_general: "⚙️ Общие",
+    settings_tab_subjects: "📘 Предметы",
+    settings_tab_timetable: "📅 Расписание",
+    grade_level_label: "Класс",
+    grade_level_placeholder: "напр., 5А, 7Б",
+    homework_card: "Домашнее задание",
+    homework_done_badge: "✓ Выполнено",
+    homework_open_badge: "Не сделано",
+    prep_card_status: "Портфель",
+    prep_done_badge: "✓ Собрано",
+    prep_open_badge: "Не собрано",
+    country_label: "Страна / Система оценок",
+    country_hint: "Определяет шкалу оценок и расчёт среднего балла.",
+    section_visibility_title: "Отображение разделов панели",
+    section_prep: "Подготовка портфеля на завтра",
+    section_calendar: "Предстоящие контрольные и события",
+    section_timetable: "Расписание уроков на неделю",
+    section_overview: "Обзор предметов и оценок",
+
+    // Modals
+    modal_cell_title: "✏️ Редактировать ячейку расписания",
+    no_subject_free: "-- Нет урока (Окно) --",
+    custom_subject_opt: "➕ Ввести другой предмет...",
+    custom_subject_placeholder: "Введите название предмета",
+    room_label: "Кабинет (необязательно)",
+    room_placeholder: "напр., Каб. 102",
+    teacher_label: "Учитель (необязательно)",
+    teacher_placeholder: "напр., Иванова М. И.",
+    cancel_btn: "Отмена",
+    save_btn: "💾 Сохранить",
+    
+    yaml_textarea_label: "Конфигурация YAML расписания ({child})",
+    copy_btn: "📋 Копировать",
+    copied_btn: "✅ Скопировано!",
+    import_btn: "📥 Импортировать YAML",
+
+    days: {
+      monday: "Понедельник",
+      tuesday: "Вторник",
+      wednesday: "Среда",
+      thursday: "Четверг",
+      friday: "Пятница",
+      saturday: "Суббота",
+      sunday: "Воскресенье"
+    }
+  },
+  zh: {
+    panel_title: "🎓 学校成绩 & 课程表",
+    panel_subtitle: "孩子的成绩概览、考试日历及每周课程表",
+    no_children_title: "🎓 学校成绩与课程表管理",
+    no_children_text1: "Home Assistant 中尚未配置任何孩子实例。",
+    no_children_text2: "请前往 设置 ➔ 设备与集成 ➔ 添加集成 ➔ Schulnoten。",
+    total_avg: "总平均分",
+    menu_toggle: "打开 / 关闭侧边栏",
+    back_btn_tooltip: "返回上一控制面板",
+    
+    // Prep card
+    prep_title: "🎒 准备下一个上学日的书包",
+    prep_badge_weekday: "⏰ 明日课程安排",
+    prep_badge_weekend: "📅 周末准备",
+    prep_exam_alert: "注意！当天有考试或测试安排：",
+    prep_empty: "{day} 课程表中暂无课程安排！",
+    exam_badge: "⚠️ 考试 / 测验",
+    
+    // Calendar card
+    calendar_title: "📅 即将到来的考试与日程 ({count})",
+    calendar_select_label: "学校日历：",
+    no_calendar_assigned: "-- 未关联日历 --",
+    calendar_hint: "💡 请在设置中选择一个学校日历（例如 Google 日历、本地 HA 日历、CalDAV）以显示考试日程。",
+    no_events: "🎉 日历中暂无即将到来的考试或日程！",
+    time_at: "{time}",
+    all_day: "(全天)",
+    countdown_past: "已过期",
+    countdown_today: "⚡ 今天",
+    countdown_tomorrow: "⚠️ 明天",
+    countdown_days: "{days} 天后",
+    add_event_btn: "➕ 添加考试 / 日程",
+    add_event_title: "📅 在日历中创建新考试 / 日程",
+    edit_event_title: "✏️ 编辑考试 / 日程",
+    event_summary_label: "考试 / 日程名称",
+    event_summary_placeholder: "例如：期中数学考试、生物随堂测验",
+    event_date_label: "日期",
+    event_time_label: "时间",
+    event_desc_label: "描述 / 教室（可选）",
+    event_desc_placeholder: "例如：101 教室，复习第 3 章",
+    submit_add_event: "💾 保存到日历",
+    submit_update_event: "💾 保存修改",
+    delete_event_btn: "🗑️ 删除日程",
+    delete_event_confirm: "确定要从日历中删除日程 \"{summary}\" 吗？",
+    
+    // Timetable card
+    timetable_title: "📅 每周课程表",
+    timetable_subtitle: "点击单元格即可进行编辑",
+    legend_now: "⚡ 正在上课",
+    legend_today: "今天",
+    time_hour_col: "时间 / 节次",
+    break_label: "课间休息",
+    today_badge: "今天",
+    now_badge: "⚡ 正在上课",
+    
+    // Add grade form
+    add_grade_title: "➕ 录入新成绩",
+    subject_label: "学科",
+    grade_label: "成绩",
+    weight_label: "权重",
+    weight_times: "{weight} 倍权重",
+    grade_name_label: "说明（例如：第一次月考）",
+    grade_name_placeholder: "例如：期中考试、小测验、随堂提问",
+    date_label: "日期",
+    submit_add_grade: "➕ 录入成绩",
+    toggle_add_grade_btn: "➕ 录入新成绩",
+    close_add_grade_btn: "✖ 隐藏表单",
+    
+    // Manage subjects form
+    manage_subjects_title: "📘 学科管理",
+    new_subject_label: "添加新学科",
+    new_subject_placeholder: "例如：物理、美术、音乐",
+    submit_add_subject: "➕ 创建学科",
+    delete_subject_label: "删除现有学科",
+    delete_btn: "🗑️ 删除",
+    delete_subject_confirm: "确定要删除学科 \"{subject}\" 及其所有成绩记录吗？",
+    
+    // Subjects overview
+    overview_title: "📘 学科与成绩概览",
+    avg_label: "均分",
+    no_grades_yet: "暂未录入成绩",
+    table_grade: "成绩",
+    table_weight: "权重",
+    table_date: "日期",
+    table_name: "说明",
+    table_action: "操作",
+    delete_grade_confirm: "确定要删除此条成绩记录吗？",
+    
+    // Settings
+    settings_btn: "设置",
+    settings_title: "⚙️ 设置 ({child})",
+    settings_tab_general: "⚙️ 常规",
+    settings_tab_subjects: "📘 学科管理",
+    settings_tab_timetable: "📅 课程表",
+    grade_level_label: "班级 / 年级",
+    grade_level_placeholder: "例如：初二 3 班、五年级 1 班",
+    homework_card: "家庭作业",
+    homework_done_badge: "✓ 已完成",
+    homework_open_badge: "未完成",
+    prep_card_status: "书包准备",
+    prep_done_badge: "✓ 已准备",
+    prep_open_badge: "未准备",
+    country_label: "国家 / 评分体系",
+    country_hint: "决定该实例的分数范围与成绩评定标准。",
+    section_visibility_title: "显示 / 隐藏面板区域",
+    section_prep: "准备下一个上学日的书包",
+    section_calendar: "即将到来的考试与日程",
+    section_timetable: "每周课程表",
+    section_overview: "学科与成绩概览",
+
+    // Modals
+    modal_cell_title: "✏️ 编辑课程表单元格",
+    no_subject_free: "-- 无课程（自习 / 没课） --",
+    custom_subject_opt: "➕ 输入其他自定义学科...",
+    custom_subject_placeholder: "输入自定义学科名称",
+    room_label: "教室（可选）",
+    room_placeholder: "例如：R102",
+    teacher_label: "教师（可选）",
+    teacher_placeholder: "例如：王老师",
+    cancel_btn: "取消",
+    save_btn: "💾 保存",
+    
+    yaml_textarea_label: "课程表 YAML 配置 ({child})",
+    copy_btn: "📋 复制",
+    copied_btn: "✅ 已复制！",
+    import_btn: "📥 导入 YAML",
+
+    days: {
+      monday: "星期一",
+      tuesday: "星期二",
+      wednesday: "星期三",
+      thursday: "星期四",
+      friday: "星期五",
+      saturday: "星期六",
+      sunday: "星期日"
     }
   }
 };
@@ -564,11 +1520,20 @@ class SchoolGradesPanel extends HTMLElement {
     }
   }
 
-  _t(key, params = {}) {
-    const lang = (this._hass && (this._hass.language || (this._hass.locale && this._hass.locale.language))) || 'de';
-    const dict = String(lang).toLowerCase().startsWith('en') ? I18N.en : I18N.de;
+  _getLang() {
+    const raw = (this._hass && (this._hass.language || (this._hass.locale && this._hass.locale.language))) || 'de';
+    const l = String(raw).toLowerCase().replace('_', '-');
+    for (const prefix of ['de', 'en', 'fr', 'it', 'es', 'nl', 'pl', 'ru', 'zh']) {
+      if (l.startsWith(prefix)) return prefix;
+    }
+    return 'de';
+  }
 
-    let text = dict[key] || I18N.de[key] || key;
+  _t(key, params = {}) {
+    const langKey = this._getLang();
+    const dict = I18N[langKey] || I18N.de;
+
+    let text = dict[key] || I18N.de[key] || (I18N.en && I18N.en[key]) || key;
     if (typeof text === 'string') {
       for (const [pKey, pVal] of Object.entries(params)) {
         text = text.replace(new RegExp(`\\{${pKey}\\}`, 'g'), pVal);
@@ -578,8 +1543,19 @@ class SchoolGradesPanel extends HTMLElement {
   }
 
   _getLocale() {
-    const lang = (this._hass && (this._hass.language || (this._hass.locale && this._hass.locale.language))) || 'de';
-    return String(lang).toLowerCase().startsWith('en') ? 'en-US' : 'de-DE';
+    const langKey = this._getLang();
+    const localeMap = {
+      de: 'de-DE',
+      en: 'en-US',
+      fr: 'fr-FR',
+      it: 'it-IT',
+      es: 'es-ES',
+      nl: 'nl-NL',
+      pl: 'pl-PL',
+      ru: 'ru-RU',
+      zh: 'zh-CN',
+    };
+    return localeMap[langKey] || 'de-DE';
   }
 
   _hasGradesDataChanged(oldHass, newHass) {

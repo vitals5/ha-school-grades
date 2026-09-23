@@ -61,6 +61,18 @@
     "remove_calendar_event": {
       "name": "Delete Calendar Event / Exam",
       "description": "Deletes an event or exam from the assigned calendar."
+    },
+    "set_homework_done": {
+      "name": "Set Homework Status",
+      "description": "Sets the daily homework status for a child (true = completed)."
+    },
+    "set_preparation_done": {
+      "name": "Set Preparation Status",
+      "description": "Sets the overall school bag preparation status for the next school day."
+    },
+    "toggle_prepared_subject": {
+      "name": "Toggle Subject Preparation",
+      "description": "Marks a specific school subject as prepared or not prepared for tomorrow."
     }
   }
 }

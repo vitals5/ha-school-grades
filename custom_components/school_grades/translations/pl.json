@@ -1,0 +1,78 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Dodaj dziecko",
+        "description": "Utwórz nową instancję do zarządzania ocenami szkolnymi dziecka.",
+        "data": {
+          "child_name": "Imię dziecka (np. Richard, Emma)",
+          "country": "Kraj / System oceniania"
+        }
+      }
+    },
+    "error": {
+      "already_configured": "Zarządzanie ocenami dla tego dziecka zostało już skonfigurowane."
+    },
+    "abort": {
+      "already_configured": "Zarządzanie ocenami dla tego dziecka już istnieje."
+    }
+  },
+  "services": {
+    "add_subject": {
+      "name": "Dodaj przedmiot",
+      "description": "Dodaje nowy przedmiot szkolny do zestawienia ocen."
+    },
+    "remove_subject": {
+      "name": "Usuń przedmiot",
+      "description": "Usuwa przedmiot szkolny wraz ze wszystkimi przypisanymi ocenami."
+    },
+    "add_grade": {
+      "name": "Dodaj ocenę",
+      "description": "Wprowadza nową ocenę szkolną z wybraną wagą."
+    },
+    "remove_grade": {
+      "name": "Usuń ocenę",
+      "description": "Usuwa istniejącą ocenę na podstawie jej identyfikatora."
+    },
+    "set_calendar": {
+      "name": "Przypisz kalendarz",
+      "description": "Łączy kalendarz Home Assistant z dzieckiem w celu śledzenia sprawdzianów."
+    },
+    "update_timetable_cell": {
+      "name": "Zaktualizuj komórkę planu lekcji",
+      "description": "Aktualizuje przedmiot, salę i nauczyciela dla określonej lekcji i dnia."
+    },
+    "import_timetable": {
+      "name": "Importuj plan lekcji przez YAML",
+      "description": "Importuje kompletny plan lekcji w formacie tekstu lub struktury YAML."
+    },
+    "update_settings": {
+      "name": "Zaktualizuj ustawienia ogólne",
+      "description": "Aktualizuje skalę ocen, widoczność sekcji lub przypisany kalendarz."
+    },
+    "add_calendar_event": {
+      "name": "Utwórz sprawdzian / termin w kalendarzu",
+      "description": "Tworzy nowe wydarzenie lub sprawdzian w przypisanym kalendarzu."
+    },
+    "update_calendar_event": {
+      "name": "Edytuj sprawdzian / termin w kalendarzu",
+      "description": "Aktualizuje istniejące wydarzenie lub sprawdzian w przypisanym kalendarzu."
+    },
+    "remove_calendar_event": {
+      "name": "Usuń sprawdzian / termin z kalendarza",
+      "description": "Usuwa wydarzenie lub sprawdzian z przypisanego kalendarza."
+    },
+    "set_homework_done": {
+      "name": "Ustaw status zadań domowych",
+      "description": "Ustawia dzienny status zadań domowych dla dziecka (true = zrobione)."
+    },
+    "set_preparation_done": {
+      "name": "Ustaw status przygotowania",
+      "description": "Ustawia ogólny status spakowania plecaka na kolejny dzień szkolny."
+    },
+    "toggle_prepared_subject": {
+      "name": "Przełącz przygotowanie przedmiotu",
+      "description": "Oznacza wybrany przedmiot jako przygotowany lub nieprzygotowany na jutro."
+    }
+  }
+}

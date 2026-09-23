@@ -1,0 +1,78 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Aggiungi bambino",
+        "description": "Crea una nuova istanza per gestire i voti scolastici di un bambino.",
+        "data": {
+          "child_name": "Nome del bambino (es. Richard, Emma)",
+          "country": "Paese / Sistema di valutazione"
+        }
+      }
+    },
+    "error": {
+      "already_configured": "La gestione dei voti per questo bambino è già configurata."
+    },
+    "abort": {
+      "already_configured": "La gestione dei voti per questo bambino esiste già."
+    }
+  },
+  "services": {
+    "add_subject": {
+      "name": "Aggiungi materia",
+      "description": "Aggiunge una nuova materia scolastica alla panoramica dei voti."
+    },
+    "remove_subject": {
+      "name": "Rimuovi materia",
+      "description": "Elimina una materia scolastica e tutti i relativi voti."
+    },
+    "add_grade": {
+      "name": "Aggiungi voto",
+      "description": "Registra un nuovo voto con il peso selezionato."
+    },
+    "remove_grade": {
+      "name": "Rimuovi voto",
+      "description": "Elimina un voto esistente tramite il suo ID."
+    },
+    "set_calendar": {
+      "name": "Assegna calendario",
+      "description": "Collega un calendario di Home Assistant a un bambino per le verifiche in programma."
+    },
+    "update_timetable_cell": {
+      "name": "Aggiorna cella orario",
+      "description": "Aggiorna materia, aula e insegnante per una determinata ora e giorno."
+    },
+    "import_timetable": {
+      "name": "Importa orario tramite YAML",
+      "description": "Importa un orario completo in formato testo o struttura YAML."
+    },
+    "update_settings": {
+      "name": "Aggiorna impostazioni generali",
+      "description": "Aggiorna la scala di valutazione, la visibilità delle sezioni o il calendario."
+    },
+    "add_calendar_event": {
+      "name": "Crea verifica / evento nel calendario",
+      "description": "Crea una nuova verifica o evento nel calendario assegnato."
+    },
+    "update_calendar_event": {
+      "name": "Modifica verifica / evento nel calendario",
+      "description": "Aggiorna una verifica o evento esistente nel calendario assegnato."
+    },
+    "remove_calendar_event": {
+      "name": "Elimina verifica / evento dal calendario",
+      "description": "Elimina una verifica o evento dal calendario assegnato."
+    },
+    "set_homework_done": {
+      "name": "Imposta stato compiti",
+      "description": "Imposta lo stato dei compiti per un bambino (true = completati)."
+    },
+    "set_preparation_done": {
+      "name": "Imposta stato preparazione",
+      "description": "Imposta lo stato complessivo di preparazione per il prossimo giorno di scuola."
+    },
+    "toggle_prepared_subject": {
+      "name": "Attiva/disattiva preparazione materia",
+      "description": "Segna una materia specifica come preparata o non preparata per domani."
+    }
+  }
+}

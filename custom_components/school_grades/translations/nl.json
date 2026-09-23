@@ -1,0 +1,78 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Kind toevoegen",
+        "description": "Maak een nieuwe instantie aan om schoolcijfers voor een kind te beheren.",
+        "data": {
+          "child_name": "Naam van het kind (bijv. Richard, Emma)",
+          "country": "Land / Cijfersysteem"
+        }
+      }
+    },
+    "error": {
+      "already_configured": "Cijferbeheer voor dit kind is al geconfigureerd."
+    },
+    "abort": {
+      "already_configured": "Cijferbeheer voor dit kind bestaat al."
+    }
+  },
+  "services": {
+    "add_subject": {
+      "name": "Vak toevoegen",
+      "description": "Voegt een nieuw schoolvak toe aan het cijferoverzicht."
+    },
+    "remove_subject": {
+      "name": "Vak verwijderen",
+      "description": "Verwijdert een schoolvak en alle bijbehorende cijfers."
+    },
+    "add_grade": {
+      "name": "Cijfer toevoegen",
+      "description": "Voegt een nieuw cijfer toe met de gekozen weging."
+    },
+    "remove_grade": {
+      "name": "Cijfer verwijderen",
+      "description": "Verwijdert een bestaand cijfer aan de hand van het ID."
+    },
+    "set_calendar": {
+      "name": "Agenda toewijzen",
+      "description": "Koppelt een Home Assistant agenda aan een kind voor aankomende toetsen."
+    },
+    "update_timetable_cell": {
+      "name": "Lesrooster-cel bijwerken",
+      "description": "Werkt vak, lokaal en docent bij voor een specifiek lesuur en dag."
+    },
+    "import_timetable": {
+      "name": "Lesrooster importeren via YAML",
+      "description": "Importeert een compleet lesrooster in tekst- of YAML-structuur."
+    },
+    "update_settings": {
+      "name": "Algemene instellingen bijwerken",
+      "description": "Werkt het cijfersysteem, de zichtbaarheid van secties of de agenda bij."
+    },
+    "add_calendar_event": {
+      "name": "Toets / afspraak in agenda maken",
+      "description": "Maakt een nieuwe toets of afspraak aan in de gekoppelde agenda."
+    },
+    "update_calendar_event": {
+      "name": "Toets / afspraak in agenda bewerken",
+      "description": "Werkt een bestaande toets of afspraak bij in de gekoppelde agenda."
+    },
+    "remove_calendar_event": {
+      "name": "Toets / afspraak uit agenda verwijderen",
+      "description": "Verwijdert een toets of afspraak uit de gekoppelde agenda."
+    },
+    "set_homework_done": {
+      "name": "Huiswerkstatus instellen",
+      "description": "Stelt de dagelijkse huiswerkstatus voor een kind in (true = af)."
+    },
+    "set_preparation_done": {
+      "name": "Voorbereidingsstatus instellen",
+      "description": "Stelt de algemene status van tasvoorbereiding voor de volgende schooldag in."
+    },
+    "toggle_prepared_subject": {
+      "name": "Vak-voorbereiding schakelen",
+      "description": "Markeert een specifiek vak als voorbereid of niet voorbereid voor morgen."
+    }
+  }
+}

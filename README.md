@@ -46,7 +46,8 @@ Mit dem **integrierten Sidebar-Panel** (`/schulnoten`) verwaltest du Noten, Fäc
   - **Fächer verwalten**: Bequemes Anlegen neuer Schulfächer sowie Löschen bestehender Fächer.
   - **Stundenplan**: Direkter YAML-Import/Export.
 - 🌐 **Mehrsprachigkeit (Multi-Language i18n)**:
-  - Vollständige Unterstützung für **Deutsch 🇩🇪** und **Englisch 🇬🇧**.
+  - Vollständige Lokalisierung für alle unterstützten Ländernormen: **Deutsch 🇩🇪**, **Englisch 🇬🇧/🇺🇸**, **Französisch 🇫🇷**, **Italienisch 🇮🇹**, **Spanisch 🇪🇸**, **Niederländisch 🇳🇱**, **Polnisch 🇵🇱**, **Russisch 🇷🇺** und **Chinesisch 🇨🇳**.
+  - Passt sich automatisch der eingestellten Home Assistant Sprache des Benutzers an (inkl. UI-Panel, Sensoren-Statusansagen und Dienste-Beschreibungen).
 
 ### 📦 Installation über HACS (Custom Repository)
 
@@ -294,7 +295,8 @@ With the **built-in Sidebar Panel** (`/schulnoten`), you can manage grades, subj
   - **Manage Subjects**: Easily add new subjects or delete existing ones.
   - **Timetable**: Direct YAML import/export.
 - 🌐 **Multi-Language Support (i18n)**:
-  - Native support for **German 🇩🇪** and **English 🇬🇧**.
+  - Complete native localization for all supported country standards: **German 🇩🇪**, **English 🇬🇧/🇺🇸**, **French 🇫🇷**, **Italian 🇮🇹**, **Spanish 🇪🇸**, **Dutch 🇳🇱**, **Polish 🇵🇱**, **Russian 🇷🇺**, and **Chinese 🇨🇳**.
+  - Automatically adapts to the active Home Assistant user language (including UI panel, sensor TTS announcements, and service descriptions).
 
 ### 📦 Installation via HACS (Custom Repository)
 
