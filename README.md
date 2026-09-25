@@ -4,6 +4,12 @@
   <img src="custom_components/school_grades/brand/logo.png" alt="Schulnoten Logo" width="450">
 </p>
 
+<p align="center">
+  <a href="https://my.home-assistant.io/redirect/hacs_repository/?owner=vitals5&repository=ha-school-grades&category=integration">
+    <img src="https://my.home-assistant.io/badges/hacs_repository.svg" alt="Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.">
+  </a>
+</p>
+
 [ 🇩🇪 **Deutsch** ](#-deutsch) | [ 🇬🇧 **English** ](#-english)
 
 ---
@@ -49,20 +55,33 @@ Mit dem **integrierten Sidebar-Panel** (`/schulnoten`) verwaltest du Noten, Fäc
   - Vollständige Lokalisierung für alle unterstützten Ländernormen: **Deutsch 🇩🇪**, **Englisch 🇬🇧/🇺🇸**, **Französisch 🇫🇷**, **Italienisch 🇮🇹**, **Spanisch 🇪🇸**, **Niederländisch 🇳🇱**, **Polnisch 🇵🇱**, **Russisch 🇷🇺** und **Chinesisch 🇨🇳**.
   - Passt sich automatisch der eingestellten Home Assistant Sprache des Benutzers an (inkl. UI-Panel, Sensoren-Statusansagen und Dienste-Beschreibungen).
 
-### 📦 Installation über HACS (Custom Repository)
+### 📦 Installation über HACS
+
+#### 🚀 Option 1: 1-Klick Installation via My Home Assistant (Empfohlen)
+
+Klicke einfach auf den folgenden Button, um das Repository direkt in deiner Home Assistant Instanz in HACS zu öffnen und hinzuzufügen:
+
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=vitals5&repository=ha-school-grades&category=integration)
+
+#### 🛠️ Option 2: Manuelle Installation in HACS
 
 1. Öffne **HACS** in deinem Home Assistant.
-2. Klicke oben rechts auf die **drei Punkte** `⋮` und wähle **Benutzerdefinierte Repositories** (*Custom repositories*).
-3. Gib die URL ein: `https://github.com/vitals5/ha-school-grades`.
-4. Wähle als Kategorie **Integration**.
-5. Klicke auf **Hinzufügen**.
-6. Suche nach **Schulnoten** in HACS, klicke auf **Herunterladen** und starte Home Assistant neu.
+2. Gehe auf **Integrationen** und klicke oben rechts auf das Dreipunkt-Menü `⋮` ➔ **Benutzerdefinierte Repositories** (*Custom repositories*).
+3. Gib die Repository-URL ein: `https://github.com/vitals5/ha-school-grades`
+4. Wähle als Typ / Kategorie: **Integration**.
+5. Klicke auf **Hinzufügen** (*Add*).
+6. Suche nach **Schulnoten**, klicke auf **Herunterladen** (*Download*) und starte Home Assistant anschließend neu.
 
 ### ⚙️ Einrichtung
 
+Nach dem Neustart kannst du die Integration direkt über den folgenden Button hinzufügen:
+
+[![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=school_grades)
+
+Oder manuell:
 1. Gehe zu **Einstellungen** ➔ **Geräte & Dienste** ➔ **Integration hinzufügen**.
 2. Suche nach **Schulnoten**.
-3. Gib den **Namen des Kindes** ein (z. B. `Richard`).
+3. Gib den **Namen des Kindes** ein (z. B. `Richard`) und wähle das Land / Schulsystem aus.
 4. Nach dem Speichern erscheint in der linken Navigationsleiste automatisch das Icon **🎓 Schulnoten**.
 
 ### ⚡ Home Assistant Aktionen / Services
@@ -298,21 +317,34 @@ With the **built-in Sidebar Panel** (`/schulnoten`), you can manage grades, subj
   - Complete native localization for all supported country standards: **German 🇩🇪**, **English 🇬🇧/🇺🇸**, **French 🇫🇷**, **Italian 🇮🇹**, **Spanish 🇪🇸**, **Dutch 🇳🇱**, **Polish 🇵🇱**, **Russian 🇷🇺**, and **Chinese 🇨🇳**.
   - Automatically adapts to the active Home Assistant user language (including UI panel, sensor TTS announcements, and service descriptions).
 
-### 📦 Installation via HACS (Custom Repository)
+### 📦 Installation via HACS
 
-1. Open **HACS** in Home Assistant.
-2. Click the **three dots** `⋮` in the top right corner and select **Custom repositories**.
-3. Enter repository URL: `https://github.com/vitals5/ha-school-grades`.
-4. Select category **Integration**.
+#### 🚀 Option 1: 1-Click Install via My Home Assistant (Recommended)
+
+Click the button below to directly open and add this repository inside HACS on your Home Assistant instance:
+
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=vitals5&repository=ha-school-grades&category=integration)
+
+#### 🛠️ Option 2: Manual Installation via HACS
+
+1. Open **HACS** in your Home Assistant instance.
+2. Navigate to **Integrations** and click the three dots `⋮` in the top right corner ➔ **Custom repositories**.
+3. Enter the repository URL: `https://github.com/vitals5/ha-school-grades`
+4. Select category: **Integration**.
 5. Click **Add**.
-6. Search for **Schulnoten** in HACS, click **Download**, and restart Home Assistant.
+6. Search for **Schulnoten**, click **Download**, and restart Home Assistant.
 
 ### ⚙️ Setup
 
+After restarting, you can add the integration with one click:
+
+[![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=school_grades)
+
+Or manually:
 1. Navigate to **Settings** ➔ **Devices & Services** ➔ **Add Integration**.
 2. Search for **Schulnoten**.
-3. Enter the **child's name** (e.g., `Richard`).
-4. After saving, the icon **🎓 Schulnoten** will automatically appear in your left sidebar.
+3. Enter the **child's name** (e.g. `Richard`) and select your country / grading system.
+4. After saving, the **🎓 Schulnoten** panel icon will automatically appear in your left sidebar.
 
 ### ⚡ Home Assistant Actions / Services
 
