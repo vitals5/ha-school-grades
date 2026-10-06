@@ -2992,8 +2992,8 @@ Natur und Technik:
       <!-- 3-Tab Settings Modal -->
       ${this._showSettingsModal ? `
         <div class="modal-backdrop" id="settings-modal-backdrop">
-          <div class="modal-card" style="max-width: 560px; width: 100%;">
-            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <div class="modal-card settings-modal-card" style="max-width: 580px; width: 100%;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-shrink: 0;">
               <div>
                 <h3 style="margin: 0; font-size: 18px;">⚙️ ${this._t('settings_title', { child: this._selectedChild })}</h3>
               </div>
@@ -3001,7 +3001,7 @@ Natur und Technik:
             </div>
 
             <!-- Settings Tabs Header -->
-            <div class="settings-tabs-header" style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--divider-color, rgba(255,255,255,0.1)); padding-bottom: 10px;">
+            <div class="settings-tabs-header" style="display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 1px solid var(--divider-color, rgba(255,255,255,0.1)); padding-bottom: 10px; flex-wrap: wrap; flex-shrink: 0;">
               <button type="button" class="modal-tab-btn ${this._settingsTab === 'general' ? 'active' : ''}" id="settings-tab-btn-general" style="padding: 8px 14px; border-radius: 8px; border: 1px solid ${this._settingsTab === 'general' ? 'var(--primary-color, #3b82f6)' : 'rgba(255,255,255,0.1)'}; background: ${this._settingsTab === 'general' ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.05)'}; color: #fff; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.2s;">
                 ${this._t('settings_tab_general')}
               </button>
@@ -3016,6 +3016,7 @@ Natur und Technik:
               </button>
             </div>
 
+            <div class="settings-modal-body">
             ${this._settingsTab === 'general' ? `
               <!-- General Settings Tab -->
               <form id="settings-form">
@@ -3267,7 +3268,7 @@ Natur und Technik:
                     <div style="font-size: 11px; color: rgba(255,255,255,0.6); margin-bottom: 8px; line-height: 1.3;">
                       ${this._t('portal_aliases_help')}
                     </div>
-                    <textarea id="settings-portal-aliases-textarea" rows="8" style="font-family: monospace; font-size: 12px; line-height: 1.4; resize: vertical; tab-size: 2; width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 10px;">${this._aliasesToYaml(currentChild.subjectAliases)}</textarea>
+                    <textarea id="settings-portal-aliases-textarea" rows="6" style="font-family: monospace; font-size: 12px; line-height: 1.4; resize: vertical; tab-size: 2; width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 10px;">${this._aliasesToYaml((currentChild && currentChild.subjectAliases) || {})}</textarea>
                     <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
                       <button type="button" id="settings-portal-aliases-save-btn" class="submit-btn secondary" style="width: auto; padding: 6px 14px; font-size: 12px;">
                         ${this._t('portal_aliases_save_btn')}
@@ -3300,6 +3301,7 @@ Natur und Technik:
                 </form>
               </div>
             `}
+            </div>
           </div>
         </div>
       ` : ''}
@@ -5079,6 +5081,9 @@ Natur und Technik:
         align-items: center;
         justify-content: center;
         z-index: 9999;
+        padding: 20px 12px;
+        box-sizing: border-box;
+        overflow-y: auto;
       }
 
       .modal-card {
@@ -5089,6 +5094,44 @@ Natur und Technik:
         width: 90%;
         max-width: 460px;
         box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+        max-height: calc(100vh - 40px);
+        max-height: calc(100dvh - 40px);
+        display: flex;
+        flex-direction: column;
+        box-sizing: border-box;
+        margin: auto;
+        overflow-y: auto;
+      }
+
+      .settings-modal-card {
+        max-height: calc(100vh - 40px);
+        max-height: calc(100dvh - 40px);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .settings-modal-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        padding-right: 6px;
+        overscroll-behavior: contain;
+      }
+
+      .settings-modal-body::-webkit-scrollbar {
+        width: 6px;
+      }
+      .settings-modal-body::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.15);
+        border-radius: 4px;
+      }
+      .settings-modal-body::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.25);
+        border-radius: 4px;
+      }
+      .settings-modal-body::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.4);
       }
 
       .modal-header {
