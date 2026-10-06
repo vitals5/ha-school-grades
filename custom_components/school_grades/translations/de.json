@@ -73,6 +73,26 @@
     "toggle_prepared_subject": {
       "name": "Fach-Vorbereitung umschalten",
       "description": "Markiert ein bestimmtes Schulfach als für morgen vorbereitet oder nicht."
+    },
+    "test_elternportal": {
+      "name": "Eltern-Portal Verbindung testen",
+      "description": "Testet die Zugangsdaten für das Eltern-Portal und lädt die gefundenen Kinder."
+    },
+    "update_portal_settings": {
+      "name": "Eltern-Portal Einstellungen speichern",
+      "description": "Speichert die Zugangsdaten und die Kind-Verknüpfung für das Eltern-Portal."
+    },
+    "sync_elternportal": {
+      "name": "Eltern-Portal jetzt synchronisieren",
+      "description": "Ruft aktuelle Daten (Vertretungsplan, Stundenplan) aus dem Eltern-Portal ab."
+    },
+    "import_portal_timetable": {
+      "name": "Stundenplan aus Eltern-Portal importieren",
+      "description": "Importiert den aktuellen Stundenplan aus dem Eltern-Portal."
+    },
+    "update_subject_aliases": {
+      "name": "Fach-Aliase aktualisieren",
+      "description": "Aktualisiert die Zuordnung von Fach-Kürzeln zu Langnamen."
     }
   }
 }

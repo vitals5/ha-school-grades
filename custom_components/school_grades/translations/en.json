@@ -73,6 +73,26 @@
     "toggle_prepared_subject": {
       "name": "Toggle Subject Preparation",
       "description": "Marks a specific school subject as prepared or not prepared for tomorrow."
+    },
+    "test_elternportal": {
+      "name": "Test Eltern-Portal Connection",
+      "description": "Tests credentials for Eltern-Portal and retrieves connected children."
+    },
+    "update_portal_settings": {
+      "name": "Save Eltern-Portal Settings",
+      "description": "Saves Eltern-Portal credentials and linked child selection."
+    },
+    "sync_elternportal": {
+      "name": "Sync Eltern-Portal Now",
+      "description": "Fetches current data (substitutions, timetable) from Eltern-Portal."
+    },
+    "import_portal_timetable": {
+      "name": "Import Timetable from Eltern-Portal",
+      "description": "Imports the timetable from Eltern-Portal and resolves subject aliases."
+    },
+    "update_subject_aliases": {
+      "name": "Update Subject Aliases",
+      "description": "Updates mapping of subject abbreviations to full names."
     }
   }
 }

@@ -7,13 +7,14 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.components import frontend, panel_custom
+from homeassistant.components import frontend, panel_custom, websocket_api
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, ServiceCall, callback
+from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse, callback
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
-
 from .const import (
+    CONF_ALIASES_YAML,
     CONF_CALENDAR,
     CONF_CHILD_NAME,
     CONF_COUNTRY,
@@ -25,6 +26,15 @@ from .const import (
     CONF_GRADE_LEVEL,
     CONF_HOMEWORK_DONE,
     CONF_NAME,
+    CONF_PORTAL_ENABLED,
+    CONF_PORTAL_PASSWORD,
+    CONF_PORTAL_SCHOOL,
+    CONF_PORTAL_STUDENT_ID,
+    CONF_PORTAL_STUDENT_NAME,
+    CONF_PORTAL_SYNC_EXAMS,
+    CONF_PORTAL_SYNC_SUBSTITUTIONS,
+    CONF_PORTAL_SYNC_TIMETABLE,
+    CONF_PORTAL_USERNAME,
     CONF_PREPARATION_DONE,
     CONF_ROOM,
     CONF_SHOW_CALENDAR,
@@ -34,6 +44,7 @@ from .const import (
     CONF_SLOT_ID,
     CONF_START_TIME,
     CONF_SUBJECT,
+    CONF_SUBJECT_ALIASES,
     CONF_SUMMARY,
     CONF_TEACHER,
     CONF_WEIGHT,
@@ -43,6 +54,7 @@ from .const import (
     SERVICE_ADD_CALENDAR_EVENT,
     SERVICE_ADD_GRADE,
     SERVICE_ADD_SUBJECT,
+    SERVICE_IMPORT_PORTAL_TIMETABLE,
     SERVICE_IMPORT_TIMETABLE,
     SERVICE_REMOVE_CALENDAR_EVENT,
     SERVICE_REMOVE_GRADE,
@@ -50,11 +62,21 @@ from .const import (
     SERVICE_SET_CALENDAR,
     SERVICE_SET_HOMEWORK_DONE,
     SERVICE_SET_PREPARATION_DONE,
+    SERVICE_SYNC_ELTERNPORTAL,
+    SERVICE_TEST_ELTERNPORTAL,
     SERVICE_TOGGLE_PREPARED_SUBJECT,
     SERVICE_UPDATE_CALENDAR_EVENT,
+    SERVICE_UPDATE_PORTAL_SETTINGS,
     SERVICE_UPDATE_SETTINGS,
+    SERVICE_UPDATE_SUBJECT_ALIASES,
     SERVICE_UPDATE_TIMETABLE_CELL,
     SIGNAL_UPDATE_GRADES,
+)
+from .portal import (
+    async_fetch_child_portal_data,
+    async_validate_and_get_students,
+    convert_portal_lessons_to_timetable,
+    parse_subject_aliases_yaml,
 )
 from .storage import SchoolGradesStorage
 
@@ -198,6 +220,49 @@ SCHEMA_REMOVE_CALENDAR_EVENT = vol.Schema(
     }
 )
 
+SCHEMA_TEST_ELTERNPORTAL = vol.Schema(
+    {
+        vol.Optional(CONF_CHILD_NAME): cv.string,
+        vol.Required(CONF_PORTAL_SCHOOL): cv.string,
+        vol.Optional(CONF_PORTAL_USERNAME, default=""): cv.string,
+        vol.Optional(CONF_PORTAL_PASSWORD, default=""): cv.string,
+    }
+)
+
+SCHEMA_UPDATE_PORTAL_SETTINGS = vol.Schema(
+    {
+        vol.Required(CONF_CHILD_NAME): cv.string,
+        vol.Required(CONF_PORTAL_ENABLED): cv.boolean,
+        vol.Optional(CONF_PORTAL_SCHOOL, default=""): cv.string,
+        vol.Optional(CONF_PORTAL_USERNAME, default=""): cv.string,
+        vol.Optional(CONF_PORTAL_PASSWORD, default=""): cv.string,
+        vol.Optional(CONF_PORTAL_STUDENT_ID, default=""): cv.string,
+        vol.Optional(CONF_PORTAL_STUDENT_NAME, default=""): cv.string,
+        vol.Optional(CONF_PORTAL_SYNC_TIMETABLE, default=True): cv.boolean,
+        vol.Optional(CONF_PORTAL_SYNC_SUBSTITUTIONS, default=True): cv.boolean,
+        vol.Optional(CONF_PORTAL_SYNC_EXAMS, default=True): cv.boolean,
+    }
+)
+
+SCHEMA_SYNC_ELTERNPORTAL = vol.Schema(
+    {
+        vol.Optional(CONF_CHILD_NAME): cv.string,
+    }
+)
+
+SCHEMA_IMPORT_PORTAL_TIMETABLE = vol.Schema(
+    {
+        vol.Required(CONF_CHILD_NAME): cv.string,
+    }
+)
+
+SCHEMA_UPDATE_SUBJECT_ALIASES = vol.Schema(
+    {
+        vol.Required(CONF_CHILD_NAME): cv.string,
+        vol.Optional(CONF_ALIASES_YAML): cv.string,
+        vol.Optional(CONF_SUBJECT_ALIASES): vol.Schema({cv.string: vol.All(cv.ensure_list, [cv.string])}),
+    }
+)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -234,7 +299,7 @@ async def _async_setup_frontend(hass: HomeAssistant) -> None:
     else:
         hass.http.register_static_path(URL_BASE, FRONTEND_DIR, cache_headers=False)
 
-    version_str = "1.1.14"
+    version_str = "1.2.0"
     try:
         js_file = os.path.join(FRONTEND_DIR, "school-grades-panel.js")
         if os.path.exists(js_file):
@@ -496,6 +561,292 @@ def _register_services(hass: HomeAssistant) -> None:
             async_dispatcher_send(
                 hass, SIGNAL_UPDATE_GRADES.format(entry_id=storage.entry_id)
             )
+
+    async def handle_test_elternportal(call: ServiceCall) -> dict[str, Any]:
+        """Test connection to Eltern-Portal and retrieve student list."""
+        child_name = call.data.get(CONF_CHILD_NAME)
+        school = call.data[CONF_PORTAL_SCHOOL]
+        username = call.data.get(CONF_PORTAL_USERNAME, "")
+        password = call.data.get(CONF_PORTAL_PASSWORD, "")
+
+        if (not password or not username) and child_name:
+            storage = _get_storage(hass, child_name)
+            if storage:
+                if not username and storage.data.portal_username:
+                    username = storage.data.portal_username
+                if not password and storage.data.portal_password:
+                    password = storage.data.portal_password
+                if not school and storage.data.portal_school:
+                    school = storage.data.portal_school
+
+        session = async_get_clientsession(hass)
+        result = await async_validate_and_get_students(session, school, username, password)
+        return result
+
+    async def handle_update_portal_settings(call: ServiceCall) -> None:
+        """Update Eltern-Portal settings for a specific child."""
+        child_name = call.data[CONF_CHILD_NAME]
+        enabled = call.data[CONF_PORTAL_ENABLED]
+        school = call.data.get(CONF_PORTAL_SCHOOL, "")
+        username = call.data.get(CONF_PORTAL_USERNAME, "")
+        password = call.data.get(CONF_PORTAL_PASSWORD, "")
+        student_id = call.data.get(CONF_PORTAL_STUDENT_ID, "")
+        student_name = call.data.get(CONF_PORTAL_STUDENT_NAME, "")
+        sync_timetable = call.data.get(CONF_PORTAL_SYNC_TIMETABLE, True)
+        sync_substitutions = call.data.get(CONF_PORTAL_SYNC_SUBSTITUTIONS, True)
+        sync_exams = call.data.get(CONF_PORTAL_SYNC_EXAMS, True)
+
+        storage = _get_storage(hass, child_name)
+        if storage:
+            pwd = password if password else None
+            storage.data.set_portal_settings(
+                enabled=enabled,
+                school=school,
+                username=username,
+                password=pwd,
+                student_id=student_id,
+                student_name=student_name,
+                sync_timetable=sync_timetable,
+                sync_substitutions=sync_substitutions,
+                sync_exams=sync_exams,
+            )
+            await storage.async_save()
+            async_dispatcher_send(
+                hass, SIGNAL_UPDATE_GRADES.format(entry_id=storage.entry_id)
+            )
+            _LOGGER.info(
+                "Updated Eltern-Portal settings for %s (enabled: %s, school: %s, student_id: %s)",
+                child_name, enabled, school, student_id,
+            )
+
+    @websocket_api.websocket_command(
+        {
+            vol.Required("type"): "school_grades/test_elternportal",
+            vol.Required("school"): str,
+            vol.Optional("username", default=""): str,
+            vol.Optional("password", default=""): str,
+            vol.Optional("child_name"): str,
+        }
+    )
+    @websocket_api.async_response
+    async def ws_test_elternportal(
+        hass_inner: HomeAssistant,
+        connection: websocket_api.ActiveConnection,
+        msg: dict[str, Any],
+    ) -> None:
+        """Handle websocket test connection to Eltern-Portal."""
+        child_name = msg.get("child_name")
+        school = msg["school"]
+        username = msg.get("username", "")
+        password = msg.get("password", "")
+
+        if (not password or not username) and child_name:
+            storage = _get_storage(hass, child_name)
+            if storage:
+                if not username and storage.data.portal_username:
+                    username = storage.data.portal_username
+                if not password and storage.data.portal_password:
+                    password = storage.data.portal_password
+                if not school and storage.data.portal_school:
+                    school = storage.data.portal_school
+
+        session = async_get_clientsession(hass)
+        result = await async_validate_and_get_students(session, school, username, password)
+        connection.send_result(msg["id"], result)
+
+    async def _async_sync_child_portal(storage: SchoolGradesStorage, force_timetable: bool = False) -> dict[str, Any]:
+        """Fetch and update data from Eltern-Portal for a child."""
+        data = storage.data
+        if not data.portal_enabled:
+            return {
+                "success": False,
+                "child_name": data.child_name,
+                "error": "not_enabled",
+                "message": "Eltern-Portal ist für dieses Kind nicht aktiviert.",
+            }
+        if not data.portal_school or not data.portal_username or not data.portal_student_id:
+            return {
+                "success": False,
+                "child_name": data.child_name,
+                "error": "missing_credentials",
+                "message": "Zugangsdaten oder Schüler-ID unvollständig.",
+            }
+
+        session = async_get_clientsession(hass)
+        sync_tt = force_timetable or data.portal_sync_timetable
+        sync_subst = data.portal_sync_substitutions
+        res = await async_fetch_child_portal_data(
+            session=session,
+            school=data.portal_school,
+            username=data.portal_username,
+            password=data.portal_password,
+            student_id=data.portal_student_id,
+            fetch_timetable=sync_tt,
+            fetch_substitutions=sync_subst,
+        )
+        from datetime import datetime
+        data.portal_last_sync = datetime.now().isoformat()
+
+        if not res.get("success"):
+            err_msg = res.get("message", "Unbekannter Fehler")
+            data.portal_last_status = f"Fehler: {err_msg}"
+            await storage.async_save()
+            async_dispatcher_send(hass, SIGNAL_UPDATE_GRADES.format(entry_id=storage.entry_id))
+            return res
+
+        data.portal_last_status = "ok"
+
+        # Update substitutions if fetched
+        if sync_subst and "substitutions" in res:
+            data.set_portal_substitutions(res["substitutions"])
+
+        # Update timetable if requested
+        if sync_tt and "timetable" in res and res["timetable"]:
+            tt_converted = convert_portal_lessons_to_timetable(
+                lessons=res["timetable"],
+                aliases=data.subject_aliases,
+                existing_subjects=data.subjects,
+                existing_slots=data.timetable.get("slots"),
+            )
+            data.import_timetable_data(tt_converted)
+
+        await storage.async_save()
+        async_dispatcher_send(hass, SIGNAL_UPDATE_GRADES.format(entry_id=storage.entry_id))
+        _LOGGER.info("Successfully synchronized Eltern-Portal for %s", data.child_name)
+        return {"success": True, "child_name": data.child_name, "last_sync": data.portal_last_sync}
+
+    async def handle_sync_elternportal(call: ServiceCall) -> dict[str, Any]:
+        """Synchronize data from Eltern-Portal."""
+        child_name = call.data.get(CONF_CHILD_NAME)
+        results = []
+        if child_name:
+            storage = _get_storage(hass, child_name)
+            if storage:
+                res = await _async_sync_child_portal(storage)
+                results.append(res)
+        else:
+            domain_data = hass.data.get(DOMAIN, {})
+            for storage in domain_data.values():
+                if isinstance(storage, SchoolGradesStorage) and storage.data.portal_enabled:
+                    res = await _async_sync_child_portal(storage)
+                    results.append(res)
+        return {"results": results}
+
+    async def handle_import_portal_timetable(call: ServiceCall) -> dict[str, Any]:
+        """Import timetable directly from Eltern-Portal, resolving subject aliases."""
+        child_name = call.data[CONF_CHILD_NAME]
+        storage = _get_storage(hass, child_name)
+        if not storage:
+            return {"success": False, "error": "child_not_found", "message": f"Kind '{child_name}' nicht gefunden."}
+        return await _async_sync_child_portal(storage, force_timetable=True)
+
+    async def handle_update_subject_aliases(call: ServiceCall) -> None:
+        """Update subject aliases dictionary or YAML for a child."""
+        child_name = call.data[CONF_CHILD_NAME]
+        storage = _get_storage(hass, child_name)
+        if not storage:
+            return
+        yaml_text = call.data.get(CONF_ALIASES_YAML)
+        aliases_dict = call.data.get(CONF_SUBJECT_ALIASES)
+        if yaml_text is not None:
+            parsed = parse_subject_aliases_yaml(yaml_text)
+            storage.data.set_subject_aliases(parsed)
+        elif aliases_dict is not None:
+            storage.data.set_subject_aliases(aliases_dict)
+
+        storage.data.set_portal_substitutions(storage.data.portal_substitutions)
+        await storage.async_save()
+        async_dispatcher_send(hass, SIGNAL_UPDATE_GRADES.format(entry_id=storage.entry_id))
+        _LOGGER.info("Updated subject aliases for %s", child_name)
+
+    @websocket_api.websocket_command(
+        {
+            vol.Required("type"): "school_grades/sync_elternportal",
+            vol.Optional("child_name"): str,
+        }
+    )
+    @websocket_api.async_response
+    async def ws_sync_elternportal(
+        hass_inner: HomeAssistant,
+        connection: websocket_api.ActiveConnection,
+        msg: dict[str, Any],
+    ) -> None:
+        """Handle websocket request to sync Eltern-Portal."""
+        child_name = msg.get("child_name")
+        if child_name:
+            storage = _get_storage(hass, child_name)
+            if not storage:
+                connection.send_result(msg["id"], {"success": False, "error": "child_not_found"})
+                return
+            res = await _async_sync_child_portal(storage)
+            connection.send_result(msg["id"], res)
+        else:
+            results = []
+            for storage in hass.data.get(DOMAIN, {}).values():
+                if isinstance(storage, SchoolGradesStorage) and storage.data.portal_enabled:
+                    res = await _async_sync_child_portal(storage)
+                    results.append(res)
+            connection.send_result(msg["id"], {"success": True, "results": results})
+
+    @websocket_api.websocket_command(
+        {
+            vol.Required("type"): "school_grades/import_portal_timetable",
+            vol.Required("child_name"): str,
+        }
+    )
+    @websocket_api.async_response
+    async def ws_import_portal_timetable(
+        hass_inner: HomeAssistant,
+        connection: websocket_api.ActiveConnection,
+        msg: dict[str, Any],
+    ) -> None:
+        """Handle websocket request to import timetable from Eltern-Portal."""
+        child_name = msg["child_name"]
+        storage = _get_storage(hass, child_name)
+        if not storage:
+            connection.send_result(msg["id"], {"success": False, "error": "child_not_found"})
+            return
+        res = await _async_sync_child_portal(storage, force_timetable=True)
+        connection.send_result(msg["id"], res)
+
+    @websocket_api.websocket_command(
+        {
+            vol.Required("type"): "school_grades/update_subject_aliases",
+            vol.Required("child_name"): str,
+            vol.Optional("aliases_yaml"): str,
+            vol.Optional("subject_aliases"): dict,
+        }
+    )
+    @websocket_api.async_response
+    async def ws_update_subject_aliases(
+        hass_inner: HomeAssistant,
+        connection: websocket_api.ActiveConnection,
+        msg: dict[str, Any],
+    ) -> None:
+        """Handle websocket request to update subject aliases."""
+        child_name = msg["child_name"]
+        storage = _get_storage(hass, child_name)
+        if not storage:
+            connection.send_result(msg["id"], {"success": False, "error": "child_not_found"})
+            return
+        yaml_text = msg.get("aliases_yaml")
+        aliases_dict = msg.get("subject_aliases")
+        if yaml_text is not None:
+            parsed = parse_subject_aliases_yaml(yaml_text)
+            storage.data.set_subject_aliases(parsed)
+        elif aliases_dict is not None:
+            storage.data.set_subject_aliases(aliases_dict)
+        storage.data.set_portal_substitutions(storage.data.portal_substitutions)
+        await storage.async_save()
+        async_dispatcher_send(hass, SIGNAL_UPDATE_GRADES.format(entry_id=storage.entry_id))
+        connection.send_result(
+            msg["id"],
+            {
+                "success": True,
+                "aliases": storage.data.subject_aliases,
+                "yaml": storage.data.get_subject_aliases_yaml(),
+            },
+        )
 
     def _parse_event_datetime(d_str: str, t_str: str) -> tuple[str, str]:
         from datetime import datetime, timedelta
@@ -825,6 +1176,43 @@ def _register_services(hass: HomeAssistant) -> None:
     hass.services.async_register(
         DOMAIN, SERVICE_TOGGLE_PREPARED_SUBJECT, handle_toggle_prepared_subject, schema=SCHEMA_TOGGLE_PREPARED_SUBJECT
     )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_TEST_ELTERNPORTAL,
+        handle_test_elternportal,
+        schema=SCHEMA_TEST_ELTERNPORTAL,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_UPDATE_PORTAL_SETTINGS,
+        handle_update_portal_settings,
+        schema=SCHEMA_UPDATE_PORTAL_SETTINGS,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SYNC_ELTERNPORTAL,
+        handle_sync_elternportal,
+        schema=SCHEMA_SYNC_ELTERNPORTAL,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_IMPORT_PORTAL_TIMETABLE,
+        handle_import_portal_timetable,
+        schema=SCHEMA_IMPORT_PORTAL_TIMETABLE,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_UPDATE_SUBJECT_ALIASES,
+        handle_update_subject_aliases,
+        schema=SCHEMA_UPDATE_SUBJECT_ALIASES,
+    )
+    websocket_api.async_register_command(hass, ws_test_elternportal)
+    websocket_api.async_register_command(hass, ws_sync_elternportal)
+    websocket_api.async_register_command(hass, ws_import_portal_timetable)
+    websocket_api.async_register_command(hass, ws_update_subject_aliases)
 
 
 def _unregister_services(hass: HomeAssistant) -> None:
@@ -843,4 +1231,10 @@ def _unregister_services(hass: HomeAssistant) -> None:
     hass.services.async_remove(DOMAIN, SERVICE_SET_HOMEWORK_DONE)
     hass.services.async_remove(DOMAIN, SERVICE_SET_PREPARATION_DONE)
     hass.services.async_remove(DOMAIN, SERVICE_TOGGLE_PREPARED_SUBJECT)
+    hass.services.async_remove(DOMAIN, SERVICE_TEST_ELTERNPORTAL)
+    hass.services.async_remove(DOMAIN, SERVICE_UPDATE_PORTAL_SETTINGS)
+    hass.services.async_remove(DOMAIN, SERVICE_SYNC_ELTERNPORTAL)
+    hass.services.async_remove(DOMAIN, SERVICE_IMPORT_PORTAL_TIMETABLE)
+    hass.services.async_remove(DOMAIN, SERVICE_UPDATE_SUBJECT_ALIASES)
+
 

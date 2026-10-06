@@ -357,6 +357,38 @@ const I18N = {
     settings_tab_general: "⚙️ Allgemein",
     settings_tab_subjects: "📘 Fächer verwalten",
     settings_tab_timetable: "📅 Stundenplan",
+    settings_tab_portal: "🏫 Eltern-Portal",
+    portal_title: "Eltern-Portal (eltern-portal.org)",
+    portal_desc: "Verknüpfe dieses Profil mit dem Eltern-Portal, um Stundenplan, Vertretungsplan, Termine und Klausuren automatisch abzugleichen.",
+    portal_enable: "Eltern-Portal Synchronisierung aktivieren",
+    portal_school: "Schule / Schulkürzel",
+    portal_school_placeholder: "z. B. bspgym oder https://bspgym.eltern-portal.org (oder demo)",
+    portal_school_help: "Kürzel der Schule (Subdomain auf eltern-portal.org), vollständige URL oder 'demo' zum Testen.",
+    portal_username: "Benutzername / E-Mail",
+    portal_password: "Passwort",
+    portal_password_stored: "•••••••• (bereits hinterlegt)",
+    portal_test_btn: "🔍 Verbindung testen & Kinder laden",
+    portal_testing: "Verbindung wird geprüft...",
+    portal_copy_from: "Zugangsdaten von Geschwisterkind übernehmen:",
+    portal_child_select: "Verknüpftes Kind im Eltern-Portal auswählen:",
+    portal_sync_options: "Synchronisierungs-Optionen:",
+    portal_sync_tt: "Stundenplan abgleichen",
+    portal_sync_subst: "Vertretungsplan abgleichen (Ausfälle & Raumänderungen)",
+    portal_sync_exams: "Klausuren & Termine abgleichen",
+    portal_sync_now_btn: "🔄 Jetzt synchronisieren",
+    portal_import_tt_btn: "📅 Stundenplan importieren",
+    portal_import_tt_confirm: "Möchtest du den aktuellen Stundenplan aus dem Eltern-Portal importieren und deinen lokalen Plan überschreiben?",
+    portal_aliases_title: "🔤 Fach-Kürzel & Aliase (YAML)",
+    portal_aliases_help: "Wandelt beim Import Kürzel (z. B. Ma) automatisch in Vollnamen (Mathematik) um und ordnet Vertretungen zu.",
+    portal_aliases_save_btn: "💾 Aliase speichern",
+    portal_aliases_saved: "Aliase erfolgreich gespeichert!",
+    portal_aliases_reset: "Standard wiederherstellen",
+    portal_last_sync_label: "Letzter Sync:",
+    portal_subst_stand: "Vertretungsplan Stand:",
+    prep_subst_alert: "Vertretungsplan für nächsten Schultag",
+    subst_badge_cancelled: "🚫 Entfällt",
+    subst_badge_room: "📍 Raumänderung",
+    subst_badge_subst: "🔄 Vertretung",
     grade_level_label: "Klasse / Jahrgangsstufe",
     grade_level_placeholder: "z. B. 5a, 7b",
     homework_card: "Hausaufgaben",
@@ -493,6 +525,38 @@ const I18N = {
     settings_tab_general: "⚙️ General",
     settings_tab_subjects: "📘 Manage Subjects",
     settings_tab_timetable: "📅 Timetable",
+    settings_tab_portal: "🏫 Parents Portal",
+    portal_title: "Parents Portal (eltern-portal.org)",
+    portal_desc: "Link this child profile with Eltern-Portal (eltern-portal.org) to sync timetable, substitutions, and exams.",
+    portal_enable: "Enable Eltern-Portal sync",
+    portal_school: "School identifier or URL",
+    portal_school_placeholder: "e.g. bspgym or https://bspgym.eltern-portal.org (or demo)",
+    portal_school_help: "School identifier (subdomain on eltern-portal.org), full URL or 'demo' for testing.",
+    portal_username: "Username / E-mail",
+    portal_password: "Password",
+    portal_password_stored: "•••••••• (already saved)",
+    portal_test_btn: "🔍 Test connection & load children",
+    portal_testing: "Checking connection...",
+    portal_copy_from: "Copy credentials from sibling:",
+    portal_child_select: "Select linked child in Eltern-Portal:",
+    portal_sync_options: "Synchronization options:",
+    portal_sync_tt: "Sync timetable",
+    portal_sync_subst: "Sync substitutions (cancellations & changes)",
+    portal_sync_exams: "Sync exams & appointments",
+    portal_sync_now_btn: "🔄 Sync Now",
+    portal_import_tt_btn: "📅 Import Timetable",
+    portal_import_tt_confirm: "Do you want to import the timetable from Eltern-Portal and overwrite your local timetable?",
+    portal_aliases_title: "🔤 Subject Abbreviations & Aliases (YAML)",
+    portal_aliases_help: "Converts abbreviations (e.g. Ma) to full subject names (Mathematics) during import and maps substitutions.",
+    portal_aliases_save_btn: "💾 Save Aliases",
+    portal_aliases_saved: "Aliases saved successfully!",
+    portal_aliases_reset: "Restore Default Aliases",
+    portal_last_sync_label: "Last sync:",
+    portal_subst_stand: "Substitutions update:",
+    prep_subst_alert: "Substitutions for next school day",
+    subst_badge_cancelled: "🚫 Cancelled",
+    subst_badge_room: "📍 Room change",
+    subst_badge_subst: "🔄 Substitution",
     grade_level_label: "Class / Grade Level",
     grade_level_placeholder: "e.g. 5a, 7b",
     homework_card: "Homework",
@@ -1509,6 +1573,12 @@ class SchoolGradesPanel extends HTMLElement {
     this._localHomeworkDone = {}; // { [childName]: boolean }
     this._lastPreparedDate = {}; // { [childName]: string }
     this._localTimetableSchedule = {}; // { [childName]: { [slotId]: { [day]: { subject, room, teacher } } } }
+    this._portalTesting = false;
+    this._portalTestResult = null;
+    this._portalTestError = null;
+    this._portalFormSchool = undefined;
+    this._portalFormUsername = undefined;
+    this._portalSelectedStudentId = null;
   }
 
   set hass(hass) {
@@ -1606,7 +1676,60 @@ class SchoolGradesPanel extends HTMLElement {
             show_timetable_card: true,
             show_overview_card: true,
           },
+          portalEnabled: false,
+          portalSchool: '',
+          portalUsername: '',
+          portalHasPassword: false,
+          portalStudentId: '',
+          portalStudentName: '',
+          portalSyncTimetable: true,
+          portalSyncSubstitutions: true,
+          portalSyncExams: true,
+          portalLastSync: '',
+          portalLastStatus: '',
+          subjectAliases: {},
+          portalSubstitutions: { days: [], available: false },
         };
+      }
+
+      if (attrs.portal_enabled !== undefined) {
+        children[kindName].portalEnabled = Boolean(attrs.portal_enabled);
+      }
+      if (attrs.portal_school !== undefined) {
+        children[kindName].portalSchool = String(attrs.portal_school || '');
+      }
+      if (attrs.portal_username !== undefined) {
+        children[kindName].portalUsername = String(attrs.portal_username || '');
+      }
+      if (attrs.portal_has_password !== undefined) {
+        children[kindName].portalHasPassword = Boolean(attrs.portal_has_password);
+      }
+      if (attrs.portal_student_id !== undefined) {
+        children[kindName].portalStudentId = String(attrs.portal_student_id || '');
+      }
+      if (attrs.portal_student_name !== undefined) {
+        children[kindName].portalStudentName = String(attrs.portal_student_name || '');
+      }
+      if (attrs.portal_sync_timetable !== undefined) {
+        children[kindName].portalSyncTimetable = Boolean(attrs.portal_sync_timetable);
+      }
+      if (attrs.portal_sync_substitutions !== undefined) {
+        children[kindName].portalSyncSubstitutions = Boolean(attrs.portal_sync_substitutions);
+      }
+      if (attrs.portal_sync_exams !== undefined) {
+        children[kindName].portalSyncExams = Boolean(attrs.portal_sync_exams);
+      }
+      if (attrs.portal_last_sync !== undefined) {
+        children[kindName].portalLastSync = String(attrs.portal_last_sync || '');
+      }
+      if (attrs.portal_last_status !== undefined) {
+        children[kindName].portalLastStatus = String(attrs.portal_last_status || '');
+      }
+      if (attrs.subject_aliases !== undefined) {
+        children[kindName].subjectAliases = attrs.subject_aliases || {};
+      }
+      if (attrs.portal_substitutions !== undefined) {
+        children[kindName].portalSubstitutions = attrs.portal_substitutions || { days: [], available: false };
       }
 
       if (attrs.country) {
@@ -2053,10 +2176,142 @@ class SchoolGradesPanel extends HTMLElement {
       dayKey: targetDayKey,
       dayName: targetDayName,
       dateFormatted: dateFormatted,
+      targetDateIso: targetDateIso,
       lessons: lessons,
       exams: matchingExams,
       isWeekend: currentDay === 5 || currentDay === 6 || currentDay === 0,
     };
+  }
+
+  _getDateForDayKey(dayKey) {
+    const dayMap = { monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6, sunday: 7 };
+    const targetDayIndex = dayMap[dayKey];
+    if (!targetDayIndex) return null;
+    const now = new Date();
+    const currentDay = now.getDay();
+    const diffToMonday = currentDay === 0 ? -6 : 1 - currentDay;
+    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday);
+    const target = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + (targetDayIndex - 1));
+    const y = target.getFullYear();
+    const m = String(target.getMonth() + 1).padStart(2, '0');
+    const d = String(target.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  _getSubstitution(substitutions, dateIso, slotId, slotNum, subject) {
+    if (!substitutions || !Array.isArray(substitutions.days) || !dateIso) return null;
+    const dayObj = substitutions.days.find(d => d.date === dateIso);
+    if (!dayObj || !Array.isArray(dayObj.entries)) return null;
+
+    const numStr = String(slotNum || slotId || '').replace(/^slot_/, '').trim();
+    for (const e of dayObj.entries) {
+      const eLesson = String(e.lesson || '').trim();
+      if (eLesson === numStr) return e;
+      const digits = eLesson.match(/\d+/g) || [];
+      if (digits.includes(numStr)) return e;
+      if (subject && (e.subject_resolved === subject || e.subject === subject)) return e;
+    }
+    return null;
+  }
+
+  _aliasesToYaml(aliases) {
+    if (!aliases || typeof aliases !== 'object') return '';
+    const lines = [];
+    for (const [subj, aliasList] of Object.entries(aliases)) {
+      if (Array.isArray(aliasList) && aliasList.length > 0) {
+        lines.push(`${subj}:`);
+        for (const a of aliasList) {
+          lines.push(`  - ${a}`);
+        }
+      } else {
+        lines.push(`${subj}: []`);
+      }
+    }
+    return lines.join('\n');
+  }
+
+  _getDefaultAliasesYaml() {
+    return `Mathematik:
+  - M
+  - Ma
+  - Math
+  - Mathe
+Deutsch:
+  - D
+  - De
+  - Deu
+Englisch:
+  - E
+  - En
+  - Eng
+Latein:
+  - L
+  - Lat
+Französisch:
+  - F
+  - Fr
+  - Frz
+Spanisch:
+  - Sp
+  - Spa
+Italienisch:
+  - It
+  - Ita
+Biologie:
+  - B
+  - Bio
+Physik:
+  - Ph
+  - Phy
+Chemie:
+  - C
+  - Ch
+  - Che
+Geschichte:
+  - G
+  - Ge
+  - Gesch
+Geographie:
+  - Geo
+  - Erd
+  - Erdkunde
+Sozialkunde:
+  - Sk
+  - Soz
+Wirtschaft und Recht:
+  - WR
+  - WiRe
+  - Wirtschaft
+Informatik:
+  - Inf
+  - IT
+Kunst:
+  - Ku
+  - BK
+Musik:
+  - Mu
+Sport:
+  - Sp
+  - Spo
+  - Sm
+  - Sw
+Ethik:
+  - Eth
+Evangelische Religion:
+  - Ev
+  - EvRel
+  - ER
+Katholische Religion:
+  - Kk
+  - Rk
+  - KatRel
+  - KR
+  - K
+Natur und Technik:
+  - NuT
+  - NTG
+  - NuT_B
+  - NuT_NW`;
   }
 
   _isNowInSlot(slotStart, slotEnd, dayKey) {
@@ -2199,9 +2454,10 @@ class SchoolGradesPanel extends HTMLElement {
             ${childNames.map(name => {
               const cData = data[name];
               const gradeLevelStr = cData && cData.gradeLevel ? ` (${cData.gradeLevel})` : '';
+              const portalBadge = cData && cData.portalEnabled ? ' 🏫' : '';
               return `
                 <button class="tab-btn ${name === this._selectedChild ? 'active' : ''}" data-child="${name}">
-                  👤 ${name}${gradeLevelStr}
+                  👤 ${name}${gradeLevelStr}${portalBadge}
                 </button>
               `;
             }).join('')}
@@ -2214,7 +2470,7 @@ class SchoolGradesPanel extends HTMLElement {
           </div>
         </header>
 
-        <!-- Summary Banner (Avg, Homework, Preparation) -->
+        <!-- Summary Banner (Avg, Homework, Preparation, Portal) -->
         <div class="summary-banner">
           <div class="stat-card primary">
             <span class="stat-label">${this._t('total_avg')}</span>
@@ -2232,6 +2488,14 @@ class SchoolGradesPanel extends HTMLElement {
               ${currentChild && currentChild.preparationDone ? this._t('prep_done_badge') : this._t('prep_open_badge')}
             </span>
           </div>
+          ${currentChild && currentChild.portalEnabled ? `
+            <div class="stat-card" style="border: 1px solid rgba(59, 130, 246, 0.4); background: rgba(59, 130, 246, 0.12);">
+              <span class="stat-label">🏫 Eltern-Portal</span>
+              <span class="stat-value" style="font-size: 16px; font-weight: 600; color: #93c5fd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${currentChild.portalSchool}">
+                ${currentChild.portalStudentName ? currentChild.portalStudentName : currentChild.portalSchool}
+              </span>
+            </div>
+          ` : ''}
         </div>
 
         <!-- Preparation Card for Next School Day (Interactive Clickable Subjects) -->
@@ -2261,6 +2525,30 @@ class SchoolGradesPanel extends HTMLElement {
                 </div>
               ` : ''}
 
+              ${(() => {
+                const substDays = (currentChild && currentChild.portalSubstitutions && currentChild.portalSubstitutions.days) || [];
+                const nextDaySubst = substDays.find(d => d.date === nextDay.targetDateIso);
+                const entries = (nextDaySubst && nextDaySubst.entries) || [];
+                if (entries.length === 0) return '';
+                return `
+                  <div class="prep-subst-alert" style="background: rgba(249, 115, 22, 0.12); border: 1px solid rgba(249, 115, 22, 0.35); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; display: flex; align-items: flex-start; gap: 10px;">
+                    <span style="font-size: 18px;">🔄</span>
+                    <div>
+                      <strong style="color: #fdba74; font-size: 13px;">${this._t('prep_subst_alert')} (${nextDay.dateFormatted}):</strong>
+                      <div style="font-size: 12px; color: #fff; margin-top: 4px; display: flex; flex-direction: column; gap: 3px;">
+                        ${entries.map(s => {
+                          const kindText = s.kind === 'entfall' ? this._t('subst_badge_cancelled') : (s.kind === 'raum' ? this._t('subst_badge_room') : this._t('subst_badge_subst'));
+                          const infoDetail = s.info ? ` (${s.info})` : '';
+                          const roomDetail = s.room ? ` in ${s.room}` : '';
+                          const teacherDetail = s.substitute ? ` durch ${s.substitute}` : '';
+                          return `<div>• <b>${s.lesson}. Std:</b> ${s.subject_resolved || s.subject} — <span style="font-weight:600;">${kindText}</span>${teacherDetail}${roomDetail}${infoDetail}</div>`;
+                        }).join('')}
+                      </div>
+                    </div>
+                  </div>
+                `;
+              })()}
+
               <div class="prep-body">
                 ${nextDay.lessons.length === 0 ? `
                   <div class="empty-events">
@@ -2269,6 +2557,12 @@ class SchoolGradesPanel extends HTMLElement {
                 ` : `
                   <div class="prep-grid">
                     ${nextDay.lessons.map(l => {
+                      const substDays = (currentChild && currentChild.portalSubstitutions && currentChild.portalSubstitutions.days) || [];
+                      const nextDaySubst = substDays.find(d => d.date === nextDay.targetDateIso);
+                      const nextEntries = (nextDaySubst && nextDaySubst.entries) || [];
+                      const matchingSubst = nextEntries.find(s => (s.subject_resolved === l.subject || s.subject === l.subject));
+                      const isCancelled = matchingSubst && matchingSubst.kind === 'entfall';
+
                       const isExamSubject = nextDay.exams.some(e =>
                         e.summary.toLowerCase().includes(l.subject.toLowerCase()) ||
                         l.subject.toLowerCase().includes(e.summary.toLowerCase())
@@ -2276,20 +2570,23 @@ class SchoolGradesPanel extends HTMLElement {
                       const prepSubjectsMap = (currentChild && currentChild.preparedSubjects) || {};
                       const isPrepared = Boolean(prepSubjectsMap[l.subject]);
                       return `
-                        <div class="prep-item prep-item-clickable ${isPrepared ? 'prepared-subject' : ''} ${isExamSubject ? 'has-exam' : ''}"
+                        <div class="prep-item prep-item-clickable ${isPrepared ? 'prepared-subject' : ''} ${isExamSubject ? 'has-exam' : ''} ${isCancelled ? 'cancelled-subject' : ''}"
                              data-subject="${l.subject}"
-                             style="cursor: pointer; ${isPrepared ? 'border: 2px solid #22c55e !important; background: rgba(34, 197, 94, 0.14) !important;' : ''}">
+                             style="cursor: pointer; ${isPrepared ? 'border: 2px solid #22c55e !important; background: rgba(34, 197, 94, 0.14) !important;' : ''} ${isCancelled ? 'opacity: 0.65; border: 1px dashed rgba(239,68,68,0.5);' : ''}">
                           <div class="prep-item-top">
                             <span class="prep-slot-badge">${l.slotLabel}</span>
                             <span class="prep-slot-time">${l.slotTime}</span>
                           </div>
                           <div class="prep-subject-name" style="display: flex; align-items: center; justify-content: space-between;">
-                            <span>${l.subject}</span>
-                            <span class="prep-check-icon" style="color: #22c55e; font-size: 16px; font-weight: bold; ${isPrepared ? 'display: inline;' : 'display: none;'}">✓</span>
+                            <span style="${isCancelled ? 'text-decoration: line-through;' : ''}">${l.subject}</span>
+                            <div style="display: flex; align-items: center; gap: 4px;">
+                              ${isCancelled ? `<span style="font-size: 10px; font-weight: 700; background: rgba(239,68,68,0.25); color: #fca5a5; border: 1px solid rgba(239,68,68,0.4); border-radius: 4px; padding: 1px 5px;">${this._t('subst_badge_cancelled')}</span>` : ''}
+                              <span class="prep-check-icon" style="color: #22c55e; font-size: 16px; font-weight: bold; ${isPrepared ? 'display: inline;' : 'display: none;'}">✓</span>
+                            </div>
                           </div>
                           <div class="prep-meta">
-                            ${l.room ? `<span class="prep-meta-tag">📍 ${l.room}</span>` : ''}
-                            ${l.teacher ? `<span class="prep-meta-tag">👨‍🏫 ${l.teacher}</span>` : ''}
+                            ${matchingSubst && matchingSubst.room ? `<span class="prep-meta-tag" style="color: #fde047;">📍 ${matchingSubst.room}</span>` : (l.room ? `<span class="prep-meta-tag">📍 ${l.room}</span>` : '')}
+                            ${matchingSubst && matchingSubst.substitute ? `<span class="prep-meta-tag" style="color: #93c5fd;">👨‍🏫 ${matchingSubst.substitute}</span>` : (l.teacher ? `<span class="prep-meta-tag">👨‍🏫 ${l.teacher}</span>` : '')}
                           </div>
                           ${isExamSubject ? `<div class="prep-exam-badge">${this._t('exam_badge')}</div>` : ''}
                         </div>
@@ -2418,6 +2715,11 @@ class SchoolGradesPanel extends HTMLElement {
                 <span class="timetable-subtitle">${this._t('timetable_subtitle')}</span>
               </div>
               <div class="timetable-header-actions">
+                ${currentChild && currentChild.portalSubstitutions && currentChild.portalSubstitutions.stand ? `
+                  <span style="font-size: 11px; color: #93c5fd; background: rgba(59,130,246,0.15); padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(59,130,246,0.3); font-weight: 500;">
+                    ${this._t('portal_subst_stand')} ${currentChild.portalSubstitutions.stand}
+                  </span>
+                ` : ''}
                 <div class="timetable-legend">
                   <span class="legend-item"><span class="legend-dot now-dot"></span>${this._t('legend_now')}</span>
                   <span class="legend-item"><span class="legend-dot today-dot"></span>${this._t('legend_today')}</span>
@@ -2464,9 +2766,17 @@ class SchoolGradesPanel extends HTMLElement {
                           const isNow = this._isNowInSlot(slot.start, slot.end, d.key);
                           const isToday = this._isToday(d.key);
                           const hasSubject = !!cellData.subject;
+                          const colDateIso = this._getDateForDayKey(d.key);
+                          const subst = (currentChild && currentChild.portalSubstitutions) ? this._getSubstitution(currentChild.portalSubstitutions, colDateIso, slot.id, slot.number, cellData.subject) : null;
+                          const isEntfall = subst && subst.kind === 'entfall';
+                          const isRaum = subst && subst.kind === 'raum';
+                          const isVertretung = subst && subst.kind === 'vertretung';
+                          const displaySubject = subst ? (subst.subject_resolved || subst.subject || cellData.subject) : cellData.subject;
+                          const displayRoom = subst && subst.room ? subst.room : cellData.room;
+                          const displayTeacher = subst && subst.substitute ? subst.substitute : (subst && subst.teacher ? subst.teacher : cellData.teacher);
 
                           return `
-                            <td class="timetable-cell ${isToday ? 'today-col' : ''} ${isNow ? 'now-cell' : ''} ${hasSubject ? 'has-subject' : 'empty-cell'}"
+                            <td class="timetable-cell ${isToday ? 'today-col' : ''} ${isNow ? 'now-cell' : ''} ${hasSubject || subst ? 'has-subject' : 'empty-cell'} ${subst ? 'has-substitution' : ''}"
                                 data-slot-id="${slot.id}"
                                 data-day="${d.key}"
                                 data-slot-label="${slot.label} (${slot.start}-${slot.end})"
@@ -2475,12 +2785,20 @@ class SchoolGradesPanel extends HTMLElement {
                                 data-room="${cellData.room || ''}"
                                 data-teacher="${cellData.teacher || ''}">
                               ${isNow ? `<div class="now-badge">${this._t('now_badge')}</div>` : ''}
-                              ${hasSubject ? `
-                                <div class="cell-subject">${cellData.subject}</div>
+                              ${isEntfall ? `
+                                <div class="subst-badge subst-entfall" style="font-size: 10px; font-weight: 700; background: rgba(239, 68, 68, 0.25); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 4px; padding: 1px 5px; margin-bottom: 3px; display: inline-block;" title="${subst.info || ''}">${this._t('subst_badge_cancelled')}</div>
+                              ` : isRaum ? `
+                                <div class="subst-badge subst-raum" style="font-size: 10px; font-weight: 700; background: rgba(234, 179, 8, 0.25); color: #fde047; border: 1px solid rgba(234, 179, 8, 0.4); border-radius: 4px; padding: 1px 5px; margin-bottom: 3px; display: inline-block;" title="${subst.info || ''}">${this._t('subst_badge_room')}</div>
+                              ` : isVertretung ? `
+                                <div class="subst-badge subst-vertretung" style="font-size: 10px; font-weight: 700; background: rgba(59, 130, 246, 0.25); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 4px; padding: 1px 5px; margin-bottom: 3px; display: inline-block;" title="${subst.info || ''}">${this._t('subst_badge_subst')}</div>
+                              ` : ''}
+                              ${hasSubject || subst ? `
+                                <div class="cell-subject" style="${isEntfall ? 'text-decoration: line-through; opacity: 0.6;' : ''}">${displaySubject}</div>
                                 <div class="cell-details">
-                                  ${cellData.room ? `<span class="cell-room">📍 ${cellData.room}</span>` : ''}
-                                  ${cellData.teacher ? `<span class="cell-teacher">👨‍🏫 ${cellData.teacher}</span>` : ''}
+                                  ${displayRoom ? `<span class="cell-room" style="${isRaum ? 'color: #fde047; font-weight: 600;' : ''}">📍 ${displayRoom}</span>` : ''}
+                                  ${displayTeacher ? `<span class="cell-teacher" style="${isVertretung ? 'color: #93c5fd; font-weight: 600;' : ''}">👨‍🏫 ${displayTeacher}</span>` : ''}
                                 </div>
+                                ${subst && subst.info ? `<div style="font-size: 10px; color: rgba(255,255,255,0.65); margin-top: 2px;">ℹ️ ${subst.info}</div>` : ''}
                               ` : `
                                 <div class="cell-empty-trigger">
                                   <span class="add-icon">+</span>
@@ -2692,6 +3010,9 @@ class SchoolGradesPanel extends HTMLElement {
               <button class="modal-tab-btn ${this._settingsTab === 'timetable' ? 'active' : ''}" id="settings-tab-btn-timetable" style="padding: 8px 14px; border-radius: 8px; border: 1px solid ${this._settingsTab === 'timetable' ? 'var(--primary-color, #3b82f6)' : 'rgba(255,255,255,0.1)'}; background: ${this._settingsTab === 'timetable' ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.05)'}; color: #fff; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.2s;">
                 ${this._t('settings_tab_timetable')}
               </button>
+              <button class="modal-tab-btn ${this._settingsTab === 'portal' ? 'active' : ''}" id="settings-tab-btn-portal" style="padding: 8px 14px; border-radius: 8px; border: 1px solid ${this._settingsTab === 'portal' ? 'var(--primary-color, #3b82f6)' : 'rgba(255,255,255,0.1)'}; background: ${this._settingsTab === 'portal' ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.05)'}; color: #fff; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.2s;">
+                ${this._t('settings_tab_portal')}
+              </button>
             </div>
 
             ${this._settingsTab === 'general' ? `
@@ -2788,6 +3109,169 @@ class SchoolGradesPanel extends HTMLElement {
                 <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
                   <button type="button" class="submit-btn secondary" id="settings-cancel-btn">${this._t('cancel_btn')}</button>
                 </div>
+              </div>
+            ` : this._settingsTab === 'portal' ? `
+              <!-- Eltern-Portal Tab in Settings -->
+              <div class="settings-portal-tab">
+                <form id="settings-portal-form">
+                  <div style="margin-bottom: 14px; color: rgba(255,255,255,0.75); font-size: 13px; line-height: 1.4;">
+                    ${this._t('portal_desc')}
+                  </div>
+
+                  <div style="margin-bottom: 16px; padding: 10px 14px; border-radius: 8px; background: ${currentChild.portalEnabled ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.05)'}; border: 1px solid ${currentChild.portalEnabled ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.1)'}; display: flex; align-items: center; justify-content: space-between;">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600; font-size: 13px; color: #fff;">
+                      <input type="checkbox" id="settings-portal-enabled" ${currentChild.portalEnabled ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: #3b82f6; cursor: pointer;">
+                      <span>${this._t('portal_enable')}</span>
+                    </label>
+                    <span style="font-size: 12px; padding: 2px 8px; border-radius: 12px; background: ${currentChild.portalEnabled ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.1)'}; color: ${currentChild.portalEnabled ? '#86efac' : '#94a3b8'};">
+                      ${currentChild.portalEnabled ? '🟢 Aktiv' : '⚪ Deaktiviert'}
+                    </span>
+                  </div>
+
+                  ${(() => {
+                    const siblingPortals = Object.values(children || {}).filter(c => c.name !== this._selectedChild && c.portalSchool);
+                    if (siblingPortals.length === 0) return '';
+                    return `
+                      <div style="background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.25); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px;">
+                        <div style="font-size: 12px; font-weight: 600; color: #93c5fd; margin-bottom: 6px;">👥 ${this._t('portal_copy_from')}</div>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                          ${siblingPortals.map(s => `
+                            <button type="button" class="sibling-portal-copy-btn" data-school="${s.portalSchool}" data-user="${s.portalUsername}" style="font-size: 12px; padding: 4px 10px; border-radius: 6px; background: rgba(59,130,246,0.25); border: 1px solid #3b82f6; color: #fff; cursor: pointer; transition: background 0.2s;">
+                              📋 ${s.name} (${s.portalSchool})
+                            </button>
+                          `).join('')}
+                        </div>
+                      </div>
+                    `;
+                  })()}
+
+                  <div class="form-group" style="margin-bottom: 14px;">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 500; font-size: 13px;">🏫 ${this._t('portal_school')}</label>
+                    <input type="text" id="settings-portal-school" placeholder="${this._t('portal_school_placeholder')}" value="${this._portalFormSchool !== undefined ? this._portalFormSchool : (currentChild.portalSchool || '')}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.25); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 13px; box-sizing: border-box;">
+                    <div style="font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 4px;">${this._t('portal_school_help')}</div>
+                  </div>
+
+                  <div class="form-group" style="margin-bottom: 14px;">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 500; font-size: 13px;">👤 ${this._t('portal_username')}</label>
+                    <input type="text" id="settings-portal-username" placeholder="name@beispiel.de" value="${this._portalFormUsername !== undefined ? this._portalFormUsername : (currentChild.portalUsername || '')}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.25); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 13px; box-sizing: border-box;">
+                  </div>
+
+                  <div class="form-group" style="margin-bottom: 16px;">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 500; font-size: 13px;">🔒 ${this._t('portal_password')}</label>
+                    <input type="password" id="settings-portal-password" placeholder="${currentChild.portalHasPassword ? this._t('portal_password_stored') : '••••••••'}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.25); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 13px; box-sizing: border-box;">
+                  </div>
+
+                  <div style="margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
+                    <button type="button" id="settings-portal-test-btn" class="submit-btn secondary" style="width: auto; padding: 8px 16px; font-size: 13px;" ${this._portalTesting ? 'disabled style="opacity:0.6;cursor:wait;"' : ''}>
+                      ${this._portalTesting ? '⏳ ' + this._t('portal_testing') : this._t('portal_test_btn')}
+                    </button>
+                  </div>
+
+                  ${this._portalTestError ? `
+                    <div style="background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.4); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; color: #fca5a5; font-size: 13px;">
+                      ❌ ${this._portalTestError}
+                    </div>
+                  ` : ''}
+
+                  ${this._portalTestResult ? `
+                    <div style="background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.4); border-radius: 8px; padding: 12px 14px; margin-bottom: 16px;">
+                      <div style="font-weight: 600; color: #86efac; font-size: 13px; margin-bottom: 10px;">
+                        ✅ Verbindung erfolgreich! Schule: <strong>${this._portalTestResult.school_name || this._portalTestResult.school}</strong>
+                      </div>
+                      <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 13px; color: #fff;">
+                        👤 ${this._t('portal_child_select')}
+                      </label>
+                      <select id="settings-portal-student-select" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.2); font-size: 13px; cursor: pointer;">
+                        ${this._portalTestResult.students.length === 0 ? `<option value="">Keine Schüler gefunden</option>` : ''}
+                        ${this._portalTestResult.students.map(st => {
+                          const isSel = (this._portalSelectedStudentId && this._portalSelectedStudentId === st.student_id) || (!this._portalSelectedStudentId && (currentChild.portalStudentId === st.student_id || st.fullname.toLowerCase().includes((this._selectedChild || '').toLowerCase())));
+                          return `<option value="${st.student_id}" data-name="${st.fullname}" ${isSel ? 'selected' : ''}>${st.fullname} (ID: ${st.student_id})</option>`;
+                        }).join('')}
+                      </select>
+                    </div>
+                  ` : currentChild.portalStudentId ? `
+                    <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; font-size: 13px;">
+                      👤 <strong>Verknüpftes Kind im Portal:</strong> <span style="color: #60a5fa;">${currentChild.portalStudentName || currentChild.portalStudentId}</span>
+                      <input type="hidden" id="settings-portal-student-id-hidden" value="${currentChild.portalStudentId}">
+                      <input type="hidden" id="settings-portal-student-name-hidden" value="${currentChild.portalStudentName || ''}">
+                    </div>
+                  ` : ''}
+
+                  <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 14px; margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 10px; font-weight: 600; font-size: 13px; color: #fff;">
+                      ⚙️ ${this._t('portal_sync_options')}
+                    </label>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                      <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13px;">
+                        <input type="checkbox" id="settings-portal-sync-tt" ${currentChild.portalSyncTimetable ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: #3b82f6; cursor: pointer;">
+                        <span>📅 ${this._t('portal_sync_tt')}</span>
+                      </label>
+                      <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13px;">
+                        <input type="checkbox" id="settings-portal-sync-subst" ${currentChild.portalSyncSubstitutions ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: #3b82f6; cursor: pointer;">
+                        <span>🔄 ${this._t('portal_sync_subst')}</span>
+                      </label>
+                      <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13px;">
+                        <input type="checkbox" id="settings-portal-sync-exams" ${currentChild.portalSyncExams ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: #3b82f6; cursor: pointer;">
+                        <span>📝 ${this._t('portal_sync_exams')}</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  ${currentChild.portalEnabled && currentChild.portalStudentId ? `
+                    <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 14px; margin-bottom: 20px;">
+                      <label style="display: block; margin-bottom: 8px; font-weight: 600; font-size: 13px; color: #fff;">
+                        🔄 Aktionen & Status
+                      </label>
+                      <div style="font-size: 12px; color: rgba(255,255,255,0.7); margin-bottom: 10px;">
+                        ${currentChild.portalLastSync ? `
+                          <div>⏱️ <b>${this._t('portal_last_sync_label')}</b> ${new Date(currentChild.portalLastSync).toLocaleString(this._getLocale())}</div>
+                        ` : ''}
+                        ${currentChild.portalLastStatus ? `
+                          <div>📊 <b>Status:</b> ${currentChild.portalLastStatus}</div>
+                        ` : ''}
+                      </div>
+                      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button type="button" id="settings-portal-sync-now-btn" class="submit-btn secondary" style="width: auto; padding: 8px 14px; font-size: 13px;" ${this._portalSyncing ? 'disabled style="opacity:0.6;cursor:wait;"' : ''}>
+                          ${this._portalSyncing ? '⏳ Synchronisiere...' : this._t('portal_sync_now_btn')}
+                        </button>
+                        <button type="button" id="settings-portal-import-tt-btn" class="submit-btn secondary" style="width: auto; padding: 8px 14px; font-size: 13px;" ${this._portalImportingTt ? 'disabled style="opacity:0.6;cursor:wait;"' : ''}>
+                          ${this._portalImportingTt ? '⏳ Importiere...' : this._t('portal_import_tt_btn')}
+                        </button>
+                      </div>
+                      ${this._portalSyncFeedback ? `
+                        <div style="margin-top: 10px; font-size: 12px; padding: 6px 10px; border-radius: 6px; background: rgba(59,130,246,0.2); color: #93c5fd; border: 1px solid rgba(59,130,246,0.4);">
+                          ${this._portalSyncFeedback}
+                        </div>
+                      ` : ''}
+                    </div>
+                  ` : ''}
+
+                  <!-- Editable Subject Aliases Section (YAML) -->
+                  <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 14px; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                      <label style="font-weight: 600; font-size: 13px; color: #fff;">
+                        ${this._t('portal_aliases_title')}
+                      </label>
+                      <button type="button" id="settings-portal-aliases-reset-btn" style="background: none; border: none; color: #93c5fd; cursor: pointer; font-size: 11px; text-decoration: underline;">
+                        ${this._t('portal_aliases_reset')}
+                      </button>
+                    </div>
+                    <div style="font-size: 11px; color: rgba(255,255,255,0.6); margin-bottom: 8px; line-height: 1.3;">
+                      ${this._t('portal_aliases_help')}
+                    </div>
+                    <textarea id="settings-portal-aliases-textarea" rows="8" style="font-family: monospace; font-size: 12px; line-height: 1.4; resize: vertical; tab-size: 2; width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 10px;">${this._aliasesToYaml(currentChild.subjectAliases)}</textarea>
+                    <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
+                      <button type="button" id="settings-portal-aliases-save-btn" class="submit-btn secondary" style="width: auto; padding: 6px 14px; font-size: 12px;">
+                        ${this._t('portal_aliases_save_btn')}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 12px;">
+                    <button type="button" class="submit-btn secondary" id="settings-cancel-btn">${this._t('cancel_btn')}</button>
+                    <button type="submit" class="submit-btn">${this._t('save_btn')}</button>
+                  </div>
+                </form>
               </div>
             ` : `
               <!-- Timetable Tab in Settings -->
@@ -3195,6 +3679,14 @@ class SchoolGradesPanel extends HTMLElement {
         });
       }
 
+      const tabBtnPortal = root.querySelector('#settings-tab-btn-portal');
+      if (tabBtnPortal) {
+        tabBtnPortal.addEventListener('click', () => {
+          this._settingsTab = 'portal';
+          this.render();
+        });
+      }
+
       const settingsForm = root.querySelector('#settings-form');
       if (settingsForm) {
         settingsForm.addEventListener('submit', async (e) => {
@@ -3309,6 +3801,214 @@ class SchoolGradesPanel extends HTMLElement {
             });
           } catch (err) {
             console.error('Failed to import timetable YAML:', err);
+          }
+        });
+      }
+
+      // Sibling Portal Copy Buttons
+      root.querySelectorAll('.sibling-portal-copy-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const sch = btn.getAttribute('data-school') || '';
+          const usr = btn.getAttribute('data-user') || '';
+          this._portalFormSchool = sch;
+          this._portalFormUsername = usr;
+          const sInput = root.querySelector('#settings-portal-school');
+          const uInput = root.querySelector('#settings-portal-username');
+          if (sInput) sInput.value = sch;
+          if (uInput) uInput.value = usr;
+        });
+      });
+
+      // Eltern-Portal Test Connection Button
+      const portalTestBtn = root.querySelector('#settings-portal-test-btn');
+      if (portalTestBtn) {
+        portalTestBtn.addEventListener('click', async () => {
+          const sInput = root.querySelector('#settings-portal-school');
+          const uInput = root.querySelector('#settings-portal-username');
+          const pInput = root.querySelector('#settings-portal-password');
+          const schoolVal = sInput ? sInput.value.trim() : '';
+          const userVal = uInput ? uInput.value.trim() : '';
+          const passVal = pInput ? pInput.value : '';
+
+          this._portalFormSchool = schoolVal;
+          this._portalFormUsername = userVal;
+          this._portalTesting = true;
+          this._portalTestError = null;
+          this.render();
+
+          try {
+            const res = await this._hass.callWS({
+              type: 'school_grades/test_elternportal',
+              school: schoolVal,
+              username: userVal,
+              password: passVal,
+              child_name: this._selectedChild,
+            });
+            this._portalTesting = false;
+            if (res && res.success) {
+              this._portalTestResult = res;
+              this._portalTestError = null;
+              if (Array.isArray(res.students) && res.students.length > 0) {
+                const match = res.students.find(st =>
+                  st.fullname.toLowerCase().includes((this._selectedChild || '').toLowerCase()) ||
+                  (this._selectedChild || '').toLowerCase().includes((st.firstname || '').toLowerCase())
+                );
+                this._portalSelectedStudentId = match ? match.student_id : res.students[0].student_id;
+              }
+            } else {
+              this._portalTestResult = null;
+              this._portalTestError = res && res.message ? res.message : 'Verbindung fehlgeschlagen';
+            }
+          } catch (err) {
+            this._portalTesting = false;
+            this._portalTestResult = null;
+            this._portalTestError = (err && (err.message || err.error)) || String(err);
+          }
+          this.render();
+        });
+      }
+
+      // Student Select Change Listener
+      const studentSelect = root.querySelector('#settings-portal-student-select');
+      if (studentSelect) {
+        studentSelect.addEventListener('change', () => {
+          this._portalSelectedStudentId = studentSelect.value;
+        });
+      }
+
+      // Eltern-Portal Settings Form Submit
+      const portalForm = root.querySelector('#settings-portal-form');
+      if (portalForm) {
+        portalForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const enabled = root.querySelector('#settings-portal-enabled')?.checked || false;
+          const school = root.querySelector('#settings-portal-school')?.value.trim() || '';
+          const username = root.querySelector('#settings-portal-username')?.value.trim() || '';
+          const password = root.querySelector('#settings-portal-password')?.value || '';
+          const sel = root.querySelector('#settings-portal-student-select');
+          let studentId = '';
+          let studentName = '';
+          if (sel && sel.value) {
+            studentId = sel.value;
+            const opt = sel.options[sel.selectedIndex];
+            studentName = opt ? (opt.getAttribute('data-name') || opt.text) : '';
+          } else {
+            studentId = root.querySelector('#settings-portal-student-id-hidden')?.value || '';
+            studentName = root.querySelector('#settings-portal-student-name-hidden')?.value || '';
+          }
+
+          const syncTt = root.querySelector('#settings-portal-sync-tt')?.checked ?? true;
+          const syncSubst = root.querySelector('#settings-portal-sync-subst')?.checked ?? true;
+          const syncExams = root.querySelector('#settings-portal-sync-exams')?.checked ?? true;
+
+          this._showSettingsModal = false;
+          this._portalTesting = false;
+          this._portalTestResult = null;
+          this._portalTestError = null;
+          this.render();
+
+          try {
+            await this._hass.callService('school_grades', 'update_portal_settings', {
+              child_name: this._selectedChild,
+              portal_enabled: enabled,
+              portal_school: school,
+              portal_username: username,
+              portal_password: password,
+              portal_student_id: studentId,
+              portal_student_name: studentName,
+              portal_sync_timetable: syncTt,
+              portal_sync_substitutions: syncSubst,
+              portal_sync_exams: syncExams,
+            });
+          } catch (err) {
+            console.error("Failed to update portal settings:", err);
+          }
+        });
+      }
+
+      // Eltern-Portal Sync Now button
+      const syncNowBtn = root.querySelector('#settings-portal-sync-now-btn');
+      if (syncNowBtn) {
+        syncNowBtn.addEventListener('click', async () => {
+          this._portalSyncing = true;
+          this._portalSyncFeedback = null;
+          this.render();
+          try {
+            const res = await this._hass.callWS({
+              type: 'school_grades/sync_elternportal',
+              child_name: this._selectedChild,
+            });
+            this._portalSyncing = false;
+            if (res && res.success) {
+              this._portalSyncFeedback = '✅ Synchronisierung erfolgreich!';
+            } else {
+              this._portalSyncFeedback = '❌ ' + ((res && res.message) || 'Fehler beim Synchronisieren');
+            }
+          } catch (err) {
+            this._portalSyncing = false;
+            this._portalSyncFeedback = '❌ ' + ((err && (err.message || err.error)) || String(err));
+          }
+          this.render();
+        });
+      }
+
+      // Eltern-Portal Import Timetable button
+      const importTtBtn = root.querySelector('#settings-portal-import-tt-btn');
+      if (importTtBtn) {
+        importTtBtn.addEventListener('click', async () => {
+          if (!confirm(this._t('portal_import_tt_confirm'))) {
+            return;
+          }
+          this._portalImportingTt = true;
+          this._portalSyncFeedback = null;
+          this.render();
+          try {
+            const res = await this._hass.callWS({
+              type: 'school_grades/import_portal_timetable',
+              child_name: this._selectedChild,
+            });
+            this._portalImportingTt = false;
+            if (res && res.success) {
+              this._portalSyncFeedback = '✅ Stundenplan erfolgreich importiert!';
+            } else {
+              this._portalSyncFeedback = '❌ ' + ((res && res.message) || 'Fehler beim Importieren');
+            }
+          } catch (err) {
+            this._portalImportingTt = false;
+            this._portalSyncFeedback = '❌ ' + ((err && (err.message || err.error)) || String(err));
+          }
+          this.render();
+        });
+      }
+
+      // Save Aliases YAML button
+      const saveAliasesBtn = root.querySelector('#settings-portal-aliases-save-btn');
+      if (saveAliasesBtn) {
+        saveAliasesBtn.addEventListener('click', async () => {
+          const ta = root.querySelector('#settings-portal-aliases-textarea');
+          if (!ta) return;
+          const yamlText = ta.value;
+          try {
+            await this._hass.callWS({
+              type: 'school_grades/update_subject_aliases',
+              child_name: this._selectedChild,
+              aliases_yaml: yamlText,
+            });
+            alert(this._t('portal_aliases_saved'));
+          } catch (err) {
+            console.error('Failed to update subject aliases:', err);
+            alert('Fehler: ' + ((err && err.message) || err));
+          }
+        });
+      }
+
+      // Reset Aliases to Default button
+      const resetAliasesBtn = root.querySelector('#settings-portal-aliases-reset-btn');
+      if (resetAliasesBtn) {
+        resetAliasesBtn.addEventListener('click', () => {
+          const ta = root.querySelector('#settings-portal-aliases-textarea');
+          if (ta) {
+            ta.value = this._getDefaultAliasesYaml();
           }
         });
       }

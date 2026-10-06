@@ -225,6 +225,19 @@ class SchoolGradeTotalSensor(SensorEntity):
                 subj: self.storage.data.calculate_subject_average(subj)
                 for subj in self.storage.data.subjects
             },
+            "portal_enabled": self.storage.data.portal_enabled,
+            "portal_school": self.storage.data.portal_school,
+            "portal_username": self.storage.data.portal_username,
+            "portal_has_password": bool(self.storage.data.portal_password),
+            "portal_student_id": self.storage.data.portal_student_id,
+            "portal_student_name": self.storage.data.portal_student_name,
+            "portal_sync_timetable": self.storage.data.portal_sync_timetable,
+            "portal_sync_substitutions": self.storage.data.portal_sync_substitutions,
+            "portal_sync_exams": self.storage.data.portal_sync_exams,
+            "portal_last_sync": self.storage.data.portal_last_sync,
+            "portal_last_status": self.storage.data.portal_last_status,
+            "subject_aliases": copy.deepcopy(self.storage.data.subject_aliases),
+            "portal_substitutions": copy.deepcopy(self.storage.data.portal_substitutions),
         }
 
 

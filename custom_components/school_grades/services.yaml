@@ -471,6 +471,145 @@ toggle_prepared_subject:
       selector:
         boolean:
 
+test_elternportal:
+  name: "Eltern-Portal Verbindung testen"
+  description: "Testet die Zugangsdaten für das Eltern-Portal (eltern-portal.org) und liefert die gefundenen Kinder zurück."
+  fields:
+    child_name:
+      name: "Name des Kindes"
+      description: "Name des Kindes (optional, um gespeicherte Zugangsdaten zu nutzen)."
+      example: "Max"
+      selector:
+        text:
+    portal_school:
+      name: "Schulkennung / URL"
+      description: "Kürzel der Schule (z. B. 'bspgym' oder 'demo' oder die URL 'https://bspgym.eltern-portal.org')."
+      required: true
+      example: "bspgym"
+      selector:
+        text:
+    portal_username:
+      name: "Benutzername / E-Mail"
+      description: "Benutzername oder E-Mail-Adresse für das Eltern-Portal."
+      example: "eltern@beispiel.de"
+      selector:
+        text:
+    portal_password:
+      name: "Passwort"
+      description: "Passwort für das Eltern-Portal."
+      selector:
+        text:
+
+update_portal_settings:
+  name: "Eltern-Portal Einstellungen speichern"
+  description: "Speichert die Eltern-Portal Zugangsdaten und die Kind-Verknüpfung für ein Profil."
+  fields:
+    child_name:
+      name: "Name des Kindes"
+      description: "Name des Kindes in Schulnoten."
+      required: true
+      example: "Max"
+      selector:
+        text:
+    portal_enabled:
+      name: "Aktiviert"
+      description: "Eltern-Portal Synchronisierung aktivieren oder deaktivieren."
+      required: true
+      example: true
+      selector:
+        boolean:
+    portal_school:
+      name: "Schulkennung"
+      description: "Kürzel der Schule (z. B. 'bspgym' oder 'demo')."
+      example: "bspgym"
+      selector:
+        text:
+    portal_username:
+      name: "Benutzername"
+      description: "Benutzername / E-Mail."
+      example: "eltern@beispiel.de"
+      selector:
+        text:
+    portal_password:
+      name: "Passwort"
+      description: "Passwort (leer lassen, um das bisherige beizubehalten)."
+      selector:
+        text:
+    portal_student_id:
+      name: "Schüler-ID"
+      description: "ID des verknüpften Kindes im Eltern-Portal."
+      example: "12345"
+      selector:
+        text:
+    portal_student_name:
+      name: "Schüler-Name"
+      description: "Anzeigename der Klasse/des Kindes im Eltern-Portal."
+      example: "Max Mustermann (7A)"
+      selector:
+        text:
+    portal_sync_timetable:
+      name: "Stundenplan synchronisieren"
+      description: "Automatischer Abgleich des Stundenplans."
+      example: true
+      selector:
+        boolean:
+    portal_sync_substitutions:
+      name: "Vertretungsplan synchronisieren"
+      description: "Abruf von Ausfällen und Vertretungen."
+      example: true
+      selector:
+        boolean:
+    portal_sync_exams:
+      name: "Termine & Klausuren synchronisieren"
+      description: "Abruf anstehender Schulaufgaben und Tests."
+      example: true
+      selector:
+        boolean:
+
+sync_elternportal:
+  name: "Eltern-Portal jetzt synchronisieren"
+  description: "Ruft aktuelle Daten (Vertretungsplan, Stundenplan, Klausuren) aus dem Eltern-Portal für ein Kind oder alle aktivierten Kinder ab."
+  fields:
+    child_name:
+      name: "Name des Kindes"
+      description: "Name des Kindes (leer lassen, um alle aktivierten Kinder zu synchronisieren)."
+      example: "Max"
+      selector:
+        text:
+
+import_portal_timetable:
+  name: "Stundenplan aus Eltern-Portal importieren"
+  description: "Importiert den aktuellen Stundenplan aus dem Eltern-Portal und übernimmt die aufgelösten Fächer."
+  fields:
+    child_name:
+      name: "Name des Kindes"
+      description: "Name des Kindes."
+      required: true
+      example: "Max"
+      selector:
+        text:
+
+update_subject_aliases:
+  name: "Fach-Aliase aktualisieren"
+  description: "Aktualisiert die Zuordnung von Fach-Kürzeln zu Langnamen für ein Kind."
+  fields:
+    child_name:
+      name: "Name des Kindes"
+      description: "Name des Kindes."
+      required: true
+      example: "Max"
+      selector:
+        text:
+    aliases_yaml:
+      name: "Aliase als YAML"
+      description: "YAML-Text mit den Fach-Zuordnungen (z. B. 'Mathematik: [M, Ma, Math]')."
+      example: "Mathematik:\n  - M\n  - Ma\nDeutsch:\n  - D\n  - De"
+      selector:
+        text:
+          multiline: true
+
+
+
 
 
 

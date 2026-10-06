@@ -179,5 +179,52 @@ SERVICE_SET_HOMEWORK_DONE = "set_homework_done"
 SERVICE_SET_PREPARATION_DONE = "set_preparation_done"
 SERVICE_TOGGLE_PREPARED_SUBJECT = "toggle_prepared_subject"
 
+# Eltern-Portal (eltern-portal.org) configuration keys & services
+CONF_PORTAL_ENABLED = "portal_enabled"
+CONF_PORTAL_SCHOOL = "portal_school"
+CONF_PORTAL_USERNAME = "portal_username"
+CONF_PORTAL_PASSWORD = "portal_password"
+CONF_PORTAL_STUDENT_ID = "portal_student_id"
+CONF_PORTAL_STUDENT_NAME = "portal_student_name"
+CONF_PORTAL_SYNC_TIMETABLE = "portal_sync_timetable"
+CONF_PORTAL_SYNC_SUBSTITUTIONS = "portal_sync_substitutions"
+CONF_PORTAL_SYNC_EXAMS = "portal_sync_exams"
+
+CONF_SUBJECT_ALIASES = "subject_aliases"
+CONF_PORTAL_SUBSTITUTIONS = "portal_substitutions"
+CONF_ALIASES_YAML = "aliases_yaml"
+
+SERVICE_TEST_ELTERNPORTAL = "test_elternportal"
+SERVICE_UPDATE_PORTAL_SETTINGS = "update_portal_settings"
+SERVICE_SYNC_ELTERNPORTAL = "sync_elternportal"
+SERVICE_IMPORT_PORTAL_TIMETABLE = "import_portal_timetable"
+SERVICE_UPDATE_SUBJECT_ALIASES = "update_subject_aliases"
+
+# Standard-Wörterbuch deutscher Schulfach-Kürzel & Aliase
+DEFAULT_SUBJECT_ALIASES: dict[str, list[str]] = {
+    "Mathematik": ["M", "Ma", "Math", "Mathe"],
+    "Deutsch": ["D", "De", "Deu"],
+    "Englisch": ["E", "En", "Eng"],
+    "Latein": ["L", "Lat"],
+    "Französisch": ["F", "Fr", "Frz"],
+    "Spanisch": ["Sp", "Spa"],
+    "Italienisch": ["It", "Ita"],
+    "Biologie": ["B", "Bio"],
+    "Physik": ["Ph", "Phy"],
+    "Chemie": ["C", "Ch", "Che"],
+    "Geschichte": ["G", "Ge", "Gesch"],
+    "Geographie": ["Geo", "Erd", "Erdkunde"],
+    "Sozialkunde": ["Sk", "Soz"],
+    "Wirtschaft und Recht": ["WR", "WiRe", "Wirtschaft"],
+    "Informatik": ["Inf", "IT"],
+    "Kunst": ["Ku", "BK"],
+    "Musik": ["Mu"],
+    "Sport": ["Sp", "Spo", "Sm", "Sw"],
+    "Ethik": ["Eth"],
+    "Evangelische Religion": ["Ev", "EvRel", "ER"],
+    "Katholische Religion": ["Kk", "Rk", "KatRel", "KR", "K"],
+    "Natur und Technik": ["NuT", "NTG", "NuT_B", "NuT_NW", "NuT_NWw", "NuT_NWm"],
+}
+
 
 

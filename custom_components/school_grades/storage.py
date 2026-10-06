@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 from datetime import date as dt_date, datetime as dt_datetime, timedelta
 from typing import Any
@@ -11,7 +12,33 @@ from .const import (
     DEFAULT_COUNTRY,
     DEFAULT_SECTION_VISIBILITY,
     DEFAULT_SUBJECTS,
+    DEFAULT_SUBJECT_ALIASES,
 )
+try:
+    from .portal import (
+        school_from_input,
+        resolve_subject_name,
+        parse_subject_aliases_yaml,
+        dump_subject_aliases_yaml,
+    )
+except Exception:
+    def school_from_input(value: str) -> str:
+        val = value.strip().lower()
+        if "eltern-portal.org" in val:
+            if "://" not in val:
+                val = f"https://{val}"
+            from urllib import parse
+            return (parse.urlparse(val).hostname or "").split(".")[0]
+        return val.split("/")[0].strip()
+
+    def resolve_subject_name(raw_name: str, aliases_dict=None, existing_subjects=None) -> str:
+        return raw_name.strip()
+
+    def parse_subject_aliases_yaml(yaml_text: str) -> dict[str, list[str]]:
+        return dict(DEFAULT_SUBJECT_ALIASES)
+
+    def dump_subject_aliases_yaml(aliases: dict[str, list[str]]) -> str:
+        return ""
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -56,6 +83,20 @@ class SchoolGradesData:
                 "schedule": {},
             }
             self.timetable_version: int = 1
+            # Eltern-Portal fields
+            self.portal_enabled: bool = False
+            self.portal_school: str = ""
+            self.portal_username: str = ""
+            self.portal_password: str = ""
+            self.portal_student_id: str = ""
+            self.portal_student_name: str = ""
+            self.portal_sync_timetable: bool = True
+            self.portal_sync_substitutions: bool = True
+            self.portal_sync_exams: bool = True
+            self.portal_last_sync: str = ""
+            self.portal_last_status: str = ""
+            self.subject_aliases: dict[str, list[str]] = dict(DEFAULT_SUBJECT_ALIASES)
+            self.portal_substitutions: dict[str, Any] = {"days": [], "stand": None, "available": False}
         else:
             self.child_name = data.get("child_name", child_name)
             self.country = str(data.get("country", DEFAULT_COUNTRY)).upper()
@@ -77,6 +118,32 @@ class SchoolGradesData:
                 {"slots": list(DEFAULT_TIMETABLE_SLOTS), "schedule": {}},
             )
             self.timetable_version = int(data.get("timetable_version", 1))
+            # Eltern-Portal fields
+            self.portal_enabled = bool(data.get("portal_enabled", False))
+            self.portal_school = school_from_input(str(data.get("portal_school", "")))
+            self.portal_username = str(data.get("portal_username", ""))
+            self.portal_password = str(data.get("portal_password", ""))
+            self.portal_student_id = str(data.get("portal_student_id", ""))
+            self.portal_student_name = str(data.get("portal_student_name", ""))
+            self.portal_sync_timetable = bool(data.get("portal_sync_timetable", True))
+            self.portal_sync_substitutions = bool(data.get("portal_sync_substitutions", True))
+            self.portal_sync_exams = bool(data.get("portal_sync_exams", True))
+            self.portal_last_sync = str(data.get("portal_last_sync", ""))
+            self.portal_last_status = str(data.get("portal_last_status", ""))
+            raw_aliases = data.get("subject_aliases")
+            if isinstance(raw_aliases, dict):
+                self.subject_aliases = {
+                    str(k): [str(x) for x in v] if isinstance(v, list) else []
+                    for k, v in raw_aliases.items()
+                }
+            else:
+                self.subject_aliases = dict(DEFAULT_SUBJECT_ALIASES)
+            self.portal_substitutions = data.get(
+                "portal_substitutions",
+                {"days": [], "stand": None, "available": False},
+            )
+            if not isinstance(self.portal_substitutions, dict):
+                self.portal_substitutions = {"days": [], "stand": None, "available": False}
             # Ensure all subjects have an entry in grades dict
             for subj in self._subjects:
                 if subj not in self._grades:
@@ -99,7 +166,138 @@ class SchoolGradesData:
             "grades": self._grades,
             "timetable": self.timetable,
             "timetable_version": getattr(self, "timetable_version", 1),
+            "portal_enabled": self.portal_enabled,
+            "portal_school": self.portal_school,
+            "portal_username": self.portal_username,
+            "portal_password": self.portal_password,
+            "portal_student_id": self.portal_student_id,
+            "portal_student_name": self.portal_student_name,
+            "portal_sync_timetable": self.portal_sync_timetable,
+            "portal_sync_substitutions": self.portal_sync_substitutions,
+            "portal_sync_exams": self.portal_sync_exams,
+            "portal_last_sync": self.portal_last_sync,
+            "portal_last_status": self.portal_last_status,
+            "subject_aliases": self.subject_aliases,
+            "portal_substitutions": self.portal_substitutions,
         }
+
+    def set_subject_aliases(self, aliases_dict_or_yaml: dict[str, list[str]] | str) -> None:
+        """Update subject aliases dictionary from dict or YAML string."""
+        if isinstance(aliases_dict_or_yaml, str):
+            self.subject_aliases = parse_subject_aliases_yaml(aliases_dict_or_yaml)
+        elif isinstance(aliases_dict_or_yaml, dict):
+            clean: dict[str, list[str]] = {}
+            for k, v in aliases_dict_or_yaml.items():
+                s = str(k).strip()
+                if not s:
+                    continue
+                if isinstance(v, list):
+                    clean[s] = [str(x).strip() for x in v if str(x).strip()]
+                elif isinstance(v, str):
+                    clean[s] = [x.strip() for x in v.split(",") if x.strip()]
+                else:
+                    clean[s] = []
+            self.subject_aliases = clean
+
+    def get_subject_aliases_yaml(self) -> str:
+        """Return subject aliases formatted as YAML string."""
+        return dump_subject_aliases_yaml(self.subject_aliases)
+
+    def resolve_subject(self, raw_name: str) -> str:
+        """Resolve a raw subject abbreviation using child's aliases and subject list."""
+        return resolve_subject_name(raw_name, self.subject_aliases, self._subjects)
+
+    def set_portal_substitutions(self, subst_data: dict[str, Any]) -> None:
+        """Store substitutions data and resolve subject names in entries."""
+        if isinstance(subst_data, dict):
+            resolved_days = []
+            for d in subst_data.get("days", []):
+                if not isinstance(d, dict):
+                    continue
+                resolved_entries = []
+                for e in d.get("entries", []):
+                    if not isinstance(e, dict):
+                        continue
+                    item = dict(e)
+                    subj = str(item.get("subject", "")).strip()
+                    old_subj = str(item.get("old_subject", "")).strip()
+                    if subj:
+                        item["subject_resolved"] = self.resolve_subject(subj)
+                    if old_subj:
+                        item["old_subject_resolved"] = self.resolve_subject(old_subj)
+                    resolved_entries.append(item)
+                resolved_days.append({"date": d.get("date"), "entries": resolved_entries})
+            self.portal_substitutions = {
+                "available": bool(subst_data.get("available", True)),
+                "stand": subst_data.get("stand"),
+                "days": resolved_days,
+            }
+
+    def get_substitutions_for_date(self, target_date: dt_date | str) -> list[dict[str, Any]]:
+        """Return all substitution entries for a given date."""
+        if not self.portal_substitutions or not isinstance(self.portal_substitutions, dict):
+            return []
+        date_iso = target_date.isoformat() if hasattr(target_date, "isoformat") else str(target_date).strip()
+        if "T" in date_iso:
+            date_iso = date_iso.split("T")[0]
+        days = self.portal_substitutions.get("days", [])
+        if not isinstance(days, list):
+            return []
+        for d in days:
+            if isinstance(d, dict) and d.get("date") == date_iso:
+                return list(d.get("entries", []))
+        return []
+
+    def get_substitution_for_slot(
+        self,
+        target_date: dt_date | str,
+        slot_number_or_id: str,
+        weekday_str: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Find matching substitution entry for a lesson slot on a specific date."""
+        entries = self.get_substitutions_for_date(target_date)
+        if not entries:
+            return None
+
+        clean_num = str(slot_number_or_id).replace("slot_", "").strip()
+        for e in entries:
+            if not isinstance(e, dict):
+                continue
+            entry_lesson = str(e.get("lesson", "")).strip()
+            if entry_lesson == clean_num:
+                return e
+            nums = re.findall(r"\d+", entry_lesson)
+            if clean_num in nums:
+                return e
+
+        return None
+
+    def set_portal_settings(
+        self,
+        enabled: bool,
+        school: str = "",
+        username: str = "",
+        password: str | None = None,
+        student_id: str = "",
+        student_name: str = "",
+        sync_timetable: bool | None = None,
+        sync_substitutions: bool | None = None,
+        sync_exams: bool | None = None,
+    ) -> None:
+        """Update Eltern-Portal configuration."""
+        self.portal_enabled = bool(enabled)
+        self.portal_school = school_from_input(school)
+        self.portal_username = username.strip()
+        if password is not None and password != "":
+            self.portal_password = password
+        self.portal_student_id = str(student_id).strip()
+        self.portal_student_name = str(student_name).strip()
+        if sync_timetable is not None:
+            self.portal_sync_timetable = bool(sync_timetable)
+        if sync_substitutions is not None:
+            self.portal_sync_substitutions = bool(sync_substitutions)
+        if sync_exams is not None:
+            self.portal_sync_exams = bool(sync_exams)
 
     def set_grade_level(self, grade_level: str) -> None:
         """Set or update class / grade level."""
@@ -145,7 +343,7 @@ class SchoolGradesData:
 
     def get_next_school_day_subjects(self, ref_date: dt_date | None = None) -> list[str]:
         """Return unique list of subjects on the timetable for the next school day."""
-        day_key, _ = self.get_next_school_day_date(ref_date)
+        day_key, target_date = self.get_next_school_day_date(ref_date)
         timetable = self.timetable or {}
         slots = timetable.get("slots", [])
         schedule = timetable.get("schedule", {})
@@ -161,6 +359,18 @@ class SchoolGradesData:
             subj = str(cell.get("subject", "")).strip()
             if subj and subj not in needed:
                 needed.append(subj)
+
+        # Incorporate substitutions for the target date if available
+        substs = self.get_substitutions_for_date(target_date)
+        if substs:
+            for e in substs:
+                if not isinstance(e, dict):
+                    continue
+                kind = e.get("kind")
+                subst_subj = e.get("subject_resolved") or self.resolve_subject(e.get("subject", ""))
+                if kind == "vertretung" and subst_subj and subst_subj not in needed:
+                    needed.append(subst_subj)
+
         return needed
 
     def check_and_reset_preparation_daily(
@@ -448,6 +658,8 @@ class SchoolGradesData:
             new_timetable["schedule"][slot_id] = {}
 
         clean_subj = str(subject or "").strip()
+        if clean_subj:
+            clean_subj = self.resolve_subject(clean_subj)
         clean_day = str(day or "").strip().lower()
         if not clean_subj:
             new_timetable["schedule"][slot_id].pop(clean_day, None)
@@ -493,6 +705,8 @@ class SchoolGradesData:
                     for slot_id, cell in val1.items():
                         if isinstance(cell, dict):
                             subj = str(cell.get("subject", "") or "").strip()
+                            if subj:
+                                subj = self.resolve_subject(subj)
                             normalized_schedule.setdefault(str(slot_id), {})[day] = {
                                 "subject": subj,
                                 "room": str(cell.get("room", "") or "").strip(),
@@ -509,6 +723,8 @@ class SchoolGradesData:
                         day = str(day_key).lower()
                         if isinstance(cell, dict) and day in valid_days:
                             subj = str(cell.get("subject", "") or "").strip()
+                            if subj:
+                                subj = self.resolve_subject(subj)
                             normalized_schedule.setdefault(slot_id, {})[day] = {
                                 "subject": subj,
                                 "room": str(cell.get("room", "") or "").strip(),

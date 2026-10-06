@@ -15,6 +15,14 @@ const_mod = importlib.util.module_from_spec(const_spec)
 sys.modules["custom_components.school_grades.const"] = const_mod
 const_spec.loader.exec_module(const_mod)
 
+portal_spec = importlib.util.spec_from_file_location(
+    "custom_components.school_grades.portal",
+    project_root / "custom_components" / "school_grades" / "portal.py",
+)
+portal_mod = importlib.util.module_from_spec(portal_spec)
+sys.modules["custom_components.school_grades.portal"] = portal_mod
+portal_spec.loader.exec_module(portal_mod)
+
 storage_spec = importlib.util.spec_from_file_location(
     "custom_components.school_grades.storage",
     project_root / "custom_components" / "school_grades" / "storage.py",
@@ -522,6 +530,178 @@ class TestMultiLanguageSupport(unittest.TestCase):
         primary_langs = ["de", "en", "fr", "it", "es", "nl", "pl", "ru", "zh"]
         for pl in primary_langs:
             self.assertIn(f"{pl}: {{", content, f"Language {pl} block missing in school-grades-panel.js I18N")
+
+    def test_school_from_input_parsing(self):
+        """Test URL and identifier parsing for Eltern-Portal."""
+        sfi = portal_mod.school_from_input
+        self.assertEqual(sfi("https://bspgym.eltern-portal.org"), "bspgym")
+        self.assertEqual(sfi("https://bspgym.eltern-portal.org/start"), "bspgym")
+        self.assertEqual(sfi("bspgym"), "bspgym")
+        self.assertEqual(sfi("demo"), "demo")
+        self.assertEqual(sfi("  https://my-school.eltern-portal.org/  "), "my-school")
+
+    def test_portal_settings_storage(self):
+        """Test storing, updating and serializing Eltern-Portal settings."""
+        data = SchoolGradesData("Felix")
+        self.assertFalse(data.portal_enabled)
+        self.assertEqual(data.portal_school, "")
+
+        data.set_portal_settings(
+            enabled=True,
+            school="https://bspgym.eltern-portal.org",
+            username="parent@example.com",
+            password="secretpassword",
+            student_id="12345",
+            student_name="Felix Mustermann (7a)",
+            sync_timetable=True,
+            sync_substitutions=False,
+            sync_exams=True,
+        )
+        self.assertTrue(data.portal_enabled)
+        self.assertEqual(data.portal_school, "bspgym")
+        self.assertEqual(data.portal_username, "parent@example.com")
+        self.assertEqual(data.portal_password, "secretpassword")
+        self.assertEqual(data.portal_student_id, "12345")
+        self.assertEqual(data.portal_student_name, "Felix Mustermann (7a)")
+        self.assertTrue(data.portal_sync_timetable)
+        self.assertFalse(data.portal_sync_substitutions)
+        self.assertTrue(data.portal_sync_exams)
+
+        # Update without re-entering password
+        data.set_portal_settings(
+            enabled=True,
+            school="bspgym",
+            username="newuser@example.com",
+            password="",  # Preserves existing password
+            student_id="12345",
+            student_name="Felix Mustermann (7a)",
+        )
+        self.assertEqual(data.portal_password, "secretpassword")
+        self.assertEqual(data.portal_username, "newuser@example.com")
+
+        # Serialized dictionary contains portal fields
+        d = data.to_dict()
+        self.assertTrue(d["portal_enabled"])
+        self.assertEqual(d["portal_school"], "bspgym")
+        self.assertEqual(d["portal_username"], "newuser@example.com")
+        self.assertEqual(d["portal_password"], "secretpassword")
+        self.assertEqual(d["portal_student_id"], "12345")
+        self.assertFalse(d["portal_sync_substitutions"])
+
+    def test_subject_alias_resolution(self):
+        """Test resolving abbreviations to full subject names."""
+        aliases = {
+            "Mathematik": ["M", "Ma", "Math"],
+            "Deutsch": ["D", "De"],
+            "Wirtschaft und Recht": ["WR", "WiRe"],
+        }
+        existing = ["Mathematik", "Deutsch", "Englisch", "Sport"]
+
+        # Matches existing
+        self.assertEqual(portal_mod.resolve_subject_name("Mathematik", aliases, existing), "Mathematik")
+        # Matches alias list -> key
+        self.assertEqual(portal_mod.resolve_subject_name("Ma", aliases, existing), "Mathematik")
+        self.assertEqual(portal_mod.resolve_subject_name("De", aliases, existing), "Deutsch")
+        self.assertEqual(portal_mod.resolve_subject_name("WR", aliases, existing), "Wirtschaft und Recht")
+        # Exact alias key
+        self.assertEqual(portal_mod.resolve_subject_name("wirtschaft und recht", aliases, existing), "Wirtschaft und Recht")
+        # Prefix match
+        self.assertEqual(portal_mod.resolve_subject_name("Engl", aliases, existing), "Englisch")
+        # Unknown fallback
+        self.assertEqual(portal_mod.resolve_subject_name("Astronomie", aliases, existing), "Astronomie")
+
+    def test_subject_aliases_yaml_parsing_and_dumping(self):
+        """Test parsing and dumping subject aliases YAML."""
+        yaml_text = """
+Mathematik:
+  - M
+  - Ma
+Deutsch:
+  - D
+  - De
+"""
+        parsed = portal_mod.parse_subject_aliases_yaml(yaml_text)
+        self.assertIn("Mathematik", parsed)
+        self.assertEqual(parsed["Mathematik"], ["M", "Ma"])
+        self.assertEqual(parsed["Deutsch"], ["D", "De"])
+
+        dumped = portal_mod.dump_subject_aliases_yaml(parsed)
+        reparsed = portal_mod.parse_subject_aliases_yaml(dumped)
+        self.assertEqual(parsed, reparsed)
+
+    def test_substitutions_storage_and_matching(self):
+        """Test storing substitutions and slot/day matching in SchoolGradesData."""
+        data = SchoolGradesData("Max")
+        data.timetable = {
+            "slots": [
+                {"id": "slot_1", "type": "lesson", "number": "1", "label": "1. Stunde", "start": "08:00", "end": "08:45"},
+                {"id": "slot_2", "type": "lesson", "number": "2", "label": "2. Stunde", "start": "08:45", "end": "09:30"},
+            ],
+            "schedule": {
+                "slot_1": {"monday": {"subject": "Mathematik", "room": "R101"}},
+                "slot_2": {"monday": {"subject": "Deutsch", "room": "R101"}},
+            },
+        }
+
+        subst_data = {
+            "available": True,
+            "stand": "06.10.2026 07:30",
+            "days": [
+                {
+                    "date": "2026-10-06",
+                    "entries": [
+                        {
+                            "lesson": "1",
+                            "teacher": "Mst",
+                            "substitute": "Sch",
+                            "subject": "Ma",
+                            "room": "R204",
+                            "info": "Vertretung",
+                            "kind": "vertretung",
+                        },
+                        {
+                            "lesson": "2",
+                            "teacher": "Lrn",
+                            "substitute": "---",
+                            "subject": "De",
+                            "room": "",
+                            "info": "Entfällt",
+                            "kind": "entfall",
+                        },
+                    ],
+                }
+            ],
+        }
+
+        data.set_portal_substitutions(subst_data)
+        entries = data.get_substitutions_for_date("2026-10-06")
+        self.assertEqual(len(entries), 2)
+        self.assertEqual(entries[0]["subject_resolved"], "Mathematik")
+        self.assertEqual(entries[1]["subject_resolved"], "Deutsch")
+        self.assertEqual(entries[1]["kind"], "entfall")
+
+        slot1_subst = data.get_substitution_for_slot("2026-10-06", "slot_1")
+        self.assertIsNotNone(slot1_subst)
+        self.assertEqual(slot1_subst["substitute"], "Sch")
+
+        slot2_subst = data.get_substitution_for_slot("2026-10-06", "2")
+        self.assertIsNotNone(slot2_subst)
+        self.assertEqual(slot2_subst["kind"], "entfall")
+
+    def test_convert_portal_lessons_to_timetable(self):
+        """Test converting parsed portal lessons into SchoolGrades timetable structure."""
+        lessons = [
+            {"weekday": 1, "lesson": "1", "start": "08:00", "end": "08:45", "subject": "Ma", "room": "R101"},
+            {"weekday": 1, "lesson": "2", "start": "08:45", "end": "09:30", "subject": "De", "room": "R101"},
+        ]
+        tt = portal_mod.convert_portal_lessons_to_timetable(lessons)
+        self.assertIn("slots", tt)
+        self.assertIn("schedule", tt)
+        slot1_data = tt["schedule"]["slot_1"]["monday"]
+        self.assertEqual(slot1_data["subject"], "Mathematik")
+        self.assertEqual(slot1_data["raw_subject"], "Ma")
+        self.assertEqual(slot1_data["room"], "R101")
+
 
 
 
