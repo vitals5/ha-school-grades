@@ -2207,13 +2207,60 @@ class SchoolGradesPanel extends HTMLElement {
     const dayObj = substitutions.days.find(d => d.date === dateIso);
     if (!dayObj || !Array.isArray(dayObj.entries)) return null;
 
+    // A substitution only matches if the timetable cell actually has a scheduled subject
+    const subjStr = String(subject || '').trim().toLowerCase();
+    if (!subjStr) return null;
+
     const numStr = String(slotNum || slotId || '').replace(/^slot_/, '').trim();
     for (const e of dayObj.entries) {
       const eLesson = String(e.lesson || '').trim();
-      if (eLesson === numStr) return e;
       const digits = eLesson.match(/\d+/g) || [];
-      if (digits.includes(numStr)) return e;
-      if (subject && (e.subject_resolved === subject || e.subject === subject)) return e;
+      const lessonMatches = (eLesson === numStr) || digits.includes(numStr);
+      if (!lessonMatches) continue;
+
+      const eSubj = String(e.subject || '').trim().toLowerCase();
+      const eSubjRes = String(e.subject_resolved || '').trim().toLowerCase();
+      const eOldSubj = String(e.old_subject || '').trim().toLowerCase();
+      const eOldSubjRes = String(e.old_subject_resolved || '').trim().toLowerCase();
+
+      // If substitution entry has no subject at all, it's a general cancellation/substitution for this lesson
+      if (!eSubj && !eSubjRes && !eOldSubj && !eOldSubjRes) {
+        return e;
+      }
+
+      // Exact match with subject or resolved subject
+      if (
+        eSubj === subjStr ||
+        eSubjRes === subjStr ||
+        eOldSubj === subjStr ||
+        eOldSubjRes === subjStr
+      ) {
+        return e;
+      }
+
+      // Check base names without trailing numbers (e.g. L1 vs L)
+      const subjBase = subjStr.replace(/\d+$/, '').trim();
+      const eSubjBase = eSubj.replace(/\d+$/, '').trim();
+      if (subjBase && eSubjBase && subjBase === eSubjBase) {
+        return e;
+      }
+
+      // Handle slash-separated electives (e.g. Mu/Cho or Eth/K/Ev)
+      if (subjStr.includes('/')) {
+        const parts = subjStr.split('/').map(p => p.trim()).filter(Boolean);
+        for (const p of parts) {
+          const pBase = p.replace(/\d+$/, '').trim();
+          if (
+            p === eSubj ||
+            p === eSubjRes ||
+            p === eOldSubj ||
+            p === eOldSubjRes ||
+            (pBase && eSubjBase && pBase === eSubjBase)
+          ) {
+            return e;
+          }
+        }
+      }
     }
     return null;
   }
@@ -3069,7 +3116,7 @@ Natur und Technik:
               </div>
 
               <div class="modal-actions">
-                <button type="button" class="delete-btn" id="modal-delete-btn" ${!this._editingCell.subject ? 'disabled style="opacity:0.4;cursor:not-allowed;"' : ''}>${this._t('delete_btn')}</button>
+                <button type="button" class="delete-btn" id="modal-delete-btn">${this._t('delete_btn')}</button>
                 <div class="modal-actions-right">
                   <button type="button" class="submit-btn secondary" id="modal-cancel-btn">${this._t('cancel_btn')}</button>
                   <button type="submit" class="submit-btn">${this._t('save_btn')}</button>
@@ -3899,8 +3946,44 @@ Natur und Technik:
           const selectElem = root.querySelector('#settings-delete-subject-select');
           const subject = selectElem ? selectElem.value : '';
           if (subject && confirm(this._t('delete_subject_confirm', { subject: subject }))) {
+            const childName = this._selectedChild;
+
+            // Optimistically purge subject from local timetable schedule
+            if (this._localTimetableSchedule && this._localTimetableSchedule[childName]) {
+              for (const slotMap of Object.values(this._localTimetableSchedule[childName])) {
+                if (slotMap && typeof slotMap === 'object') {
+                  for (const [dayKey, cell] of Object.entries(slotMap)) {
+                    if (cell && cell.subject === subject) {
+                      slotMap[dayKey] = { subject: '', room: '', teacher: '' };
+                    }
+                  }
+                }
+              }
+            }
+
+            // Optimistically remove from current child data
+            const currentChild = this._data && this._data[childName];
+            if (currentChild) {
+              if (currentChild.subjects) {
+                delete currentChild.subjects[subject];
+              }
+              if (currentChild.timetable && currentChild.timetable.schedule) {
+                for (const slotMap of Object.values(currentChild.timetable.schedule)) {
+                  if (slotMap && typeof slotMap === 'object') {
+                    for (const [dayKey, cell] of Object.entries(slotMap)) {
+                      if (cell && cell.subject === subject) {
+                        delete slotMap[dayKey];
+                      }
+                    }
+                  }
+                }
+              }
+            }
+
+            this.render();
+
             await this._hass.callService('school_grades', 'remove_subject', {
-              child_name: this._selectedChild,
+              child_name: childName,
               subject: subject,
             });
             setTimeout(() => this.render(), 200);
@@ -4447,6 +4530,17 @@ Natur und Technik:
             teacher: '',
           };
 
+          // Also remove directly from current child schedule immediately
+          const currentChild = this._data && this._data[childName];
+          if (currentChild && currentChild.timetable && currentChild.timetable.schedule) {
+            const possibleSlots = [slotId, slotId.startsWith('slot_') ? slotId.replace('slot_', '') : `slot_${slotId}`];
+            for (const ps of possibleSlots) {
+              if (currentChild.timetable.schedule[ps]) {
+                delete currentChild.timetable.schedule[ps][day];
+              }
+            }
+          }
+
           this._editingCell = null;
           this.render();
 
@@ -4478,8 +4572,8 @@ Natur und Technik:
           if (subjectVal === '__custom__') {
             subjectVal = (root.querySelector('#modal-custom-subject').value || '').trim();
           }
-          const roomVal = (root.querySelector('#modal-room').value || '').trim();
-          const teacherVal = (root.querySelector('#modal-teacher').value || '').trim();
+          const roomVal = subjectVal ? (root.querySelector('#modal-room').value || '').trim() : '';
+          const teacherVal = subjectVal ? (root.querySelector('#modal-teacher').value || '').trim() : '';
 
           // Optimistically update local timetable schedule
           if (!this._localTimetableSchedule) this._localTimetableSchedule = {};
@@ -4490,6 +4584,16 @@ Natur und Technik:
             room: roomVal,
             teacher: teacherVal,
           };
+
+          const currentChild = this._data && this._data[childName];
+          if (!subjectVal && currentChild && currentChild.timetable && currentChild.timetable.schedule) {
+            const possibleSlots = [slotId, slotId.startsWith('slot_') ? slotId.replace('slot_', '') : `slot_${slotId}`];
+            for (const ps of possibleSlots) {
+              if (currentChild.timetable.schedule[ps]) {
+                delete currentChild.timetable.schedule[ps][day];
+              }
+            }
+          }
 
           this._editingCell = null;
           this.render();

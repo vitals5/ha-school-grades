@@ -82,9 +82,14 @@ class TestSchoolGradesLogic(unittest.TestCase):
         self.assertIn("Informatik", data.subjects)
         self.assertFalse(data.add_subject("Informatik"))
 
+        data.update_timetable_cell("slot_1", "tuesday", "Informatik", "R102", "Hr. Weber")
+        self.assertEqual(data.timetable["schedule"]["slot_1"]["tuesday"]["subject"], "Informatik")
+
         data.add_grade("Informatik", 1.0, 1.0)
         self.assertTrue(data.remove_subject("Informatik"))
         self.assertNotIn("Informatik", data.subjects)
+        # Verify timetable cell was also purged
+        self.assertNotIn("tuesday", data.timetable["schedule"]["slot_1"])
 
     def test_timetable_cell_update(self):
         data = SchoolGradesData("Richard")
@@ -111,6 +116,18 @@ class TestSchoolGradesLogic(unittest.TestCase):
         self.assertNotIn("monday", data.timetable["schedule"]["slot_1"])
         self.assertIsNot(data.timetable, mid_timetable)
         self.assertEqual(data.timetable_version, initial_version + 2)
+
+        # Test cross-key variant clearing (schedule has "slot_1", cleared with "1")
+        data.update_timetable_cell("1", "wednesday", "Chemie", "R300", "Hr. Nobel")
+        self.assertEqual(data.timetable["schedule"]["slot_1"]["wednesday"]["subject"], "Chemie")
+        data.update_timetable_cell("1", "wednesday", "", "", "")
+        self.assertNotIn("wednesday", data.timetable["schedule"]["slot_1"])
+
+        # Test schedule with key "2", cleared with "slot_2"
+        data.timetable["schedule"]["2"] = {"thursday": {"subject": "Biologie", "room": "BIO1", "teacher": "Fr. Darwin"}}
+        self.assertIn("thursday", data.timetable["schedule"]["2"])
+        data.update_timetable_cell("slot_2", "thursday", "", "", "")
+        self.assertNotIn("thursday", data.timetable["schedule"]["2"])
 
     def test_timetable_yaml_import(self):
         data = SchoolGradesData("Richard")

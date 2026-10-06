@@ -668,17 +668,28 @@ class SchoolGradesData:
         new_timetable = copy.deepcopy(self.timetable)
         if "schedule" not in new_timetable or not isinstance(new_timetable["schedule"], dict):
             new_timetable["schedule"] = {}
-        if slot_id not in new_timetable["schedule"]:
-            new_timetable["schedule"][slot_id] = {}
 
         clean_subj = str(subject or "").strip()
         if clean_subj:
             clean_subj = self.resolve_subject(clean_subj)
         clean_day = str(day or "").strip().lower()
-        if not clean_subj:
-            new_timetable["schedule"][slot_id].pop(clean_day, None)
+
+        slot_str = str(slot_id).strip()
+        possible_slot_keys = [slot_str]
+        if slot_str.startswith("slot_"):
+            possible_slot_keys.append(slot_str[5:])
         else:
-            new_timetable["schedule"][slot_id][clean_day] = {
+            possible_slot_keys.append(f"slot_{slot_str}")
+
+        if not clean_subj:
+            for sk in possible_slot_keys:
+                if sk in new_timetable["schedule"] and isinstance(new_timetable["schedule"][sk], dict):
+                    new_timetable["schedule"][sk].pop(clean_day, None)
+        else:
+            target_key = next((sk for sk in possible_slot_keys if sk in new_timetable["schedule"]), slot_str)
+            if target_key not in new_timetable["schedule"]:
+                new_timetable["schedule"][target_key] = {}
+            new_timetable["schedule"][target_key][clean_day] = {
                 "subject": clean_subj,
                 "room": str(room or "").strip(),
                 "teacher": str(teacher or "").strip(),
@@ -771,13 +782,28 @@ class SchoolGradesData:
         return True
 
     def remove_subject(self, subject: str) -> bool:
-        """Remove a subject and all its recorded grades."""
+        """Remove a subject, all its recorded grades, and any timetable cells referencing it."""
         clean_subj = subject.strip()
-        if clean_subj not in self._subjects:
-            return False
-        self._subjects.remove(clean_subj)
-        self._grades.pop(clean_subj, None)
-        return True
+        removed = False
+
+        if clean_subj in self._subjects:
+            self._subjects.remove(clean_subj)
+            self._grades.pop(clean_subj, None)
+            removed = True
+
+        # Also purge subject from timetable schedule
+        if "schedule" in self.timetable and isinstance(self.timetable["schedule"], dict):
+            for slot_id, days in list(self.timetable["schedule"].items()):
+                if isinstance(days, dict):
+                    for day_key, cell in list(days.items()):
+                        if isinstance(cell, dict) and cell.get("subject") == clean_subj:
+                            days.pop(day_key, None)
+                            removed = True
+
+        if removed:
+            self.timetable_version = getattr(self, "timetable_version", 1) + 1
+
+        return removed
 
     def add_grade(
         self,
