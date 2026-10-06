@@ -659,6 +659,47 @@ class TestMultiLanguageSupport(unittest.TestCase):
             "Religion"
         )
 
+        # 6. resolve_subject_with_index: returns matched index for slash-separated subjects
+        res_subj, matched_idx = portal_mod.resolve_subject_with_index(
+            "Eth/K/Ev",
+            {"Religion": ["Rel", "K"]},
+            ["Mathematik", "Religion"]
+        )
+        self.assertEqual(res_subj, "Religion")
+        self.assertEqual(matched_idx, 1)
+
+        res_subj, matched_idx = portal_mod.resolve_subject_with_index(
+            "Eth/K/Ev",
+            const_mod.DEFAULT_SUBJECT_ALIASES,
+            ["Mathematik", "Katholische Religion"]
+        )
+        self.assertEqual(res_subj, "Katholische Religion")
+        self.assertEqual(matched_idx, 1)
+
+        res_subj, matched_idx = portal_mod.resolve_subject_with_index(
+            "Mu/Cho",
+            full_aliases,
+            ["Mathematik", "Musik"]
+        )
+        self.assertEqual(res_subj, "Musik")
+        self.assertEqual(matched_idx, 0)
+
+        res_subj, matched_idx = portal_mod.resolve_subject_with_index(
+            "Mu/Cho",
+            full_aliases,
+            ["Mathematik", "Chor"]
+        )
+        self.assertEqual(res_subj, "Chor")
+        self.assertEqual(matched_idx, 1)
+
+        res_subj, matched_idx = portal_mod.resolve_subject_with_index(
+            "Mathematik",
+            full_aliases,
+            ["Mathematik"]
+        )
+        self.assertEqual(res_subj, "Mathematik")
+        self.assertIsNone(matched_idx)
+
     def test_subject_aliases_yaml_parsing_and_dumping(self):
         """Test parsing and dumping subject aliases YAML."""
         yaml_text = """
@@ -737,19 +778,69 @@ Deutsch:
         self.assertIsNotNone(slot2_subst)
         self.assertEqual(slot2_subst["kind"], "entfall")
 
+        # Test substitution entry with slash subject/teacher/room
+        subst_slash = {
+            "days": [
+                {
+                    "date": "2026-10-07",
+                    "entries": [
+                        {
+                            "lesson": "3",
+                            "subject": "Eth/K/Ev",
+                            "teacher": "Re/Li/Ma",
+                            "room": "105/853/333",
+                            "substitute": "Vertretung",
+                            "kind": "vertretung",
+                        }
+                    ],
+                }
+            ]
+        }
+        child = SchoolGradesData("Lena")
+        child.subject_aliases = {"Religion": ["Rel", "K"]}
+        child._subjects = ["Mathematik", "Religion"]
+        child.set_portal_substitutions(subst_slash)
+        entries_slash = child.get_substitutions_for_date("2026-10-07")
+        self.assertEqual(len(entries_slash), 1)
+        self.assertEqual(entries_slash[0]["subject_resolved"], "Religion")
+        self.assertEqual(entries_slash[0]["teacher"], "Li")
+        self.assertEqual(entries_slash[0]["room"], "853")
+
     def test_convert_portal_lessons_to_timetable(self):
         """Test converting parsed portal lessons into SchoolGrades timetable structure."""
         lessons = [
             {"weekday": 1, "lesson": "1", "start": "08:00", "end": "08:45", "subject": "Ma", "room": "R101"},
             {"weekday": 1, "lesson": "2", "start": "08:45", "end": "09:30", "subject": "De", "room": "R101"},
+            {
+                "weekday": 2,
+                "lesson": "3",
+                "start": "09:45",
+                "end": "10:30",
+                "subject": "Eth/K/Ev",
+                "teacher": "Re/Li/Ma",
+                "room": "105/853/333",
+            },
         ]
-        tt = portal_mod.convert_portal_lessons_to_timetable(lessons)
+        tt = portal_mod.convert_portal_lessons_to_timetable(
+            lessons,
+            aliases={"Religion": ["Rel", "K"]},
+            existing_subjects=["Mathematik", "Religion"],
+        )
         self.assertIn("slots", tt)
         self.assertIn("schedule", tt)
         slot1_data = tt["schedule"]["slot_1"]["monday"]
         self.assertEqual(slot1_data["subject"], "Mathematik")
         self.assertEqual(slot1_data["raw_subject"], "Ma")
         self.assertEqual(slot1_data["room"], "R101")
+
+        # Verify positional slash resolution: Eth/K/Ev (index 1 for K) -> Li and 853
+        slot3_tuesday = tt["schedule"]["slot_3"]["tuesday"]
+        self.assertEqual(slot3_tuesday["subject"], "Religion")
+        self.assertEqual(slot3_tuesday["teacher"], "Li")
+        self.assertEqual(slot3_tuesday["room"], "853")
+        self.assertEqual(slot3_tuesday["raw_subject"], "Eth/K/Ev")
+        self.assertEqual(slot3_tuesday["raw_teacher"], "Re/Li/Ma")
+        self.assertEqual(slot3_tuesday["raw_room"], "105/853/333")
 
         # Verify slots are sorted chronologically by start time: breaks appear in correct order
         slot_ids = [s["id"] for s in tt["slots"]]

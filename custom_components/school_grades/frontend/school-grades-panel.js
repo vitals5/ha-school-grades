@@ -2313,6 +2313,7 @@ Evangelische Religion:
   - EvRel
   - ER
   - Evan
+  - Evangelisch
 Katholische Religion:
   - Kk
   - Rk
@@ -2320,6 +2321,7 @@ Katholische Religion:
   - KR
   - K
   - Kath
+  - Katholisch
 Natur und Technik:
   - NuT
   - NTG

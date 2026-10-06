@@ -76,23 +76,25 @@ def school_from_input(value: str) -> str:
     return val
 
 
-def resolve_subject_name(
+def resolve_subject_with_index(
     raw_name: str,
     aliases_dict: dict[str, list[str]] | None = None,
     existing_subjects: list[str] | None = None,
-) -> str:
-    """Resolve a subject abbreviation or code to a full subject name.
+) -> tuple[str, int | None]:
+    """Resolve a subject abbreviation or code to a full subject name,
+    and return the 0-based index of the matched part if slash-separated.
 
     Supports:
       - Trailing digit stripping (e.g., 'L1' -> 'Latein', 'E2' -> 'Englisch')
       - Slash-separated alternatives (e.g., 'Eth/K/Ev', 'Mu/Cho', 'Smd/Swd') matched
         against student's existing subjects or explicit YAML aliases.
+      - Positional matching of teacher and room when multiple options are separated by slashes.
     """
     if not raw_name:
-        return ""
+        return ("", None)
     clean = raw_name.strip()
     if not clean:
-        return ""
+        return ("", None)
 
     existing = [s.strip() for s in (existing_subjects or []) if s.strip()]
     aliases = aliases_dict if aliases_dict is not None else DEFAULT_SUBJECT_ALIASES
@@ -144,56 +146,111 @@ def resolve_subject_name(
 
         return None
 
+    # Step 0: If no slashes, resolve single code directly
+    if "/" not in clean:
+        res = _resolve_single(clean)
+        return (res if res else clean, None)
+
+    parts = [p.strip() for p in clean.split("/")]
+    if len(parts) <= 1:
+        res = _resolve_single(clean)
+        return (res if res else clean, None)
+
+    # Resolve each part individually
+    resolved_parts = []
+    for p in parts:
+        r = _resolve_single(p)
+        resolved_parts.append(r if r else p)
+
     # Step 1: Check full string first (e.g. if 'Eth/K/Ev' is directly configured as an alias in YAML)
     full_resolved = _resolve_single(clean)
     if full_resolved:
-        return full_resolved
+        matched_idx = None
+        for idx, p in enumerate(parts):
+            rp = resolved_parts[idx]
+            if rp.lower() == full_resolved.lower() or ("religion" in rp.lower() and "religion" in full_resolved.lower()):
+                matched_idx = idx
+                break
+            f_aliases = aliases.get(full_resolved, [])
+            p_cands = [p, re.sub(r"\d+$", "", p).strip()]
+            if any(any(pc.lower() == str(a).strip().lower() for a in f_aliases) for pc in p_cands if pc):
+                matched_idx = idx
+                break
+        return (full_resolved, matched_idx)
 
-    # Step 2: Handle slash-separated subjects (e.g. 'Eth/K/Ev', 'Mu/Cho', 'Smd/Swd', 'Smd/Smd/Smd')
-    if "/" in clean:
-        parts = [p.strip() for p in clean.split("/") if p.strip()]
-        if len(parts) > 1:
-            resolved_parts = []
-            for p in parts:
-                r = _resolve_single(p)
-                resolved_parts.append(r if r else p)
+    # Step 2: Check which parts match a student's configured aliases for an existing subject
+    # (High priority: user explicitly put e.g. 'K' in their child's YAML aliases for 'Religion' or 'Katholisch')
+    alias_matches: list[tuple[int, str]] = []
+    for idx, p in enumerate(parts):
+        p_cands = [p, re.sub(r"\d+$", "", p).strip()]
+        for pc in p_cands:
+            if not pc:
+                continue
+            for s in existing:
+                s_aliases = aliases.get(s, [])
+                if any(pc.lower() == str(a).strip().lower() for a in s_aliases):
+                    alias_matches.append((idx, s))
+                    break
 
-            # Case 2a: All parts map to the same subject (e.g. Smd/Smd/Smd or Smd/Swd -> Sport)
-            unique_resolved = list(dict.fromkeys(resolved_parts))
-            if len(unique_resolved) == 1:
-                return unique_resolved[0]
+    seen_idx = set()
+    unique_alias_matches = []
+    for idx, s in alias_matches:
+        if idx not in seen_idx:
+            seen_idx.add(idx)
+            unique_alias_matches.append((idx, s))
 
-            # Case 2b: Check which parts match a subject this student actually takes (existing_subjects)
-            matching_existing = []
-            for rp in unique_resolved:
-                for s in existing:
-                    if rp.lower() == s.lower():
-                        matching_existing.append(s)
-                    elif "religion" in rp.lower() and "religion" in s.lower():
-                        matching_existing.append(s)
+    unique_alias_subjects = list(dict.fromkeys(s for _, s in unique_alias_matches))
+    if len(unique_alias_subjects) == 1:
+        return (unique_alias_subjects[0], unique_alias_matches[0][0])
 
-            matching_existing = list(dict.fromkeys(matching_existing))
-            if len(matching_existing) == 1:
-                return matching_existing[0]
+    # Step 3: Check which parts match an enrolled existing subject
+    existing_matches: list[tuple[int, str]] = []
+    for idx, rp in enumerate(resolved_parts):
+        for s in existing:
+            if rp.lower() == s.lower():
+                existing_matches.append((idx, s))
+                break
+            elif "religion" in rp.lower() and "religion" in s.lower():
+                existing_matches.append((idx, s))
+                break
 
-            # Case 2c: Check if any raw part matches a student's configured aliases for an existing subject
-            for p in parts:
-                p_cands = [p, re.sub(r"\d+$", "", p).strip()]
-                for pc in p_cands:
-                    if not pc:
-                        continue
-                    for s in existing:
-                        s_aliases = aliases.get(s, [])
-                        if any(pc.lower() == str(a).strip().lower() for a in s_aliases):
-                            return s
+    seen_idx = set()
+    unique_existing_matches = []
+    for idx, s in existing_matches:
+        if idx not in seen_idx:
+            seen_idx.add(idx)
+            unique_existing_matches.append((idx, s))
 
-            # Case 2d: If only one resolved part was mapped to a known subject, use it
-            known_candidates = [rp for rp in unique_resolved if rp not in parts]
-            if len(known_candidates) == 1:
-                return known_candidates[0]
+    unique_existing_subjects = list(dict.fromkeys(s for _, s in unique_existing_matches))
+    if len(unique_existing_subjects) == 1:
+        return (unique_existing_subjects[0], unique_existing_matches[0][0])
 
-    # Step 3: Fallback to original cleaned name
-    return clean
+    # Step 4: Check if all parts map to the same subject (e.g. Smd/Swd or Smd/Smd/Smd -> Sport)
+    unique_resolved = list(dict.fromkeys(resolved_parts))
+    if len(unique_resolved) == 1:
+        idx = unique_alias_matches[0][0] if len(unique_alias_matches) == 1 else None
+        return (unique_resolved[0], idx)
+
+    # Step 5: If only one resolved part was mapped to a known subject, use it
+    known_candidates: list[tuple[int, str]] = []
+    for idx, rp in enumerate(resolved_parts):
+        if rp not in parts:
+            known_candidates.append((idx, rp))
+    if len(known_candidates) == 1:
+        return (known_candidates[0][1], known_candidates[0][0])
+
+    # Step 6: Fallback to original cleaned name
+    return (clean, None)
+
+
+def resolve_subject_name(
+    raw_name: str,
+    aliases_dict: dict[str, list[str]] | None = None,
+    existing_subjects: list[str] | None = None,
+) -> str:
+    """Resolve a subject abbreviation or code to a full subject name."""
+    res, _ = resolve_subject_with_index(raw_name, aliases_dict, existing_subjects)
+    return res
 
 
 def parse_subject_aliases_yaml(yaml_text: str) -> dict[str, list[str]]:
@@ -507,13 +564,34 @@ def convert_portal_lessons_to_timetable(
             schedule[slot_id] = {}
 
         raw_subject = str(item.get("subject", "")).strip()
-        resolved_subject = resolve_subject_name(raw_subject, aliases, existing_subjects)
+        raw_room = str(item.get("room", "")).strip()
+        raw_teacher = str(item.get("teacher", "")).strip()
+
+        resolved_subject, matched_idx = resolve_subject_with_index(
+            raw_subject, aliases, existing_subjects
+        )
+
+        final_room = raw_room
+        final_teacher = raw_teacher
+
+        if matched_idx is not None:
+            if "/" in raw_teacher:
+                teacher_parts = [p.strip() for p in raw_teacher.split("/")]
+                if 0 <= matched_idx < len(teacher_parts):
+                    final_teacher = teacher_parts[matched_idx]
+
+            if "/" in raw_room:
+                room_parts = [p.strip() for p in raw_room.split("/")]
+                if 0 <= matched_idx < len(room_parts):
+                    final_room = room_parts[matched_idx]
 
         schedule[slot_id][day_key] = {
             "subject": resolved_subject,
-            "room": str(item.get("room", "")).strip(),
-            "teacher": str(item.get("teacher", "")).strip(),
+            "room": final_room,
+            "teacher": final_teacher,
             "raw_subject": raw_subject,
+            "raw_room": raw_room,
+            "raw_teacher": raw_teacher,
         }
 
     return {"slots": slots, "schedule": schedule}

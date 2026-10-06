@@ -239,8 +239,8 @@ DEFAULT_SUBJECT_ALIASES: dict[str, list[str]] = {
     "Sport": ["Sp", "Spo", "Sm", "Sw", "Smd", "Swd", "Out"],
     "Religion": ["Rel"],
     "Ethik": ["Eth"],
-    "Evangelische Religion": ["Ev", "EvRel", "ER", "Evan"],
-    "Katholische Religion": ["Kk", "Rk", "KatRel", "KR", "K", "Kath"],
+    "Evangelische Religion": ["Ev", "EvRel", "ER", "Evan", "Evangelisch"],
+    "Katholische Religion": ["Kk", "Rk", "KatRel", "KR", "K", "Kath", "Katholisch"],
     "Natur und Technik": ["NuT", "NTG", "NuTB", "NuTP", "NuT_B", "NuT_NW", "NuT_NWw", "NuT_NWm"],
 }
 

@@ -19,6 +19,7 @@ try:
     from .portal import (
         school_from_input,
         resolve_subject_name,
+        resolve_subject_with_index,
         parse_subject_aliases_yaml,
         dump_subject_aliases_yaml,
     )
@@ -34,6 +35,9 @@ except Exception:
 
     def resolve_subject_name(raw_name: str, aliases_dict=None, existing_subjects=None) -> str:
         return raw_name.strip()
+
+    def resolve_subject_with_index(raw_name: str, aliases_dict=None, existing_subjects=None) -> tuple[str, int | None]:
+        return (raw_name.strip(), None)
 
     def parse_subject_aliases_yaml(yaml_text: str) -> dict[str, list[str]]:
         return dict(DEFAULT_SUBJECT_ALIASES)
@@ -197,6 +201,10 @@ class SchoolGradesData:
         """Resolve a raw subject abbreviation using child's aliases and subject list."""
         return resolve_subject_name(raw_name, self.subject_aliases, self._subjects)
 
+    def resolve_subject_with_index(self, raw_name: str) -> tuple[str, int | None]:
+        """Resolve a raw subject abbreviation and return matched index if slash-separated."""
+        return resolve_subject_with_index(raw_name, self.subject_aliases, self._subjects)
+
     def set_portal_substitutions(self, subst_data: dict[str, Any]) -> None:
         """Store substitutions data and resolve subject names in entries."""
         if isinstance(subst_data, dict):
@@ -211,10 +219,26 @@ class SchoolGradesData:
                     item = dict(e)
                     subj = str(item.get("subject", "")).strip()
                     old_subj = str(item.get("old_subject", "")).strip()
+                    matched_idx = None
                     if subj:
-                        item["subject_resolved"] = self.resolve_subject(subj)
+                        item["subject_resolved"], matched_idx = self.resolve_subject_with_index(subj)
                     if old_subj:
-                        item["old_subject_resolved"] = self.resolve_subject(old_subj)
+                        item["old_subject_resolved"], old_idx = self.resolve_subject_with_index(old_subj)
+                        if matched_idx is None:
+                            matched_idx = old_idx
+
+                    if matched_idx is not None:
+                        t_val = str(item.get("teacher", "")).strip()
+                        if "/" in t_val:
+                            t_parts = [p.strip() for p in t_val.split("/")]
+                            if 0 <= matched_idx < len(t_parts):
+                                item["teacher"] = t_parts[matched_idx]
+                        r_val = str(item.get("room", "")).strip()
+                        if "/" in r_val:
+                            r_parts = [p.strip() for p in r_val.split("/")]
+                            if 0 <= matched_idx < len(r_parts):
+                                item["room"] = r_parts[matched_idx]
+
                     resolved_entries.append(item)
                 resolved_days.append({"date": d.get("date"), "entries": resolved_entries})
             self.portal_substitutions = {
