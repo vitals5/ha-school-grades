@@ -128,11 +128,26 @@ def resolve_subject_with_index(
 
             # Match within alias list
             for key, alias_list in aliases.items():
-                if any(cand_l == str(a).strip().lower() for a in alias_list):
-                    for s in existing:
-                        if s.lower() == key.lower() or any(s.lower() == str(a).strip().lower() for a in alias_list):
-                            return s
-                    return key
+                if not isinstance(alias_list, list):
+                    continue
+                for a in alias_list:
+                    a_str = str(a).strip()
+                    pattern = None
+                    if "->" in a_str:
+                        pattern = a_str.split("->", 1)[0].strip()
+                    elif "➔" in a_str:
+                        pattern = a_str.split("➔", 1)[0].strip()
+
+                    if pattern and cand_l == pattern.lower():
+                        for s in existing:
+                            if s.lower() == key.lower():
+                                return s
+                        return key
+                    elif cand_l == a_str.lower():
+                        for s in existing:
+                            if s.lower() == key.lower() or any(s.lower() == str(al).strip().lower() for al in alias_list):
+                                return s
+                        return key
 
             # Prefix match against existing subjects (at least 2 chars)
             if len(cand) >= 2:
@@ -155,6 +170,43 @@ def resolve_subject_with_index(
     if len(parts) <= 1:
         res = _resolve_single(clean)
         return (res if res else clean, None)
+
+    # Step 0b: Check explicit arrow mapping in aliases (e.g. 'Eth/K/Ev -> K', 'Eth/K/Ev -> 1', 'Mu/Cho -> Mu')
+    for subj_key, alias_list in aliases.items():
+        if not isinstance(alias_list, list):
+            continue
+        for a in alias_list:
+            a_str = str(a).strip()
+            pattern = None
+            target_part = None
+            if "->" in a_str:
+                pattern, target_part = [x.strip() for x in a_str.split("->", 1)]
+            elif "➔" in a_str:
+                pattern, target_part = [x.strip() for x in a_str.split("➔", 1)]
+            elif ":" in a_str and not a_str.startswith("http"):
+                pattern, target_part = [x.strip() for x in a_str.split(":", 1)]
+
+            if pattern and target_part and pattern.lower() == clean.lower():
+                # Direct numeric index (0-based or 1-based)
+                if target_part.isdigit():
+                    num_i = int(target_part)
+                    if 0 <= num_i < len(parts):
+                        return (subj_key, num_i)
+                    elif 1 <= num_i <= len(parts):
+                        return (subj_key, num_i - 1)
+
+                t_clean = re.sub(r"\d+$", "", target_part).strip().lower()
+                for p_idx, p in enumerate(parts):
+                    p_clean = re.sub(r"\d+$", "", p).strip().lower()
+                    if p.lower() == target_part.lower() or (p_clean and t_clean and p_clean == t_clean):
+                        return (subj_key, p_idx)
+
+                # Match by resolved single subject
+                for p_idx, p in enumerate(parts):
+                    if _resolve_single(p) == subj_key:
+                        return (subj_key, p_idx)
+
+                return (subj_key, 0)
 
     # Resolve each part individually
     resolved_parts = []
@@ -188,7 +240,13 @@ def resolve_subject_with_index(
                 continue
             for s in existing:
                 s_aliases = aliases.get(s, [])
+                resolved_p = _resolve_single(pc)
+                is_match = False
                 if any(pc.lower() == str(a).strip().lower() for a in s_aliases):
+                    is_match = True
+                elif resolved_p and (resolved_p.lower() == s.lower() or ("religion" in resolved_p.lower() and "religion" in s.lower())):
+                    is_match = True
+                if is_match:
                     alias_matches.append((idx, s))
                     break
 
@@ -254,14 +312,20 @@ def resolve_subject_name(
 
 
 def parse_subject_aliases_yaml(yaml_text: str) -> dict[str, list[str]]:
-    """Parse YAML text into subject aliases dictionary."""
+    """Parse YAML text into subject aliases dictionary.
+
+    Empty input yields an empty dict. Does NOT silently restore defaults
+    to prevent resurrecting intentionally deleted aliases. Raises ValueError on syntax error.
+    """
     if not yaml_text or not yaml_text.strip():
-        return dict(DEFAULT_SUBJECT_ALIASES)
+        return {}
     try:
         import yaml
         data = yaml.safe_load(yaml_text)
+        if data is None:
+            return {}
         if not isinstance(data, dict):
-            return dict(DEFAULT_SUBJECT_ALIASES)
+            raise ValueError("YAML muss ein Mapping/Dictionary von Fächern sein.")
         result: dict[str, list[str]] = {}
         for k, v in data.items():
             subj = str(k).strip()
@@ -274,9 +338,11 @@ def parse_subject_aliases_yaml(yaml_text: str) -> dict[str, list[str]]:
             else:
                 result[subj] = []
         return result
+    except ValueError:
+        raise
     except Exception as err:
         _LOGGER.warning("Failed to parse subject aliases YAML: %s", err)
-        return dict(DEFAULT_SUBJECT_ALIASES)
+        raise ValueError(f"YAML-Syntaxfehler: {err}") from err
 
 
 def dump_subject_aliases_yaml(aliases: dict[str, list[str]]) -> str:

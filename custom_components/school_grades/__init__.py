@@ -300,7 +300,7 @@ async def _async_setup_frontend(hass: HomeAssistant) -> None:
     else:
         hass.http.register_static_path(URL_BASE, FRONTEND_DIR, cache_headers=False)
 
-    version_str = "1.2.6"
+    version_str = "1.2.7"
     try:
         js_file = os.path.join(FRONTEND_DIR, "school-grades-panel.js")
         if os.path.exists(js_file):
@@ -805,8 +805,12 @@ def _register_services(hass: HomeAssistant) -> None:
         yaml_text = call.data.get(CONF_ALIASES_YAML)
         aliases_dict = call.data.get(CONF_SUBJECT_ALIASES)
         if yaml_text is not None:
-            parsed = parse_subject_aliases_yaml(yaml_text)
-            storage.data.set_subject_aliases(parsed)
+            try:
+                parsed = parse_subject_aliases_yaml(yaml_text)
+                storage.data.set_subject_aliases(parsed)
+            except ValueError as err:
+                _LOGGER.error("Fehler beim Parsen der Fach-Aliase für %s: %s", child_name, err)
+                return
         elif aliases_dict is not None:
             storage.data.set_subject_aliases(aliases_dict)
 
@@ -888,8 +892,15 @@ def _register_services(hass: HomeAssistant) -> None:
         yaml_text = msg.get("aliases_yaml")
         aliases_dict = msg.get("subject_aliases")
         if yaml_text is not None:
-            parsed = parse_subject_aliases_yaml(yaml_text)
-            storage.data.set_subject_aliases(parsed)
+            try:
+                parsed = parse_subject_aliases_yaml(yaml_text)
+                storage.data.set_subject_aliases(parsed)
+            except ValueError as err:
+                connection.send_result(
+                    msg["id"],
+                    {"success": False, "error": str(err)},
+                )
+                return
         elif aliases_dict is not None:
             storage.data.set_subject_aliases(aliases_dict)
         storage.data.set_portal_substitutions(storage.data.portal_substitutions)

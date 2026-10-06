@@ -717,6 +717,44 @@ class TestMultiLanguageSupport(unittest.TestCase):
         self.assertEqual(res_subj, "Mathematik")
         self.assertIsNone(matched_idx)
 
+        # 7. Arrow syntax mapping: 'Eth/K/Ev -> K' or 'Eth/K/Ev -> 1'
+        arrow_aliases = {"Religion": ["Rel", "Eth/K/Ev -> K"]}
+        res_subj, matched_idx = portal_mod.resolve_subject_with_index(
+            "Eth/K/Ev",
+            arrow_aliases,
+            []
+        )
+        self.assertEqual(res_subj, "Religion")
+        self.assertEqual(matched_idx, 1)
+
+        arrow_num_aliases = {"Religion": ["Rel", "Eth/K/Ev -> 1"]}
+        res_subj, matched_idx = portal_mod.resolve_subject_with_index(
+            "Eth/K/Ev",
+            arrow_num_aliases,
+            []
+        )
+        self.assertEqual(res_subj, "Religion")
+        self.assertEqual(matched_idx, 1)
+
+        mu_arrow_aliases = {"Musik": ["Mu", "Mu/Cho -> Mu"]}
+        res_subj, matched_idx = portal_mod.resolve_subject_with_index(
+            "Mu/Cho",
+            mu_arrow_aliases,
+            []
+        )
+        self.assertEqual(res_subj, "Musik")
+        self.assertEqual(matched_idx, 0)
+
+        # 8. User intentionally pruned YAML: deleted Ethik and Evangelische Religion, kept only Religion: [K]
+        pruned_aliases = {"Religion": ["K"]}
+        res_subj, matched_idx = portal_mod.resolve_subject_with_index(
+            "Eth/K/Ev",
+            pruned_aliases,
+            []
+        )
+        self.assertEqual(res_subj, "Religion")
+        self.assertEqual(matched_idx, 1)
+
     def test_subject_aliases_yaml_parsing_and_dumping(self):
         """Test parsing and dumping subject aliases YAML."""
         yaml_text = """
@@ -735,6 +773,22 @@ Deutsch:
         dumped = portal_mod.dump_subject_aliases_yaml(parsed)
         reparsed = portal_mod.parse_subject_aliases_yaml(dumped)
         self.assertEqual(parsed, reparsed)
+
+        # Empty input returns empty dict, never resurrects defaults
+        empty_parsed = portal_mod.parse_subject_aliases_yaml("")
+        self.assertEqual(empty_parsed, {})
+        spaces_parsed = portal_mod.parse_subject_aliases_yaml("   \n  ")
+        self.assertEqual(spaces_parsed, {})
+
+        # Intentionally pruned YAML preserves only the specified keys
+        pruned_yaml = "Religion:\n  - K\n  - Eth/K/Ev -> K\n"
+        pruned_res = portal_mod.parse_subject_aliases_yaml(pruned_yaml)
+        self.assertEqual(list(pruned_res.keys()), ["Religion"])
+        self.assertEqual(pruned_res["Religion"], ["K", "Eth/K/Ev -> K"])
+
+        # Invalid YAML raises ValueError
+        with self.assertRaises(ValueError):
+            portal_mod.parse_subject_aliases_yaml("Mathematik: [unclosed")
 
     def test_substitutions_storage_and_matching(self):
         """Test storing substitutions and slot/day matching in SchoolGradesData."""

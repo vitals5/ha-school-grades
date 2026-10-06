@@ -381,10 +381,11 @@ const I18N = {
     portal_import_tt_confirm: "Möchtest du den aktuellen Stundenplan aus dem Eltern-Portal importieren und deinen lokalen Plan überschreiben?",
     portal_aliases_title: "🔤 Fach-Kürzel & Aliase (YAML)",
     portal_aliases_help: "Wandelt beim Import Kürzel (z. B. Ma) automatisch in Vollnamen (Mathematik) um und ordnet Vertretungen zu.",
-    portal_aliases_slash_tip: "💡 Tipp für Wahlfächer & Schrägstrich-Kürzel (z. B. Eth/K/Ev, Mu/Cho, L1): Ziffern (L1 ➔ Latein) werden automatisch gefiltert. Schrägstrich-Fächer werden automatisch anhand der Fächerliste deines Kindes zugeordnet. Du kannst hier auch direkt Einträge wie 'Eth/K/Ev' oder 'K' unter 'Religion' eintragen.",
+    portal_aliases_slash_tip: "💡 Tipp für Wahlfächer & Schrägstrich-Kürzel (z. B. Eth/K/Ev, Mu/Cho, L1): Ziffern werden ignoriert. Bei Schrägstrichen wird das passende Fach automatisch anhand der belegten Fächer deines Kindes gewählt (inkl. passendem Lehrer/Raum). Du kannst auch eine Pfeil-Zuweisung wie 'Eth/K/Ev -> K' oder 'Mu/Cho -> Mu' eintragen.",
     portal_aliases_save_btn: "💾 Aliase speichern",
     portal_aliases_saved: "Aliase erfolgreich gespeichert!",
     portal_aliases_reset: "Standard wiederherstellen",
+    portal_aliases_reset_confirm: "Möchtest du die Fach-Kürzel & Aliase wirklich auf die Standardwerte zurücksetzen? Eigene Anpassungen gehen dabei verloren.",
     portal_last_sync_label: "Letzter Sync:",
     portal_subst_stand: "Vertretungsplan Stand:",
     prep_subst_alert: "Vertretungsplan für nächsten Schultag",
@@ -551,10 +552,11 @@ const I18N = {
     portal_import_tt_confirm: "Do you want to import the timetable from Eltern-Portal and overwrite your local timetable?",
     portal_aliases_title: "🔤 Subject Abbreviations & Aliases (YAML)",
     portal_aliases_help: "Converts abbreviations (e.g. Ma) to full subject names (Mathematics) during import and maps substitutions.",
-    portal_aliases_slash_tip: "💡 Tip for electives & slash abbreviations (e.g. Eth/K/Ev, Mu/Cho, L1): Digits (L1 ➔ Latin) are filtered automatically. Slashed subjects are matched against your child's subjects. You can also add entries like 'Eth/K/Ev' or 'K' directly under 'Religion'.",
+    portal_aliases_slash_tip: "💡 Tip for electives & slash abbreviations (e.g. Eth/K/Ev, Mu/Cho, L1): Digits are ignored. Slashed subjects are matched against your child's active subjects automatically (matching teachers/rooms included). You can also add arrow mappings like 'Eth/K/Ev -> K' or 'Mu/Cho -> Mu'.",
     portal_aliases_save_btn: "💾 Save Aliases",
     portal_aliases_saved: "Aliases saved successfully!",
     portal_aliases_reset: "Restore Default Aliases",
+    portal_aliases_reset_confirm: "Do you really want to reset subject aliases to default values? Custom changes will be lost.",
     portal_last_sync_label: "Last sync:",
     portal_subst_stand: "Substitutions update:",
     prep_subst_alert: "Substitutions for next school day",
@@ -4178,6 +4180,24 @@ Natur und Technik:
           const syncExams = root.querySelector('#settings-portal-sync-exams')?.checked ?? true;
           const copySib = this._portalCopySibling;
 
+          // Also save subject aliases textarea if present before closing modal
+          const aliasesTa = root.querySelector('#settings-portal-aliases-textarea');
+          if (aliasesTa && this._selectedChild) {
+            try {
+              const aliasRes = await this._hass.callWS({
+                type: 'school_grades/update_subject_aliases',
+                child_name: this._selectedChild,
+                aliases_yaml: aliasesTa.value,
+              });
+              if (aliasRes && aliasRes.aliases) {
+                const curChild = this._data?.children?.[this._selectedChild];
+                if (curChild) curChild.subjectAliases = aliasRes.aliases;
+              }
+            } catch (err) {
+              console.warn("Failed to auto-save subject aliases on portal form submit:", err);
+            }
+          }
+
           this._showSettingsModal = false;
           this._portalTesting = false;
           this._portalTestResult = null;
@@ -4255,6 +4275,23 @@ Natur und Technik:
           if (!confirm(this._t('portal_import_tt_confirm'))) {
             return;
           }
+          // Auto-save any edited aliases before importing timetable
+          const aliasesTa = root.querySelector('#settings-portal-aliases-textarea');
+          if (aliasesTa && this._selectedChild) {
+            try {
+              const aliasRes = await this._hass.callWS({
+                type: 'school_grades/update_subject_aliases',
+                child_name: this._selectedChild,
+                aliases_yaml: aliasesTa.value,
+              });
+              if (aliasRes && aliasRes.aliases) {
+                const curChild = this._data?.children?.[this._selectedChild];
+                if (curChild) curChild.subjectAliases = aliasRes.aliases;
+              }
+            } catch (err) {
+              console.warn("Failed to auto-save subject aliases before timetable import:", err);
+            }
+          }
           this._portalImportingTt = true;
           this._portalSyncFeedback = null;
           this.render();
@@ -4285,15 +4322,21 @@ Natur und Technik:
           if (!ta) return;
           const yamlText = ta.value;
           try {
-            await this._hass.callWS({
+            const res = await this._hass.callWS({
               type: 'school_grades/update_subject_aliases',
               child_name: this._selectedChild,
               aliases_yaml: yamlText,
             });
+            if (res && res.aliases) {
+              const currentChild = this._data?.children?.[this._selectedChild];
+              if (currentChild) {
+                currentChild.subjectAliases = res.aliases;
+              }
+            }
             alert(this._t('portal_aliases_saved'));
           } catch (err) {
             console.error('Failed to update subject aliases:', err);
-            alert('Fehler: ' + ((err && err.message) || err));
+            alert('Fehler: ' + ((err && (err.message || err.error)) || err));
           }
         });
       }
@@ -4302,6 +4345,9 @@ Natur und Technik:
       const resetAliasesBtn = root.querySelector('#settings-portal-aliases-reset-btn');
       if (resetAliasesBtn) {
         resetAliasesBtn.addEventListener('click', () => {
+          if (!confirm(this._t('portal_aliases_reset_confirm'))) {
+            return;
+          }
           const ta = root.querySelector('#settings-portal-aliases-textarea');
           if (ta) {
             ta.value = this._getDefaultAliasesYaml();
