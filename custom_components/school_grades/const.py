@@ -1,4 +1,7 @@
 """Constants for the Schulnoten (School Grades) integration."""
+from __future__ import annotations
+
+from typing import Any
 
 DOMAIN = "school_grades"
 
@@ -200,6 +203,18 @@ SERVICE_SYNC_ELTERNPORTAL = "sync_elternportal"
 SERVICE_IMPORT_PORTAL_TIMETABLE = "import_portal_timetable"
 SERVICE_UPDATE_SUBJECT_ALIASES = "update_subject_aliases"
 
+# Standard-Zeitraster für Schulstunden und Pausen
+DEFAULT_TIMETABLE_SLOTS: list[dict[str, Any]] = [
+    {"id": "slot_1", "type": "lesson", "number": "1", "label": "1. Stunde", "start": "08:00", "end": "08:45"},
+    {"id": "slot_2", "type": "lesson", "number": "2", "label": "2. Stunde", "start": "08:45", "end": "09:30"},
+    {"id": "break_1", "type": "break", "label": "1. Pause", "start": "09:30", "end": "09:45"},
+    {"id": "slot_3", "type": "lesson", "number": "3", "label": "3. Stunde", "start": "09:45", "end": "10:30"},
+    {"id": "slot_4", "type": "lesson", "number": "4", "label": "4. Stunde", "start": "10:30", "end": "11:15"},
+    {"id": "break_2", "type": "break", "label": "2. Pause", "start": "11:15", "end": "11:30"},
+    {"id": "slot_5", "type": "lesson", "number": "5", "label": "5. Stunde", "start": "11:30", "end": "12:15"},
+    {"id": "slot_6", "type": "lesson", "number": "6", "label": "6. Stunde", "start": "12:15", "end": "13:00"},
+]
+
 # Standard-Wörterbuch deutscher Schulfach-Kürzel & Aliase
 DEFAULT_SUBJECT_ALIASES: dict[str, list[str]] = {
     "Mathematik": ["M", "Ma", "Math", "Mathe"],
@@ -209,6 +224,7 @@ DEFAULT_SUBJECT_ALIASES: dict[str, list[str]] = {
     "Französisch": ["F", "Fr", "Frz"],
     "Spanisch": ["Sp", "Spa"],
     "Italienisch": ["It", "Ita"],
+    "Griechisch": ["Gr", "Grie"],
     "Biologie": ["B", "Bio"],
     "Physik": ["Ph", "Phy"],
     "Chemie": ["C", "Ch", "Che"],
@@ -219,11 +235,13 @@ DEFAULT_SUBJECT_ALIASES: dict[str, list[str]] = {
     "Informatik": ["Inf", "IT"],
     "Kunst": ["Ku", "BK"],
     "Musik": ["Mu"],
-    "Sport": ["Sp", "Spo", "Sm", "Sw"],
+    "Chor": ["Cho"],
+    "Sport": ["Sp", "Spo", "Sm", "Sw", "Smd", "Swd", "Out"],
+    "Religion": ["Rel"],
     "Ethik": ["Eth"],
-    "Evangelische Religion": ["Ev", "EvRel", "ER"],
-    "Katholische Religion": ["Kk", "Rk", "KatRel", "KR", "K"],
-    "Natur und Technik": ["NuT", "NTG", "NuT_B", "NuT_NW", "NuT_NWw", "NuT_NWm"],
+    "Evangelische Religion": ["Ev", "EvRel", "ER", "Evan"],
+    "Katholische Religion": ["Kk", "Rk", "KatRel", "KR", "K", "Kath"],
+    "Natur und Technik": ["NuT", "NTG", "NuTB", "NuTP", "NuT_B", "NuT_NW", "NuT_NWw", "NuT_NWm"],
 }
 
 

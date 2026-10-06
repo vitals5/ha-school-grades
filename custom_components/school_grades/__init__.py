@@ -238,7 +238,7 @@ SCHEMA_UPDATE_PORTAL_SETTINGS = vol.Schema(
         vol.Optional(CONF_PORTAL_PASSWORD, default=""): cv.string,
         vol.Optional(CONF_PORTAL_STUDENT_ID, default=""): cv.string,
         vol.Optional(CONF_PORTAL_STUDENT_NAME, default=""): cv.string,
-        vol.Optional(CONF_PORTAL_SYNC_TIMETABLE, default=True): cv.boolean,
+        vol.Optional(CONF_PORTAL_SYNC_TIMETABLE, default=False): cv.boolean,
         vol.Optional(CONF_PORTAL_SYNC_SUBSTITUTIONS, default=True): cv.boolean,
         vol.Optional(CONF_PORTAL_SYNC_EXAMS, default=True): cv.boolean,
         vol.Optional("copy_sibling_name"): cv.string,
@@ -300,7 +300,7 @@ async def _async_setup_frontend(hass: HomeAssistant) -> None:
     else:
         hass.http.register_static_path(URL_BASE, FRONTEND_DIR, cache_headers=False)
 
-    version_str = "1.2.3"
+    version_str = "1.2.4"
     try:
         js_file = os.path.join(FRONTEND_DIR, "school-grades-panel.js")
         if os.path.exists(js_file):
@@ -593,7 +593,7 @@ def _register_services(hass: HomeAssistant) -> None:
         password = call.data.get(CONF_PORTAL_PASSWORD, "")
         student_id = call.data.get(CONF_PORTAL_STUDENT_ID, "")
         student_name = call.data.get(CONF_PORTAL_STUDENT_NAME, "")
-        sync_timetable = call.data.get(CONF_PORTAL_SYNC_TIMETABLE, True)
+        sync_timetable = call.data.get(CONF_PORTAL_SYNC_TIMETABLE, False)
         sync_substitutions = call.data.get(CONF_PORTAL_SYNC_SUBSTITUTIONS, True)
         sync_exams = call.data.get(CONF_PORTAL_SYNC_EXAMS, True)
 

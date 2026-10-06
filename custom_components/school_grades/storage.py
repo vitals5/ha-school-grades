@@ -13,6 +13,7 @@ from .const import (
     DEFAULT_SECTION_VISIBILITY,
     DEFAULT_SUBJECTS,
     DEFAULT_SUBJECT_ALIASES,
+    DEFAULT_TIMETABLE_SLOTS,
 )
 try:
     from .portal import (
@@ -44,17 +45,6 @@ _LOGGER = logging.getLogger(__name__)
 
 STORAGE_VERSION = 1
 STORAGE_KEY = "school_grades.{entry_id}"
-
-DEFAULT_TIMETABLE_SLOTS = [
-    {"id": "slot_1", "type": "lesson", "number": "1", "label": "1. Stunde", "start": "08:00", "end": "08:45"},
-    {"id": "slot_2", "type": "lesson", "number": "2", "label": "2. Stunde", "start": "08:45", "end": "09:30"},
-    {"id": "break_1", "type": "break", "label": "1. Pause", "start": "09:30", "end": "09:45"},
-    {"id": "slot_3", "type": "lesson", "number": "3", "label": "3. Stunde", "start": "09:45", "end": "10:30"},
-    {"id": "slot_4", "type": "lesson", "number": "4", "label": "4. Stunde", "start": "10:30", "end": "11:15"},
-    {"id": "break_2", "type": "break", "label": "2. Pause", "start": "11:15", "end": "11:30"},
-    {"id": "slot_5", "type": "lesson", "number": "5", "label": "5. Stunde", "start": "11:30", "end": "12:15"},
-    {"id": "slot_6", "type": "lesson", "number": "6", "label": "6. Stunde", "start": "12:15", "end": "13:00"},
-]
 
 
 class SchoolGradesData:
@@ -90,7 +80,7 @@ class SchoolGradesData:
             self.portal_password: str = ""
             self.portal_student_id: str = ""
             self.portal_student_name: str = ""
-            self.portal_sync_timetable: bool = True
+            self.portal_sync_timetable: bool = False
             self.portal_sync_substitutions: bool = True
             self.portal_sync_exams: bool = True
             self.portal_last_sync: str = ""
@@ -125,7 +115,7 @@ class SchoolGradesData:
             self.portal_password = str(data.get("portal_password", ""))
             self.portal_student_id = str(data.get("portal_student_id", ""))
             self.portal_student_name = str(data.get("portal_student_name", ""))
-            self.portal_sync_timetable = bool(data.get("portal_sync_timetable", True))
+            self.portal_sync_timetable = bool(data.get("portal_sync_timetable", False))
             self.portal_sync_substitutions = bool(data.get("portal_sync_substitutions", True))
             self.portal_sync_exams = bool(data.get("portal_sync_exams", True))
             self.portal_last_sync = str(data.get("portal_last_sync", ""))

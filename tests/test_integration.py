@@ -610,6 +610,55 @@ class TestMultiLanguageSupport(unittest.TestCase):
         # Unknown fallback
         self.assertEqual(portal_mod.resolve_subject_name("Astronomie", aliases, existing), "Astronomie")
 
+        # Trailing digit stripping (e.g. L1 -> Latein, E2 -> Englisch)
+        alias_with_langs = {
+            "Latein": ["L", "Lat"],
+            "Englisch": ["E", "Eng"],
+            "Französisch": ["F", "Fra"],
+        }
+        langs_existing = ["Latein", "Englisch", "Französisch"]
+        self.assertEqual(portal_mod.resolve_subject_name("L1", alias_with_langs, langs_existing), "Latein")
+        self.assertEqual(portal_mod.resolve_subject_name("E2", alias_with_langs, langs_existing), "Englisch")
+        self.assertEqual(portal_mod.resolve_subject_name("F3", alias_with_langs, langs_existing), "Französisch")
+
+        # Slash-separated subjects
+        full_aliases = {
+            "Mathematik": ["M", "Ma"],
+            "Deutsch": ["D", "De"],
+            "Religion": ["Rel", "K", "Ev", "Kath", "Evang"],
+            "Ethik": ["Eth"],
+            "Musik": ["Mu", "Mus"],
+            "Chor": ["Cho"],
+            "Sport": ["Sp", "Spo", "Sm", "Sw", "Smd", "Swd"],
+        }
+        # 1. Child enrolled in Religion (Catholic): 'Eth/K/Ev' matches Religion
+        self.assertEqual(
+            portal_mod.resolve_subject_name("Eth/K/Ev", full_aliases, ["Mathematik", "Deutsch", "Religion"]),
+            "Religion"
+        )
+        # 2. Child enrolled in Ethik: 'Eth/K/Ev' matches Ethik
+        self.assertEqual(
+            portal_mod.resolve_subject_name("Eth/K/Ev", full_aliases, ["Mathematik", "Deutsch", "Ethik"]),
+            "Ethik"
+        )
+        # 3. Child enrolled in Musik: 'Mu/Cho' matches Musik
+        self.assertEqual(
+            portal_mod.resolve_subject_name("Mu/Cho", full_aliases, ["Mathematik", "Musik"]),
+            "Musik"
+        )
+        # 4. Homogeneous slash (e.g. boys/girls gym split Smd/Swd -> both map to Sport)
+        self.assertEqual(
+            portal_mod.resolve_subject_name("Smd/Swd", full_aliases, ["Mathematik", "Sport"]),
+            "Sport"
+        )
+        # 5. Direct alias override in child YAML: 'Eth/K/Ev' configured explicitly
+        override_aliases = dict(full_aliases)
+        override_aliases["Religion"] = ["Rel", "Eth/K/Ev"]
+        self.assertEqual(
+            portal_mod.resolve_subject_name("Eth/K/Ev", override_aliases, ["Mathematik"]),
+            "Religion"
+        )
+
     def test_subject_aliases_yaml_parsing_and_dumping(self):
         """Test parsing and dumping subject aliases YAML."""
         yaml_text = """
@@ -701,6 +750,17 @@ Deutsch:
         self.assertEqual(slot1_data["subject"], "Mathematik")
         self.assertEqual(slot1_data["raw_subject"], "Ma")
         self.assertEqual(slot1_data["room"], "R101")
+
+        # Verify slots are sorted chronologically by start time: breaks appear in correct order
+        slot_ids = [s["id"] for s in tt["slots"]]
+        self.assertEqual(slot_ids[:6], ["slot_1", "slot_2", "break_1", "slot_3", "slot_4", "break_2"])
+
+    def test_portal_sync_timetable_default_is_false(self):
+        """Test that portal_sync_timetable defaults to False to prevent overwriting manual timetables."""
+        data = SchoolGradesData("Paul")
+        self.assertFalse(data.portal_sync_timetable)
+        self.assertTrue(data.portal_sync_substitutions)
+        self.assertTrue(data.portal_sync_exams)
 
     def test_portal_error_handling_exceptions(self):
         """Test that async_fetch_child_portal_data returns user-friendly messages on portal exceptions."""

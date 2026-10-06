@@ -40,7 +40,7 @@ except ImportError:
     StudentListException = Exception
     HAVE_PYELTERNPORTAL = False
 
-from .const import DEFAULT_SUBJECT_ALIASES
+from .const import DEFAULT_SUBJECT_ALIASES, DEFAULT_TIMETABLE_SLOTS
 
 _TIME_RE = re.compile(r"(\d{1,2})[.:](\d{2})\s*-\s*(\d{1,2})[.:](\d{2})")
 _ENTFALL_RE = re.compile(r"entf[aä]ll|ausfall|f[aä]llt\s+aus|\bfrei\b|unterrichtsfrei", re.I)
@@ -81,7 +81,13 @@ def resolve_subject_name(
     aliases_dict: dict[str, list[str]] | None = None,
     existing_subjects: list[str] | None = None,
 ) -> str:
-    """Resolve a subject abbreviation or code to a full subject name."""
+    """Resolve a subject abbreviation or code to a full subject name.
+
+    Supports:
+      - Trailing digit stripping (e.g., 'L1' -> 'Latein', 'E2' -> 'Englisch')
+      - Slash-separated alternatives (e.g., 'Eth/K/Ev', 'Mu/Cho', 'Smd/Swd') matched
+        against student's existing subjects or explicit YAML aliases.
+    """
     if not raw_name:
         return ""
     clean = raw_name.strip()
@@ -91,38 +97,102 @@ def resolve_subject_name(
     existing = [s.strip() for s in (existing_subjects or []) if s.strip()]
     aliases = aliases_dict if aliases_dict is not None else DEFAULT_SUBJECT_ALIASES
 
-    # 1. Exact match with an existing subject (case-insensitive)
-    for s in existing:
-        if clean.lower() == s.lower():
-            return s
+    def _resolve_single(code: str) -> str | None:
+        c = code.strip()
+        if not c:
+            return None
 
-    # 2. Exact match with a key in aliases_dict (case-insensitive)
-    for key in aliases.keys():
-        if clean.lower() == key.lower():
+        # 1. Try exact code first, then without trailing digits (e.g. L1 -> L, E2 -> E, NuT1 -> NuT)
+        candidates = [c]
+        no_digits = re.sub(r"\d+$", "", c).strip()
+        if no_digits and no_digits.lower() != c.lower():
+            candidates.append(no_digits)
+
+        for cand in candidates:
+            cand_l = cand.lower()
+
+            # Exact match with existing subject
             for s in existing:
-                if key.lower() == s.lower():
+                if cand_l == s.lower():
                     return s
-            return key
 
-    # 3. Match within alias list of aliases_dict
-    for key, alias_list in aliases.items():
-        if any(clean.lower() == str(a).strip().lower() for a in alias_list):
-            for s in existing:
-                if s.lower() == key.lower() or any(s.lower() == str(a).strip().lower() for a in alias_list):
-                    return s
-            return key
+            # Exact match with key in aliases
+            for key in aliases.keys():
+                if cand_l == key.lower():
+                    for s in existing:
+                        if key.lower() == s.lower():
+                            return s
+                    return key
 
-    # 4. Prefix match against existing subjects (at least 2 chars)
-    if len(clean) >= 2:
-        prefix_existing = [s for s in existing if s.lower().startswith(clean.lower())]
-        if len(prefix_existing) == 1:
-            return prefix_existing[0]
+            # Match within alias list
+            for key, alias_list in aliases.items():
+                if any(cand_l == str(a).strip().lower() for a in alias_list):
+                    for s in existing:
+                        if s.lower() == key.lower() or any(s.lower() == str(a).strip().lower() for a in alias_list):
+                            return s
+                    return key
 
-        prefix_aliases = [k for k in aliases.keys() if k.lower().startswith(clean.lower())]
-        if len(prefix_aliases) == 1:
-            return prefix_aliases[0]
+            # Prefix match against existing subjects (at least 2 chars)
+            if len(cand) >= 2:
+                prefix_existing = [s for s in existing if s.lower().startswith(cand_l)]
+                if len(prefix_existing) == 1:
+                    return prefix_existing[0]
 
-    # 5. Fallback: preserve original cleaned name
+                prefix_aliases = [k for k in aliases.keys() if k.lower().startswith(cand_l)]
+                if len(prefix_aliases) == 1:
+                    return prefix_aliases[0]
+
+        return None
+
+    # Step 1: Check full string first (e.g. if 'Eth/K/Ev' is directly configured as an alias in YAML)
+    full_resolved = _resolve_single(clean)
+    if full_resolved:
+        return full_resolved
+
+    # Step 2: Handle slash-separated subjects (e.g. 'Eth/K/Ev', 'Mu/Cho', 'Smd/Swd', 'Smd/Smd/Smd')
+    if "/" in clean:
+        parts = [p.strip() for p in clean.split("/") if p.strip()]
+        if len(parts) > 1:
+            resolved_parts = []
+            for p in parts:
+                r = _resolve_single(p)
+                resolved_parts.append(r if r else p)
+
+            # Case 2a: All parts map to the same subject (e.g. Smd/Smd/Smd or Smd/Swd -> Sport)
+            unique_resolved = list(dict.fromkeys(resolved_parts))
+            if len(unique_resolved) == 1:
+                return unique_resolved[0]
+
+            # Case 2b: Check which parts match a subject this student actually takes (existing_subjects)
+            matching_existing = []
+            for rp in unique_resolved:
+                for s in existing:
+                    if rp.lower() == s.lower():
+                        matching_existing.append(s)
+                    elif "religion" in rp.lower() and "religion" in s.lower():
+                        matching_existing.append(s)
+
+            matching_existing = list(dict.fromkeys(matching_existing))
+            if len(matching_existing) == 1:
+                return matching_existing[0]
+
+            # Case 2c: Check if any raw part matches a student's configured aliases for an existing subject
+            for p in parts:
+                p_cands = [p, re.sub(r"\d+$", "", p).strip()]
+                for pc in p_cands:
+                    if not pc:
+                        continue
+                    for s in existing:
+                        s_aliases = aliases.get(s, [])
+                        if any(pc.lower() == str(a).strip().lower() for a in s_aliases):
+                            return s
+
+            # Case 2d: If only one resolved part was mapped to a known subject, use it
+            known_candidates = [rp for rp in unique_resolved if rp not in parts]
+            if len(known_candidates) == 1:
+                return known_candidates[0]
+
+    # Step 3: Fallback to original cleaned name
     return clean
 
 
@@ -368,7 +438,7 @@ def convert_portal_lessons_to_timetable(
     existing_slots: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Convert parsed portal lessons into SchoolGradesData timetable structure."""
-    slots = [dict(s) for s in (existing_slots or [])]
+    slots = [dict(s) for s in (existing_slots if existing_slots else DEFAULT_TIMETABLE_SLOTS)]
     schedule: dict[str, dict[str, Any]] = {}
 
     lesson_times: dict[str, tuple[str | None, str | None]] = {}
@@ -405,9 +475,20 @@ def convert_portal_lessons_to_timetable(
             if end_t and not slot_match.get("end"):
                 slot_match["end"] = end_t
 
-    def _slot_sort_key(s: dict[str, Any]) -> int:
-        num_m = re.search(r"\d+", str(s.get("number", "")))
-        return int(num_m.group(0)) if num_m else 99
+    def _parse_time_mins(time_str: str | None) -> int:
+        if not time_str or ":" not in str(time_str):
+            return 9999
+        parts = str(time_str).strip().split(":")
+        try:
+            return int(parts[0]) * 60 + int(parts[1])
+        except (ValueError, IndexError):
+            return 9999
+
+    def _slot_sort_key(s: dict[str, Any]) -> tuple[int, int]:
+        time_mins = _parse_time_mins(s.get("start"))
+        num_m = re.search(r"\d+", str(s.get("number", "") or s.get("label", "")))
+        num_val = int(num_m.group(0)) if num_m else 99
+        return (time_mins, num_val)
 
     slots.sort(key=_slot_sort_key)
 

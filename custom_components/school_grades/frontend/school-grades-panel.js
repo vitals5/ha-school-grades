@@ -372,7 +372,8 @@ const I18N = {
     portal_copy_from: "Zugangsdaten von Geschwisterkind übernehmen:",
     portal_child_select: "Verknüpftes Kind im Eltern-Portal auswählen:",
     portal_sync_options: "Synchronisierungs-Optionen:",
-    portal_sync_tt: "Stundenplan abgleichen",
+    portal_sync_tt: "Stundenplan bei jedem Sync automatisch überschreiben (optional)",
+    portal_sync_tt_help: "Nicht empfohlen bei manuellen Stundenplan-Anpassungen. Der Stundenplan kann gezielt über den Button 'Stundenplan importieren' aktualisiert werden.",
     portal_sync_subst: "Vertretungsplan abgleichen (Ausfälle & Raumänderungen)",
     portal_sync_exams: "Klausuren & Termine abgleichen",
     portal_sync_now_btn: "🔄 Jetzt synchronisieren",
@@ -380,6 +381,7 @@ const I18N = {
     portal_import_tt_confirm: "Möchtest du den aktuellen Stundenplan aus dem Eltern-Portal importieren und deinen lokalen Plan überschreiben?",
     portal_aliases_title: "🔤 Fach-Kürzel & Aliase (YAML)",
     portal_aliases_help: "Wandelt beim Import Kürzel (z. B. Ma) automatisch in Vollnamen (Mathematik) um und ordnet Vertretungen zu.",
+    portal_aliases_slash_tip: "💡 Tipp für Wahlfächer & Schrägstrich-Kürzel (z. B. Eth/K/Ev, Mu/Cho, L1): Ziffern (L1 ➔ Latein) werden automatisch gefiltert. Schrägstrich-Fächer werden automatisch anhand der Fächerliste deines Kindes zugeordnet. Du kannst hier auch direkt Einträge wie 'Eth/K/Ev' oder 'K' unter 'Religion' eintragen.",
     portal_aliases_save_btn: "💾 Aliase speichern",
     portal_aliases_saved: "Aliase erfolgreich gespeichert!",
     portal_aliases_reset: "Standard wiederherstellen",
@@ -540,7 +542,8 @@ const I18N = {
     portal_copy_from: "Copy credentials from sibling:",
     portal_child_select: "Select linked child in Eltern-Portal:",
     portal_sync_options: "Synchronization options:",
-    portal_sync_tt: "Sync timetable",
+    portal_sync_tt: "Automatically overwrite timetable on each sync (optional)",
+    portal_sync_tt_help: "Not recommended if you customized your timetable. You can import on demand using the 'Import Timetable' button below.",
     portal_sync_subst: "Sync substitutions (cancellations & changes)",
     portal_sync_exams: "Sync exams & appointments",
     portal_sync_now_btn: "🔄 Sync Now",
@@ -548,6 +551,7 @@ const I18N = {
     portal_import_tt_confirm: "Do you want to import the timetable from Eltern-Portal and overwrite your local timetable?",
     portal_aliases_title: "🔤 Subject Abbreviations & Aliases (YAML)",
     portal_aliases_help: "Converts abbreviations (e.g. Ma) to full subject names (Mathematics) during import and maps substitutions.",
+    portal_aliases_slash_tip: "💡 Tip for electives & slash abbreviations (e.g. Eth/K/Ev, Mu/Cho, L1): Digits (L1 ➔ Latin) are filtered automatically. Slashed subjects are matched against your child's subjects. You can also add entries like 'Eth/K/Ev' or 'K' directly under 'Religion'.",
     portal_aliases_save_btn: "💾 Save Aliases",
     portal_aliases_saved: "Aliases saved successfully!",
     portal_aliases_reset: "Restore Default Aliases",
@@ -2295,21 +2299,32 @@ Sport:
   - Spo
   - Sm
   - Sw
+  - Smd
+  - Swd
+  - Out
+Chor:
+  - Cho
+Religion:
+  - Rel
 Ethik:
   - Eth
 Evangelische Religion:
   - Ev
   - EvRel
   - ER
+  - Evan
 Katholische Religion:
   - Kk
   - Rk
   - KatRel
   - KR
   - K
+  - Kath
 Natur und Technik:
   - NuT
   - NTG
+  - NuTB
+  - NuTP
   - NuT_B
   - NuT_NW`;
   }
@@ -2469,7 +2484,22 @@ Natur und Technik:
     const subjectList = Object.keys(subjects).sort();
     const upcomingEvents = this._calendarEvents[this._selectedChild] || [];
     const timetable = (currentChild && currentChild.timetable) ? currentChild.timetable : DEFAULT_TIMETABLE;
-    const slots = timetable.slots || DEFAULT_TIMETABLE.slots;
+    const rawSlots = timetable.slots || DEFAULT_TIMETABLE.slots;
+    const parseSlotTime = (t) => {
+      if (!t || typeof t !== 'string' || !t.includes(':')) return 9999;
+      const parts = t.split(':');
+      const h = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      return (isNaN(h) || isNaN(m)) ? 9999 : h * 60 + m;
+    };
+    const slots = [...rawSlots].sort((a, b) => {
+      const tA = parseSlotTime(a.start);
+      const tB = parseSlotTime(b.start);
+      if (tA !== tB) return tA - tB;
+      const nA = parseInt(String(a.number || a.label || a.id || '').replace(/\D+/g, ''), 10) || 99;
+      const nB = parseInt(String(b.number || b.label || b.id || '').replace(/\D+/g, ''), 10) || 99;
+      return nA - nB;
+    });
     const schedule = timetable.schedule || {};
     const dayNames = this._t('days');
 
@@ -3267,6 +3297,9 @@ Natur und Technik:
                         <input type="checkbox" id="settings-portal-sync-tt" ${currentChild.portalSyncTimetable ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: #3b82f6; cursor: pointer;">
                         <span>📅 ${this._t('portal_sync_tt')}</span>
                       </label>
+                      <div style="font-size: 11px; color: rgba(255,255,255,0.5); margin-left: 26px; margin-top: -4px; margin-bottom: 4px; line-height: 1.3;">
+                        ${this._t('portal_sync_tt_help')}
+                      </div>
                       <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13px;">
                         <input type="checkbox" id="settings-portal-sync-subst" ${currentChild.portalSyncSubstitutions ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: #3b82f6; cursor: pointer;">
                         <span>🔄 ${this._t('portal_sync_subst')}</span>
@@ -3326,6 +3359,9 @@ Natur und Technik:
                     </div>
                     <div style="font-size: 11px; color: rgba(255,255,255,0.6); margin-bottom: 8px; line-height: 1.3;">
                       ${this._t('portal_aliases_help')}
+                    </div>
+                    <div style="font-size: 11px; color: #93c5fd; background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.3); border-radius: 6px; padding: 6px 10px; margin-bottom: 8px; line-height: 1.35;">
+                      ${this._t('portal_aliases_slash_tip')}
                     </div>
                     <textarea id="settings-portal-aliases-textarea" rows="6" style="font-family: monospace; font-size: 12px; line-height: 1.4; resize: vertical; tab-size: 2; width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 10px;">${this._aliasesToYaml((currentChild && currentChild.subjectAliases) || {})}</textarea>
                     <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
