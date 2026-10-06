@@ -2366,6 +2366,51 @@ Natur und Technik:
     return yaml;
   }
 
+  async _triggerPortalSync(childName) {
+    if (!childName) childName = this._selectedChild;
+    if (!childName) return;
+
+    const now = Date.now();
+    if (!this._portalSyncTimestamps) this._portalSyncTimestamps = {};
+    const lastSync = this._portalSyncTimestamps[childName] || 0;
+    const elapsed = Math.floor((now - lastSync) / 1000);
+
+    if (elapsed < 60) {
+      const wait = 60 - elapsed;
+      alert(`⏳ Synchronisierungs-Limit: Bitte warte noch ${wait} Sekunden.\n(Schutz der Eltern-Portal Schnittstelle: maximal 1x pro Minute)`);
+      return;
+    }
+
+    this._portalSyncTimestamps[childName] = now;
+    this._portalHeaderSyncing = true;
+    this.render();
+
+    try {
+      const res = await this._hass.callWS({
+        type: 'school_grades/sync_elternportal',
+        child_name: childName,
+      });
+      this._portalHeaderSyncing = false;
+      if (res && res.success) {
+        this._portalHeaderSyncSuccess = true;
+        this.render();
+        setTimeout(() => {
+          this._portalHeaderSyncSuccess = false;
+          this.render();
+        }, 3500);
+      } else {
+        const msg = (res && res.message) || 'Fehler beim Synchronisieren';
+        alert(`❌ Synchronisierung fehlgeschlagen:\n${msg}`);
+        this.render();
+      }
+    } catch (err) {
+      this._portalHeaderSyncing = false;
+      const msg = (err && (err.message || err.error)) || String(err);
+      alert(`❌ Fehler beim Synchronisieren:\n${msg}`);
+      this.render();
+    }
+  }
+
   render() {
     const data = this._getSchoolGradesData();
     const children = data;
@@ -2455,13 +2500,22 @@ Natur und Technik:
             ${childNames.map(name => {
               const cData = data[name];
               const gradeLevelStr = cData && cData.gradeLevel ? ` (${cData.gradeLevel})` : '';
-              const portalBadge = cData && cData.portalEnabled ? ' 🏫' : '';
+              const isSyncing = this._portalHeaderSyncing && name === this._selectedChild;
+              const portalBadge = cData && cData.portalEnabled ? `
+                <span class="child-portal-sync-badge ${isSyncing ? 'syncing' : ''}" data-child="${name}" title="Eltern-Portal für ${name} synchronisieren (Klicken zum Abrufen, max. 1x/Min)" style="cursor: pointer; margin-left: 6px; padding: 2px 6px; border-radius: 6px; background: rgba(59,130,246,0.25); border: 1px solid rgba(59,130,246,0.45); font-size: 11px; display: inline-flex; align-items: center; gap: 3px;">
+                  🏫${isSyncing ? '<span class="spin-icon">⏳</span>' : ''}
+                </span>` : '';
               return `
                 <button class="tab-btn ${name === this._selectedChild ? 'active' : ''}" data-child="${name}">
                   👤 ${name}${gradeLevelStr}${portalBadge}
                 </button>
               `;
             }).join('')}
+            ${currentChild && currentChild.portalEnabled ? `
+              <button class="settings-badge-btn ${this._portalHeaderSyncing ? 'syncing' : ''}" id="header-portal-sync-btn" aria-label="Eltern-Portal synchronisieren" title="Eltern-Portal jetzt synchronisieren (max. 1x/Min)" style="margin-right: 4px; ${this._portalHeaderSyncSuccess ? 'border-color: #22c55e; color: #86efac; background: rgba(34,197,94,0.15);' : ''}">
+                <span class="${this._portalHeaderSyncing ? 'spin-icon' : ''}" style="font-size: 16px;">${this._portalHeaderSyncing ? '⏳' : (this._portalHeaderSyncSuccess ? '✅' : '🔄')}</span>
+              </button>
+            ` : ''}
             <button class="settings-badge-btn" id="open-settings-btn" aria-label="${this._t('settings_btn')}" title="${this._t('settings_btn')}">
               <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="3"></circle>
@@ -2490,9 +2544,14 @@ Natur und Technik:
             </span>
           </div>
           ${currentChild && currentChild.portalEnabled ? `
-            <div class="stat-card" style="border: 1px solid rgba(59, 130, 246, 0.4); background: rgba(59, 130, 246, 0.12);">
-              <span class="stat-label">🏫 Eltern-Portal</span>
-              <span class="stat-value" style="font-size: 16px; font-weight: 600; color: #93c5fd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${currentChild.portalSchool}">
+            <div class="stat-card portal-sync-trigger" id="banner-portal-sync-card" style="cursor: pointer; border: 1px solid rgba(59, 130, 246, 0.4); background: rgba(59, 130, 246, 0.12);" title="Klicken zum Synchronisieren (max. 1x/Min)">
+              <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <span class="stat-label">🏫 Eltern-Portal</span>
+                <span style="font-size: 11px; padding: 2px 6px; border-radius: 4px; background: rgba(59,130,246,0.25); color: #93c5fd; display: inline-flex; align-items: center; gap: 4px;">
+                  ${this._portalHeaderSyncing ? '<span class="spin-icon">⏳</span> Lädt...' : (this._portalHeaderSyncSuccess ? '✅ Aktualisiert' : '🔄 Sync')}
+                </span>
+              </div>
+              <span class="stat-value" style="font-size: 15px; font-weight: 600; color: #93c5fd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 4px;" title="${currentChild.portalSchool}">
                 ${currentChild.portalStudentName ? currentChild.portalStudentName : currentChild.portalSchool}
               </span>
             </div>
@@ -3138,7 +3197,7 @@ Natur und Technik:
                         <div style="font-size: 12px; font-weight: 600; color: #93c5fd; margin-bottom: 6px;">👥 ${this._t('portal_copy_from')}</div>
                         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                           ${siblingPortals.map(s => `
-                            <button type="button" class="sibling-portal-copy-btn" data-school="${s.portalSchool}" data-user="${s.portalUsername}" style="font-size: 12px; padding: 4px 10px; border-radius: 6px; background: rgba(59,130,246,0.25); border: 1px solid #3b82f6; color: #fff; cursor: pointer; transition: background 0.2s;">
+                            <button type="button" class="sibling-portal-copy-btn" data-child="${s.name}" data-school="${s.portalSchool}" data-user="${s.portalUsername}" style="font-size: 12px; padding: 4px 10px; border-radius: 6px; background: rgba(59,130,246,0.25); border: 1px solid #3b82f6; color: #fff; cursor: pointer; transition: background 0.2s;">
                               📋 ${s.name} (${s.portalSchool})
                             </button>
                           `).join('')}
@@ -3160,7 +3219,7 @@ Natur und Technik:
 
                   <div class="form-group" style="margin-bottom: 16px;">
                     <label style="display: block; margin-bottom: 6px; font-weight: 500; font-size: 13px;">🔒 ${this._t('portal_password')}</label>
-                    <input type="password" id="settings-portal-password" placeholder="${currentChild.portalHasPassword ? this._t('portal_password_stored') : '••••••••'}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.25); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 13px; box-sizing: border-box;">
+                    <input type="password" id="settings-portal-password" placeholder="${currentChild.portalHasPassword ? this._t('portal_password_stored') : '••••••••'}" value="${this._portalFormPassword !== undefined ? this._portalFormPassword : ''}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.25); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 13px; box-sizing: border-box;">
                   </div>
 
                   <div style="margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
@@ -3439,6 +3498,36 @@ Natur und Technik:
       });
     });
 
+    // Child Portal Sync Badge inside Tab
+    root.querySelectorAll('.child-portal-sync-badge').forEach(badge => {
+      badge.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const cName = badge.getAttribute('data-child') || this._selectedChild;
+        this._triggerPortalSync(cName);
+      });
+    });
+
+    // Header Portal Sync Button
+    const headerSyncBtn = root.querySelector('#header-portal-sync-btn');
+    if (headerSyncBtn) {
+      headerSyncBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        this._triggerPortalSync(this._selectedChild);
+      });
+    }
+
+    // Summary Banner Portal Card Click Sync
+    const bannerSyncCard = root.querySelector('#banner-portal-sync-card');
+    if (bannerSyncCard) {
+      bannerSyncCard.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        this._triggerPortalSync(this._selectedChild);
+      });
+    }
+
     // Summary Banner Interactive Toggles
     const toggleHomeworkBtn = root.querySelector('#toggle-homework-btn');
     if (toggleHomeworkBtn) {
@@ -3635,6 +3724,13 @@ Natur und Technik:
         e.preventDefault();
         this._showSettingsModal = true;
         this._settingsTab = 'general';
+        this._portalTesting = false;
+        this._portalTestResult = null;
+        this._portalTestError = null;
+        this._portalFormSchool = undefined;
+        this._portalFormUsername = undefined;
+        this._portalFormPassword = undefined;
+        this._portalCopySibling = undefined;
         this.render();
       });
     });
@@ -3821,17 +3917,57 @@ Natur und Technik:
 
       // Sibling Portal Copy Buttons
       root.querySelectorAll('.sibling-portal-copy-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', async () => {
+          const sibChild = btn.getAttribute('data-child') || '';
           const sch = btn.getAttribute('data-school') || '';
           const usr = btn.getAttribute('data-user') || '';
           this._portalFormSchool = sch;
           this._portalFormUsername = usr;
+          this._portalCopySibling = sibChild;
+
+          let pwd = '';
+          if (sibChild) {
+            try {
+              const res = await this._hass.callWS({
+                type: 'school_grades/get_sibling_portal_credentials',
+                sibling_name: sibChild,
+              });
+              if (res && res.success && res.password) {
+                pwd = res.password;
+              }
+            } catch (err) {
+              console.warn('Could not fetch sibling password:', err);
+            }
+          }
+          this._portalFormPassword = pwd;
           const sInput = root.querySelector('#settings-portal-school');
           const uInput = root.querySelector('#settings-portal-username');
+          const pInput = root.querySelector('#settings-portal-password');
           if (sInput) sInput.value = sch;
           if (uInput) uInput.value = usr;
+          if (pInput) pInput.value = pwd;
         });
       });
+
+      // Inputs change tracking for portal
+      const sInputTrack = root.querySelector('#settings-portal-school');
+      if (sInputTrack) {
+        sInputTrack.addEventListener('input', () => {
+          this._portalFormSchool = sInputTrack.value;
+        });
+      }
+      const uInputTrack = root.querySelector('#settings-portal-username');
+      if (uInputTrack) {
+        uInputTrack.addEventListener('input', () => {
+          this._portalFormUsername = uInputTrack.value;
+        });
+      }
+      const pInputTrack = root.querySelector('#settings-portal-password');
+      if (pInputTrack) {
+        pInputTrack.addEventListener('input', () => {
+          this._portalFormPassword = pInputTrack.value;
+        });
+      }
 
       // Eltern-Portal Test Connection Button
       const portalTestBtn = root.querySelector('#settings-portal-test-btn');
@@ -3840,24 +3976,29 @@ Natur und Technik:
           const sInput = root.querySelector('#settings-portal-school');
           const uInput = root.querySelector('#settings-portal-username');
           const pInput = root.querySelector('#settings-portal-password');
-          const schoolVal = sInput ? sInput.value.trim() : '';
-          const userVal = uInput ? uInput.value.trim() : '';
-          const passVal = pInput ? pInput.value : '';
+          const schoolVal = sInput ? sInput.value.trim() : (this._portalFormSchool || '');
+          const userVal = uInput ? uInput.value.trim() : (this._portalFormUsername || '');
+          const passVal = pInput && pInput.value ? pInput.value : (this._portalFormPassword || '');
 
           this._portalFormSchool = schoolVal;
           this._portalFormUsername = userVal;
+          this._portalFormPassword = passVal;
           this._portalTesting = true;
           this._portalTestError = null;
           this.render();
 
           try {
-            const res = await this._hass.callWS({
+            const reqData = {
               type: 'school_grades/test_elternportal',
               school: schoolVal,
               username: userVal,
               password: passVal,
               child_name: this._selectedChild,
-            });
+            };
+            if (this._portalCopySibling) {
+              reqData.copy_sibling_name = this._portalCopySibling;
+            }
+            const res = await this._hass.callWS(reqData);
             this._portalTesting = false;
             if (res && res.success) {
               this._portalTestResult = res;
@@ -3896,9 +4037,9 @@ Natur und Technik:
         portalForm.addEventListener('submit', async (e) => {
           e.preventDefault();
           const enabled = root.querySelector('#settings-portal-enabled')?.checked || false;
-          const school = root.querySelector('#settings-portal-school')?.value.trim() || '';
-          const username = root.querySelector('#settings-portal-username')?.value.trim() || '';
-          const password = root.querySelector('#settings-portal-password')?.value || '';
+          const school = root.querySelector('#settings-portal-school')?.value.trim() || this._portalFormSchool || '';
+          const username = root.querySelector('#settings-portal-username')?.value.trim() || this._portalFormUsername || '';
+          const password = root.querySelector('#settings-portal-password')?.value || this._portalFormPassword || '';
           const sel = root.querySelector('#settings-portal-student-select');
           let studentId = '';
           let studentName = '';
@@ -3914,15 +4055,20 @@ Natur und Technik:
           const syncTt = root.querySelector('#settings-portal-sync-tt')?.checked ?? true;
           const syncSubst = root.querySelector('#settings-portal-sync-subst')?.checked ?? true;
           const syncExams = root.querySelector('#settings-portal-sync-exams')?.checked ?? true;
+          const copySib = this._portalCopySibling;
 
           this._showSettingsModal = false;
           this._portalTesting = false;
           this._portalTestResult = null;
           this._portalTestError = null;
+          this._portalFormSchool = undefined;
+          this._portalFormUsername = undefined;
+          this._portalFormPassword = undefined;
+          this._portalCopySibling = undefined;
           this.render();
 
           try {
-            await this._hass.callService('school_grades', 'update_portal_settings', {
+            const payload = {
               child_name: this._selectedChild,
               portal_enabled: enabled,
               portal_school: school,
@@ -3933,7 +4079,11 @@ Natur und Technik:
               portal_sync_timetable: syncTt,
               portal_sync_substitutions: syncSubst,
               portal_sync_exams: syncExams,
-            });
+            };
+            if (copySib) {
+              payload.copy_sibling_name = copySib;
+            }
+            await this._hass.callService('school_grades', 'update_portal_settings', payload);
           } catch (err) {
             console.error("Failed to update portal settings:", err);
           }
@@ -3944,6 +4094,17 @@ Natur und Technik:
       const syncNowBtn = root.querySelector('#settings-portal-sync-now-btn');
       if (syncNowBtn) {
         syncNowBtn.addEventListener('click', async () => {
+          const now = Date.now();
+          if (!this._portalSyncTimestamps) this._portalSyncTimestamps = {};
+          const lastSync = this._portalSyncTimestamps[this._selectedChild] || 0;
+          const elapsed = Math.floor((now - lastSync) / 1000);
+          if (elapsed < 60) {
+            const wait = 60 - elapsed;
+            this._portalSyncFeedback = `⏳ Synchronisierungs-Limit: Bitte noch ${wait}s warten (max. 1x/Min).`;
+            this.render();
+            return;
+          }
+          this._portalSyncTimestamps[this._selectedChild] = now;
           this._portalSyncing = true;
           this._portalSyncFeedback = null;
           this.render();
@@ -4542,6 +4703,26 @@ Natur und Technik:
       .settings-badge-btn svg {
         display: block;
         pointer-events: none;
+      }
+
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+
+      .spin-icon {
+        display: inline-block;
+        animation: spin 1s linear infinite;
+      }
+
+      .child-portal-sync-badge:hover {
+        background: rgba(59, 130, 246, 0.45) !important;
+        transform: scale(1.05);
+      }
+
+      .portal-sync-trigger:hover {
+        border-color: rgba(59, 130, 246, 0.8) !important;
+        background: rgba(59, 130, 246, 0.2) !important;
       }
 
       .summary-banner {

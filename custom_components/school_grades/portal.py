@@ -639,6 +639,34 @@ async def async_fetch_child_portal_data(
             "substitutions": substitutions_data,
         }
 
+    except BadCredentialsException as err:
+        _LOGGER.debug("Eltern-Portal bad credentials: %s", err)
+        return {
+            "success": False,
+            "error": "bad_credentials",
+            "message": "Anmeldung im Eltern-Portal fehlgeschlagen (Benutzername oder Passwort falsch). Bitte Zugangsdaten in den Einstellungen prüfen.",
+        }
+    except CannotConnectException as err:
+        _LOGGER.debug("Eltern-Portal cannot connect: %s", err)
+        return {
+            "success": False,
+            "error": "cannot_connect",
+            "message": f"Verbindung zum Eltern-Portal fehlgeschlagen: {err}",
+        }
+    except ResolveHostnameException as err:
+        _LOGGER.debug("Eltern-Portal hostname resolution failed: %s", err)
+        return {
+            "success": False,
+            "error": "invalid_school",
+            "message": f"Die Schule '{clean_school}' konnte auf eltern-portal.org nicht gefunden werden.",
+        }
+    except StudentListException as err:
+        _LOGGER.debug("Eltern-Portal student list missing: %s", err)
+        return {
+            "success": False,
+            "error": "no_students",
+            "message": "Anmeldung erfolgreich, aber es wurden keine Kinder im Account gefunden.",
+        }
     except Exception as err:
         _LOGGER.exception("Error fetching child portal data: %s", err)
         return {

@@ -702,9 +702,107 @@ Deutsch:
         self.assertEqual(slot1_data["raw_subject"], "Ma")
         self.assertEqual(slot1_data["room"], "R101")
 
+    def test_portal_error_handling_exceptions(self):
+        """Test that async_fetch_child_portal_data returns user-friendly messages on portal exceptions."""
+        import asyncio
+        from unittest.mock import AsyncMock, MagicMock, patch
 
+        class MockBadCredentialsException(Exception): pass
+        class MockCannotConnectException(Exception): pass
+        class MockResolveHostnameException(Exception): pass
+        class MockStudentListException(Exception): pass
 
+        async def run_test():
+            with patch.object(portal_mod, "HAVE_PYELTERNPORTAL", True), \
+                 patch.object(portal_mod, "BadCredentialsException", MockBadCredentialsException), \
+                 patch.object(portal_mod, "CannotConnectException", MockCannotConnectException), \
+                 patch.object(portal_mod, "ResolveHostnameException", MockResolveHostnameException), \
+                 patch.object(portal_mod, "StudentListException", MockStudentListException), \
+                 patch.object(portal_mod, "ElternPortalAPI") as mock_api_cls:
 
+                mock_instance = mock_api_cls.return_value
+                mock_instance.async_base_online = AsyncMock()
+
+                # 1. BadCredentialsException (e.g. pupil-selector tag error caused by bad auth)
+                mock_instance.async_login_online = AsyncMock(side_effect=MockBadCredentialsException("The tag with class 'pupil-selector' could not be found."))
+                res = await portal_mod.async_fetch_child_portal_data(
+                    session=None,
+                    school="gy-peissenberg",
+                    username="user@example.com",
+                    password="wrong_password",
+                    student_id="12345",
+                )
+                self.assertFalse(res["success"])
+                self.assertEqual(res["error"], "bad_credentials")
+                self.assertIn("Benutzername oder Passwort falsch", res["message"])
+
+                # 2. CannotConnectException
+                mock_instance.async_login_online = AsyncMock(side_effect=MockCannotConnectException("Timeout"))
+                res = await portal_mod.async_fetch_child_portal_data(
+                    session=None,
+                    school="gy-peissenberg",
+                    username="user@example.com",
+                    password="secret",
+                    student_id="12345",
+                )
+                self.assertFalse(res["success"])
+                self.assertEqual(res["error"], "cannot_connect")
+
+                # 3. ResolveHostnameException
+                mock_instance.async_login_online = AsyncMock(side_effect=MockResolveHostnameException("Unknown host"))
+                res = await portal_mod.async_fetch_child_portal_data(
+                    session=None,
+                    school="invalid-school-name",
+                    username="user@example.com",
+                    password="secret",
+                    student_id="12345",
+                )
+                self.assertFalse(res["success"])
+                self.assertEqual(res["error"], "invalid_school")
+
+                # 4. StudentListException
+                mock_instance.async_login_online = AsyncMock(side_effect=MockStudentListException("No students found"))
+                res = await portal_mod.async_fetch_child_portal_data(
+                    session=None,
+                    school="gy-peissenberg",
+                    username="user@example.com",
+                    password="secret",
+                    student_id="12345",
+                )
+                self.assertFalse(res["success"])
+                self.assertEqual(res["error"], "no_students")
+
+        asyncio.run(run_test())
+
+    def test_copy_sibling_portal_credentials(self):
+        """Test sharing and copying portal settings from sibling child."""
+        child1 = SchoolGradesData("ChildA")
+        child1.set_portal_settings(
+            enabled=True,
+            school="gymnasium-test",
+            username="parent@example.com",
+            password="securePassword123!",
+            student_id="101",
+            student_name="Child A",
+        )
+        self.assertEqual(child1.portal_school, "gymnasium-test")
+        self.assertEqual(child1.portal_username, "parent@example.com")
+        self.assertEqual(child1.portal_password, "securePassword123!")
+
+        # Child B copies credentials from sibling Child A
+        child2 = SchoolGradesData("ChildB")
+        child2.set_portal_settings(
+            enabled=True,
+            school=child1.portal_school,
+            username=child1.portal_username,
+            password=child1.portal_password,
+            student_id="102",
+            student_name="Child B",
+        )
+        self.assertEqual(child2.portal_school, "gymnasium-test")
+        self.assertEqual(child2.portal_username, "parent@example.com")
+        self.assertEqual(child2.portal_password, "securePassword123!")
+        self.assertEqual(child2.portal_student_id, "102")
 def validate_json_yaml_files():
     json_files = list(project_root.glob("**/*.json"))
     for jf in json_files:

@@ -241,6 +241,7 @@ SCHEMA_UPDATE_PORTAL_SETTINGS = vol.Schema(
         vol.Optional(CONF_PORTAL_SYNC_TIMETABLE, default=True): cv.boolean,
         vol.Optional(CONF_PORTAL_SYNC_SUBSTITUTIONS, default=True): cv.boolean,
         vol.Optional(CONF_PORTAL_SYNC_EXAMS, default=True): cv.boolean,
+        vol.Optional("copy_sibling_name"): cv.string,
     }
 )
 
@@ -299,7 +300,7 @@ async def _async_setup_frontend(hass: HomeAssistant) -> None:
     else:
         hass.http.register_static_path(URL_BASE, FRONTEND_DIR, cache_headers=False)
 
-    version_str = "1.2.2"
+    version_str = "1.2.3"
     try:
         js_file = os.path.join(FRONTEND_DIR, "school-grades-panel.js")
         if os.path.exists(js_file):
@@ -596,8 +597,13 @@ def _register_services(hass: HomeAssistant) -> None:
         sync_substitutions = call.data.get(CONF_PORTAL_SYNC_SUBSTITUTIONS, True)
         sync_exams = call.data.get(CONF_PORTAL_SYNC_EXAMS, True)
 
+        copy_sibling = call.data.get("copy_sibling_name")
         storage = _get_storage(hass, child_name)
         if storage:
+            if not password and copy_sibling:
+                sib_storage = _get_storage(hass, copy_sibling)
+                if sib_storage and sib_storage.data.portal_password:
+                    password = sib_storage.data.portal_password
             pwd = password if password else None
             storage.data.set_portal_settings(
                 enabled=enabled,
@@ -621,11 +627,41 @@ def _register_services(hass: HomeAssistant) -> None:
 
     @websocket_api.websocket_command(
         {
+            vol.Required("type"): "school_grades/get_sibling_portal_credentials",
+            vol.Required("sibling_name"): str,
+        }
+    )
+    @websocket_api.async_response
+    async def ws_get_sibling_portal_credentials(
+        hass_inner: HomeAssistant,
+        connection: websocket_api.ActiveConnection,
+        msg: dict[str, Any],
+    ) -> None:
+        """Handle websocket getting portal credentials from sibling child."""
+        sib_name = msg["sibling_name"]
+        sib_storage = _get_storage(hass, sib_name)
+        if not sib_storage:
+            connection.send_result(msg["id"], {"success": False, "error": "sibling_not_found"})
+            return
+        connection.send_result(
+            msg["id"],
+            {
+                "success": True,
+                "school": sib_storage.data.portal_school,
+                "username": sib_storage.data.portal_username,
+                "password": sib_storage.data.portal_password,
+                "student_id": sib_storage.data.portal_student_id,
+            },
+        )
+
+    @websocket_api.websocket_command(
+        {
             vol.Required("type"): "school_grades/test_elternportal",
             vol.Required("school"): str,
             vol.Optional("username", default=""): str,
             vol.Optional("password", default=""): str,
             vol.Optional("child_name"): str,
+            vol.Optional("copy_sibling_name"): str,
         }
     )
     @websocket_api.async_response
@@ -639,6 +675,12 @@ def _register_services(hass: HomeAssistant) -> None:
         school = msg["school"]
         username = msg.get("username", "")
         password = msg.get("password", "")
+        copy_sibling = msg.get("copy_sibling_name")
+
+        if not password and copy_sibling:
+            sib_storage = _get_storage(hass, copy_sibling)
+            if sib_storage and sib_storage.data.portal_password:
+                password = sib_storage.data.portal_password
 
         if (not password or not username) and child_name:
             storage = _get_storage(hass, child_name)
@@ -664,12 +706,25 @@ def _register_services(hass: HomeAssistant) -> None:
                 "error": "not_enabled",
                 "message": "Eltern-Portal ist für dieses Kind nicht aktiviert.",
             }
-        if not data.portal_school or not data.portal_username or not data.portal_student_id:
+        if not data.portal_school or not data.portal_username or not data.portal_password or not data.portal_student_id:
             return {
                 "success": False,
                 "child_name": data.child_name,
                 "error": "missing_credentials",
-                "message": "Zugangsdaten oder Schüler-ID unvollständig.",
+                "message": "Zugangsdaten unvollständig (Schule, Benutzername, Passwort oder Schüler-ID fehlt). Bitte in den Einstellungen eintragen.",
+            }
+
+        import time
+        cooldowns = hass.data.setdefault(f"{DOMAIN}_portal_sync_cooldowns", {})
+        now_ts = time.time()
+        last_ts = cooldowns.get(data.child_name, 0.0)
+        if not force_timetable and (now_ts - last_ts < 60.0):
+            wait_s = int(60.0 - (now_ts - last_ts))
+            return {
+                "success": False,
+                "child_name": data.child_name,
+                "error": "rate_limited",
+                "message": f"Synchronisierung ist limitiert auf maximal 1x pro Minute. Bitte noch {wait_s} Sekunden warten.",
             }
 
         session = async_get_clientsession(hass)
@@ -695,6 +750,7 @@ def _register_services(hass: HomeAssistant) -> None:
             return res
 
         data.portal_last_status = "ok"
+        cooldowns[data.child_name] = now_ts
 
         # Update substitutions if fetched
         if sync_subst and "substitutions" in res:
@@ -1213,6 +1269,7 @@ def _register_services(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_sync_elternportal)
     websocket_api.async_register_command(hass, ws_import_portal_timetable)
     websocket_api.async_register_command(hass, ws_update_subject_aliases)
+    websocket_api.async_register_command(hass, ws_get_sibling_portal_credentials)
 
 
 def _unregister_services(hass: HomeAssistant) -> None:
