@@ -2368,6 +2368,7 @@ Natur und Technik:
 
   render() {
     const data = this._getSchoolGradesData();
+    const children = data;
     const childNames = Object.keys(data);
     const availableCalendars = this._getAvailableCalendars();
 
@@ -3001,16 +3002,16 @@ Natur und Technik:
 
             <!-- Settings Tabs Header -->
             <div class="settings-tabs-header" style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--divider-color, rgba(255,255,255,0.1)); padding-bottom: 10px;">
-              <button class="modal-tab-btn ${this._settingsTab === 'general' ? 'active' : ''}" id="settings-tab-btn-general" style="padding: 8px 14px; border-radius: 8px; border: 1px solid ${this._settingsTab === 'general' ? 'var(--primary-color, #3b82f6)' : 'rgba(255,255,255,0.1)'}; background: ${this._settingsTab === 'general' ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.05)'}; color: #fff; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.2s;">
+              <button type="button" class="modal-tab-btn ${this._settingsTab === 'general' ? 'active' : ''}" id="settings-tab-btn-general" style="padding: 8px 14px; border-radius: 8px; border: 1px solid ${this._settingsTab === 'general' ? 'var(--primary-color, #3b82f6)' : 'rgba(255,255,255,0.1)'}; background: ${this._settingsTab === 'general' ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.05)'}; color: #fff; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.2s;">
                 ${this._t('settings_tab_general')}
               </button>
-              <button class="modal-tab-btn ${this._settingsTab === 'subjects' ? 'active' : ''}" id="settings-tab-btn-subjects" style="padding: 8px 14px; border-radius: 8px; border: 1px solid ${this._settingsTab === 'subjects' ? 'var(--primary-color, #3b82f6)' : 'rgba(255,255,255,0.1)'}; background: ${this._settingsTab === 'subjects' ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.05)'}; color: #fff; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.2s;">
+              <button type="button" class="modal-tab-btn ${this._settingsTab === 'subjects' ? 'active' : ''}" id="settings-tab-btn-subjects" style="padding: 8px 14px; border-radius: 8px; border: 1px solid ${this._settingsTab === 'subjects' ? 'var(--primary-color, #3b82f6)' : 'rgba(255,255,255,0.1)'}; background: ${this._settingsTab === 'subjects' ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.05)'}; color: #fff; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.2s;">
                 ${this._t('settings_tab_subjects')}
               </button>
-              <button class="modal-tab-btn ${this._settingsTab === 'timetable' ? 'active' : ''}" id="settings-tab-btn-timetable" style="padding: 8px 14px; border-radius: 8px; border: 1px solid ${this._settingsTab === 'timetable' ? 'var(--primary-color, #3b82f6)' : 'rgba(255,255,255,0.1)'}; background: ${this._settingsTab === 'timetable' ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.05)'}; color: #fff; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.2s;">
+              <button type="button" class="modal-tab-btn ${this._settingsTab === 'timetable' ? 'active' : ''}" id="settings-tab-btn-timetable" style="padding: 8px 14px; border-radius: 8px; border: 1px solid ${this._settingsTab === 'timetable' ? 'var(--primary-color, #3b82f6)' : 'rgba(255,255,255,0.1)'}; background: ${this._settingsTab === 'timetable' ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.05)'}; color: #fff; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.2s;">
                 ${this._t('settings_tab_timetable')}
               </button>
-              <button class="modal-tab-btn ${this._settingsTab === 'portal' ? 'active' : ''}" id="settings-tab-btn-portal" style="padding: 8px 14px; border-radius: 8px; border: 1px solid ${this._settingsTab === 'portal' ? 'var(--primary-color, #3b82f6)' : 'rgba(255,255,255,0.1)'}; background: ${this._settingsTab === 'portal' ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.05)'}; color: #fff; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.2s;">
+              <button type="button" class="modal-tab-btn ${this._settingsTab === 'portal' ? 'active' : ''}" id="settings-tab-btn-portal" style="padding: 8px 14px; border-radius: 8px; border: 1px solid ${this._settingsTab === 'portal' ? 'var(--primary-color, #3b82f6)' : 'rgba(255,255,255,0.1)'}; background: ${this._settingsTab === 'portal' ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.05)'}; color: #fff; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.2s;">
                 ${this._t('settings_tab_portal')}
               </button>
             </div>
@@ -3129,7 +3130,7 @@ Natur und Technik:
                   </div>
 
                   ${(() => {
-                    const siblingPortals = Object.values(children || {}).filter(c => c.name !== this._selectedChild && c.portalSchool);
+                    const siblingPortals = Object.values(data || children || {}).filter(c => c && c.name !== this._selectedChild && c.portalSchool);
                     if (siblingPortals.length === 0) return '';
                     return `
                       <div style="background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.25); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px;">
@@ -3223,10 +3224,17 @@ Natur und Technik:
                         🔄 Aktionen & Status
                       </label>
                       <div style="font-size: 12px; color: rgba(255,255,255,0.7); margin-bottom: 10px;">
-                        ${currentChild.portalLastSync ? `
-                          <div>⏱️ <b>${this._t('portal_last_sync_label')}</b> ${new Date(currentChild.portalLastSync).toLocaleString(this._getLocale())}</div>
+                        ${currentChild && currentChild.portalLastSync ? `
+                          <div>⏱️ <b>${this._t('portal_last_sync_label')}</b> ${(() => {
+                            try {
+                              const d = new Date(currentChild.portalLastSync);
+                              return isNaN(d.getTime()) ? currentChild.portalLastSync : d.toLocaleString(this._getLocale());
+                            } catch (e) {
+                              return currentChild.portalLastSync;
+                            }
+                          })()}</div>
                         ` : ''}
-                        ${currentChild.portalLastStatus ? `
+                        ${currentChild && currentChild.portalLastStatus ? `
                           <div>📊 <b>Status:</b> ${currentChild.portalLastStatus}</div>
                         ` : ''}
                       </div>
@@ -3620,14 +3628,14 @@ Natur und Technik:
     });
 
     // Open Settings Modal
-    const openSettingsBtn = root.querySelector('#open-settings-btn') || root.querySelector('#open-settings-banner-btn');
-    if (openSettingsBtn) {
-      openSettingsBtn.addEventListener('click', () => {
+    root.querySelectorAll('#open-settings-btn, #open-settings-banner-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
         this._showSettingsModal = true;
         this._settingsTab = 'general';
         this.render();
       });
-    }
+    });
 
     // Settings Modal Backdrop & Forms
     const settingsBackdrop = root.querySelector('#settings-modal-backdrop');
@@ -3657,7 +3665,8 @@ Natur und Technik:
       // Settings Tab Switchers
       const tabBtnGeneral = root.querySelector('#settings-tab-btn-general');
       if (tabBtnGeneral) {
-        tabBtnGeneral.addEventListener('click', () => {
+        tabBtnGeneral.addEventListener('click', (e) => {
+          e.preventDefault();
           this._settingsTab = 'general';
           this.render();
         });
@@ -3665,7 +3674,8 @@ Natur und Technik:
 
       const tabBtnSubjects = root.querySelector('#settings-tab-btn-subjects');
       if (tabBtnSubjects) {
-        tabBtnSubjects.addEventListener('click', () => {
+        tabBtnSubjects.addEventListener('click', (e) => {
+          e.preventDefault();
           this._settingsTab = 'subjects';
           this.render();
         });
@@ -3673,7 +3683,8 @@ Natur und Technik:
 
       const tabBtnTimetable = root.querySelector('#settings-tab-btn-timetable');
       if (tabBtnTimetable) {
-        tabBtnTimetable.addEventListener('click', () => {
+        tabBtnTimetable.addEventListener('click', (e) => {
+          e.preventDefault();
           this._settingsTab = 'timetable';
           this.render();
         });
@@ -3681,7 +3692,8 @@ Natur und Technik:
 
       const tabBtnPortal = root.querySelector('#settings-tab-btn-portal');
       if (tabBtnPortal) {
-        tabBtnPortal.addEventListener('click', () => {
+        tabBtnPortal.addEventListener('click', (e) => {
+          e.preventDefault();
           this._settingsTab = 'portal';
           this.render();
         });
