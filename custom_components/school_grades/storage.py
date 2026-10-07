@@ -435,8 +435,14 @@ class SchoolGradesData:
             item = dict(apt)
 
             # Filter info events if configured
-            if ignore_info_events and not item.get("is_exam"):
-                class_str = str(item.get("class") or item.get("class_name") or item.get("className") or "").lower()
+            if ignore_info_events:
+                class_str = str(
+                    item.get("class")
+                    or item.get("class_name")
+                    or item.get("className")
+                    or item.get("classname")
+                    or ""
+                ).lower()
                 if "info" in class_str or class_str == "event-info":
                     continue
 

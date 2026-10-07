@@ -1342,12 +1342,12 @@ Deutsch:
         all_parsed = parse_appointments(raw_events, ignore_info_events=False)
         self.assertEqual(len(all_parsed), 5)
 
-        # 2. With ignore_info_events=True: Schulfest is ignored, but Vokabeltest (exam) is kept!
+        # 2. With ignore_info_events=True: ALL event-info appointments are strictly ignored!
         filtered = parse_appointments(raw_events, ignore_info_events=True)
-        self.assertEqual(len(filtered), 4)
+        self.assertEqual(len(filtered), 3)
         titles = [e["title"] for e in filtered]
         self.assertNotIn("Schulfest der gesamten Schule", titles)
-        self.assertIn("Vokabeltest Englisch", titles)
+        self.assertNotIn("Vokabeltest Englisch", titles)
         self.assertIn("Wichtiger Elternabend", titles)
         self.assertIn("Hitzefrei Warnung", titles)
         self.assertIn("Vergangener Termin", titles)
@@ -1358,16 +1358,19 @@ Deutsch:
         data.set_portal_appointments(all_parsed)
         self.assertEqual(len(data.portal_appointments), 5)
 
-        # Update settings to ignore info events -> re-filters existing appointments
+        # Update settings to ignore info events -> strictly re-filters all event-info appointments
         data.set_portal_settings(enabled=True, ignore_info_events=True)
-        self.assertEqual(len(data.portal_appointments), 4)
+        self.assertEqual(len(data.portal_appointments), 3)
         self.assertNotIn("Schulfest der gesamten Schule", [e["title"] for e in data.portal_appointments])
+        self.assertNotIn("Vokabeltest Englisch", [e["title"] for e in data.portal_appointments])
 
         # 4. Test only_upcoming in get_portal_appointments
         upcoming = data.get_portal_appointments(only_upcoming=True)
         upcoming_titles = [e["title"] for e in upcoming]
         self.assertNotIn("Vergangener Termin", upcoming_titles)
-        self.assertIn("Vokabeltest Englisch", upcoming_titles)
+        self.assertNotIn("Vokabeltest Englisch", upcoming_titles)
+        self.assertIn("Wichtiger Elternabend", upcoming_titles)
+        self.assertIn("Hitzefrei Warnung", upcoming_titles)
 
 def validate_json_yaml_files():
     json_files = list(project_root.glob("**/*.json"))

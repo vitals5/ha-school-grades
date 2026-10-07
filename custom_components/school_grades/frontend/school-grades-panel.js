@@ -2119,9 +2119,12 @@ class SchoolGradesPanel extends HTMLElement {
       let portalAppts = (childData && childData.portalAppointments) || [];
       if (childData && childData.portalIgnoreInfoEvents) {
         portalAppts = portalAppts.filter(apt => {
-          if (apt.is_exam) return true;
-          const c = String(apt.class || apt.className || apt.class_name || '').toLowerCase();
+          const c = String(apt.class || apt.className || apt.class_name || apt.classname || '').toLowerCase();
           return !c.includes('info') && c !== 'event-info';
+        });
+        parsedEvents = parsedEvents.filter(evt => {
+          const desc = String(evt.description || '').toLowerCase();
+          return !desc.includes('event-info') && !desc.includes('kategorie: event-info');
         });
       }
       for (const apt of portalAppts) {

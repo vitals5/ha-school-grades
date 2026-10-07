@@ -789,7 +789,7 @@ def parse_appointments(
         elif _EXAM_KW_RE.search(title) or _EXAM_KW_RE.search(title_short):
             is_exam = True
 
-        if ignore_info_events and not is_exam and ("info" in class_l or class_l == "event-info"):
+        if ignore_info_events and ("info" in class_l or class_l == "event-info"):
             continue
 
         subject = extract_exam_subject(title, title_short, aliases, existing_subjects)
