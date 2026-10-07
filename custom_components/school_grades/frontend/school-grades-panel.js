@@ -3029,19 +3029,6 @@ Natur und Technik:
               ${currentChild && currentChild.preparationDone ? this._t('prep_done_badge') : this._t('prep_open_badge')}
             </span>
           </div>
-          ${currentChild && currentChild.portalEnabled ? `
-            <div class="stat-card portal-sync-trigger" id="banner-portal-sync-card" style="cursor: pointer; border: 1px solid rgba(59, 130, 246, 0.4); background: rgba(59, 130, 246, 0.12);" title="Klicken zum Synchronisieren (max. 1x/Min)">
-              <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                <span class="stat-label">🏫 Eltern-Portal</span>
-                <span style="font-size: 11px; padding: 2px 6px; border-radius: 4px; background: rgba(59,130,246,0.25); color: #93c5fd; display: inline-flex; align-items: center; gap: 4px;">
-                  ${this._portalHeaderSyncing ? '<span class="spin-icon">⏳</span> Lädt...' : (this._portalHeaderSyncSuccess ? '✅ Aktualisiert' : '🔄 Sync')}
-                </span>
-              </div>
-              <span class="stat-value" style="font-size: 15px; font-weight: 600; color: #93c5fd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 4px;" title="${currentChild.portalSchool}">
-                ${currentChild.portalStudentName ? currentChild.portalStudentName : currentChild.portalSchool}
-              </span>
-            </div>
-          ` : ''}
         </div>
 
         <!-- Preparation Card for Next School Day (Interactive Clickable Subjects) -->
@@ -3158,11 +3145,6 @@ Natur und Technik:
             <div class="calendar-header">
               <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
                 <h3 style="margin: 0;">${this._t('calendar_title', { count: upcomingEvents.length })}</h3>
-                ${currentChild && currentChild.portalEnabled ? `
-                  <button class="pill-btn" id="sync-portal-exams-btn" style="padding: 6px 14px; font-size: 13px; font-weight: 600; background: rgba(59, 130, 246, 0.2); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.2s ease;" title="${this._t('portal_sync_exams_title')}" ${this._portalImportingExams ? 'disabled style="opacity:0.6;cursor:wait;"' : ''}>
-                    ${this._portalImportingExams ? '<span class="spin-icon">⏳</span> Lädt...' : `<span>📝</span> ${this._t('portal_sync_exams_title')}`}
-                  </button>
-                ` : ''}
                 ${currentChild && currentChild.calendarEntity ? `
                   <button class="pill-btn add-event-toggle-btn" id="toggle-add-event-btn" style="padding: 6px 14px; font-size: 13px; font-weight: 600; background: linear-gradient(135deg, #10b981, #059669); color: #fff; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35); transition: all 0.2s ease;">
                     ${this._t('add_event_btn')}
@@ -4044,16 +4026,6 @@ Natur und Technik:
       });
     }
 
-    // Summary Banner Portal Card Click Sync
-    const bannerSyncCard = root.querySelector('#banner-portal-sync-card');
-    if (bannerSyncCard) {
-      bannerSyncCard.addEventListener('click', (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        this._triggerPortalSync(this._selectedChild);
-      });
-    }
-
     // Summary Banner Interactive Toggles
     const toggleHomeworkBtn = root.querySelector('#toggle-homework-btn');
     if (toggleHomeworkBtn) {
@@ -4833,38 +4805,6 @@ Natur und Technik:
           }
         });
       }
-    }
-
-    // Sync Portal Exams Button in Calendar Card
-    const syncPortalExamsBtn = root.querySelector('#sync-portal-exams-btn');
-    if (syncPortalExamsBtn) {
-      syncPortalExamsBtn.addEventListener('click', async () => {
-        this._portalImportingExams = true;
-        this.render();
-        try {
-          const res = await this._hass.callWS({
-            type: 'school_grades/import_portal_exams',
-            child_name: this._selectedChild,
-          });
-          this._portalImportingExams = false;
-          if (res && res.success) {
-            await this._fetchUpcomingCalendarEvents();
-            let calText = '';
-            if (res.deleted_info_count > 0) {
-              calText = `\n(${res.deleted_info_count} Info-Termine aus Kalender entfernt)`;
-            } else if (res.synced_to_calendar) {
-              calText = ' (inkl. Kalender)';
-            }
-            alert(`✅ ${this._t('portal_exams_synced')}${calText}`);
-          } else {
-            alert(`❌ ${(res && res.message) || 'Fehler beim Importieren der Klausuren'}`);
-          }
-        } catch (err) {
-          this._portalImportingExams = false;
-          alert(`❌ ${(err && (err.message || err.error)) || String(err)}`);
-        }
-        this.render();
-      });
     }
 
     // Open Add Calendar Event Modal
