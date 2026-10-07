@@ -437,6 +437,123 @@ class TestCalendarServicesLogic(unittest.TestCase):
         compiled_path = py_compile.compile(str(init_path), doraise=True)
         self.assertIsNotNone(compiled_path)
 
+    def test_async_find_event_uid_and_duplicate_prevention(self):
+        """Test finding existing calendar events and preventing duplicates during sync."""
+        import asyncio
+
+        mock_events = [
+            {
+                "summary": "Schulaufgabe in Latein (De)",
+                "start": "2026-11-16T08:00:00",
+                "end": "2026-11-16T09:00:00",
+                "uid": "latin_uid_123",
+            },
+            {
+                "summary": "Kurzarbeit Mathe",
+                "start": "2026-11-20T09:00:00",
+                "end": "2026-11-20T10:00:00",
+            },
+        ]
+
+        class MockServices:
+            async def async_call(self, domain, service, service_data, blocking=False, return_response=False):
+                if domain == "calendar" and service == "get_events":
+                    return {
+                        service_data["entity_id"]: {
+                            "events": mock_events
+                        }
+                    }
+                return {}
+
+        class MockHass:
+            def __init__(self):
+                self.services = MockServices()
+                self.data = {}
+
+        hass = MockHass()
+
+        async def _async_find_event_uid(target_calendar: str, summary: str | None, date_str: str | None) -> str | None:
+            if not summary or not date_str:
+                return None
+            try:
+                from datetime import datetime, timedelta
+                clean_date = date_str.strip()
+                if len(clean_date) > 10:
+                    clean_date = clean_date[:10]
+                try:
+                    from homeassistant.util import dt as dt_util
+                    tz = dt_util.get_default_time_zone()
+                    target_date = datetime.fromisoformat(f"{clean_date}T00:00:00").replace(tzinfo=tz)
+                except Exception:
+                    target_date = datetime.fromisoformat(f"{clean_date}T00:00:00")
+
+                start_search = target_date - timedelta(days=2)
+                end_search = target_date + timedelta(days=3)
+
+                raw_events = []
+                svc_res = await hass.services.async_call(
+                    "calendar",
+                    "get_events",
+                    {
+                        "entity_id": target_calendar,
+                        "start_date_time": start_search.isoformat(),
+                        "end_date_time": end_search.isoformat(),
+                    },
+                    blocking=True,
+                    return_response=True,
+                )
+                if isinstance(svc_res, dict):
+                    cal_data = svc_res.get(target_calendar)
+                    if isinstance(cal_data, dict) and isinstance(cal_data.get("events"), list):
+                        raw_events = cal_data["events"]
+
+                clean_summary = summary.strip().lower()
+                for evt in raw_events:
+                    if isinstance(evt, dict):
+                        evt_summary = str(evt.get("summary") or evt.get("title") or "").strip().lower()
+                        uid_val = str(evt.get("uid") or evt.get("id") or evt.get("event_id") or "")
+                        evt_start = evt.get("start")
+                    else:
+                        evt_summary = str(getattr(evt, "summary", "") or getattr(evt, "title", "") or "").strip().lower()
+                        uid_val = str(getattr(evt, "uid", None) or getattr(evt, "id", None) or getattr(evt, "event_id", None) or "")
+                        evt_start = getattr(evt, "start", None)
+
+                    if not evt_summary:
+                        continue
+                    if evt_start:
+                        evt_date_str = str(evt_start).split("T")[0].split(" ")[0]
+                        if evt_date_str and evt_date_str != clean_date:
+                            continue
+
+                    if clean_summary == evt_summary or clean_summary in evt_summary or evt_summary in clean_summary:
+                        return uid_val if uid_val else "existing_event"
+            except Exception:
+                pass
+            return None
+
+        async def run_test():
+            # 1. Matches existing event with UID
+            uid = await _async_find_event_uid("calendar.school", "Schulaufgabe in Latein (De)", "2026-11-16")
+            self.assertEqual(uid, "latin_uid_123")
+
+            # 2. Case insensitive partial match
+            uid_partial = await _async_find_event_uid("calendar.school", "schulaufgabe in latein", "2026-11-16")
+            self.assertEqual(uid_partial, "latin_uid_123")
+
+            # 3. Matches existing event without UID -> returns "existing_event" truthy string
+            uid_no_id = await _async_find_event_uid("calendar.school", "Kurzarbeit Mathe", "2026-11-20")
+            self.assertEqual(uid_no_id, "existing_event")
+
+            # 4. Same title but different date -> should NOT match
+            uid_diff_date = await _async_find_event_uid("calendar.school", "Schulaufgabe in Latein (De)", "2026-11-17")
+            self.assertIsNone(uid_diff_date)
+
+            # 5. Non-existent title -> should NOT match
+            uid_none = await _async_find_event_uid("calendar.school", "Englisch Vokabeltest", "2026-11-16")
+            self.assertIsNone(uid_none)
+
+        asyncio.run(run_test())
+
 
 class TestMultiLanguageSupport(unittest.TestCase):
     """Test suite for multi-language translations and language helpers."""

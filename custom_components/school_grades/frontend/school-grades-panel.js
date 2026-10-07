@@ -2086,7 +2086,7 @@ class SchoolGradesPanel extends HTMLElement {
       }
 
       // Normalize and format events
-      const parsedEvents = rawEvents.map(evt => {
+      let parsedEvents = rawEvents.map(evt => {
         let startVal = evt.start;
         if (startVal && typeof startVal === 'object') {
           startVal = startVal.dateTime || startVal.date;
@@ -2184,9 +2184,21 @@ class SchoolGradesPanel extends HTMLElement {
         return d.getTime() >= todayStartMs;
       });
 
-      upcomingFiltered.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+      // Deduplicate identical events (e.g. if previous syncs created duplicate calendar entries)
+      const seenEventKeys = new Set();
+      const deduplicatedEvents = upcomingFiltered.filter(evt => {
+        const dKey = (evt.start ? String(evt.start).split('T')[0] : '');
+        const key = `${(evt.summary || '').trim().toLowerCase()}_${dKey}`;
+        if (seenEventKeys.has(key)) {
+          return false;
+        }
+        seenEventKeys.add(key);
+        return true;
+      });
 
-      this._calendarEvents[childName] = upcomingFiltered;
+      deduplicatedEvents.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+
+      this._calendarEvents[childName] = deduplicatedEvents;
     }
 
     this.render();

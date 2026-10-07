@@ -310,7 +310,7 @@ async def _async_setup_frontend(hass: HomeAssistant) -> None:
     else:
         hass.http.register_static_path(URL_BASE, FRONTEND_DIR, cache_headers=False)
 
-    version_str = "1.2.11"
+    version_str = "1.2.12"
     try:
         js_file = os.path.join(FRONTEND_DIR, "school-grades-panel.js")
         if os.path.exists(js_file):
@@ -1085,27 +1085,91 @@ def _register_services(hass: HomeAssistant) -> None:
             return None
         try:
             from datetime import datetime, timedelta
-            from homeassistant.components.calendar import async_get_events
 
             clean_date = date_str.strip()
             if len(clean_date) > 10:
                 clean_date = clean_date[:10]
 
-            target_date = datetime.fromisoformat(f"{clean_date}T00:00:00")
-            start_search = target_date - timedelta(days=1)
-            end_search = target_date + timedelta(days=2)
+            try:
+                from homeassistant.util import dt as dt_util
+                tz = dt_util.get_default_time_zone()
+                target_date = datetime.fromisoformat(f"{clean_date}T00:00:00").replace(tzinfo=tz)
+            except Exception:
+                target_date = datetime.fromisoformat(f"{clean_date}T00:00:00")
 
-            raw_events = await async_get_events(hass, target_calendar, start_search, end_search)
+            start_search = target_date - timedelta(days=2)
+            end_search = target_date + timedelta(days=3)
+
+            raw_events: list[Any] = []
+
+            # 1. calendar.get_events service call with return_response=True (HA 2023.7+)
+            try:
+                svc_res = await hass.services.async_call(
+                    "calendar",
+                    "get_events",
+                    {
+                        "entity_id": target_calendar,
+                        "start_date_time": start_search.isoformat(),
+                        "end_date_time": end_search.isoformat(),
+                    },
+                    blocking=True,
+                    return_response=True,
+                )
+                if isinstance(svc_res, dict):
+                    cal_data = svc_res.get(target_calendar)
+                    if isinstance(cal_data, dict) and isinstance(cal_data.get("events"), list):
+                        raw_events = cal_data["events"]
+                    elif isinstance(svc_res.get("events"), list):
+                        raw_events = svc_res["events"]
+            except Exception as svc_err:
+                _LOGGER.debug("calendar.get_events service call failed on %s: %s", target_calendar, svc_err)
+
+            # 2. Direct entity method call
+            if not raw_events:
+                try:
+                    entity_components = hass.data.get("entity_components", {})
+                    cal_component = entity_components.get("calendar")
+                    if cal_component:
+                        entity = cal_component.get_entity(target_calendar)
+                        if entity and hasattr(entity, "async_get_events"):
+                            raw_events = await entity.async_get_events(hass, start_search, end_search)
+                except Exception as ent_err:
+                    _LOGGER.debug("Direct entity async_get_events failed on %s: %s", target_calendar, ent_err)
+
+            # 3. components.calendar.async_get_events fallback
+            if not raw_events:
+                try:
+                    from homeassistant.components.calendar import async_get_events
+                    raw_events = await async_get_events(hass, target_calendar, start_search, end_search)
+                except Exception as comp_err:
+                    _LOGGER.debug("components.calendar.async_get_events failed on %s: %s", target_calendar, comp_err)
+
             clean_summary = summary.strip().lower()
 
             for evt in raw_events:
-                evt_summary = (getattr(evt, "summary", "") or getattr(evt, "title", "") or "").strip().lower()
-                if clean_summary in evt_summary or evt_summary in clean_summary:
-                    uid_val = getattr(evt, "uid", None) or getattr(evt, "id", None) or getattr(evt, "event_id", None)
-                    if uid_val:
-                        return str(uid_val)
+                if isinstance(evt, dict):
+                    evt_summary = str(evt.get("summary") or evt.get("title") or "").strip().lower()
+                    uid_val = str(evt.get("uid") or evt.get("id") or evt.get("event_id") or "")
+                    evt_start = evt.get("start")
+                else:
+                    evt_summary = str(getattr(evt, "summary", "") or getattr(evt, "title", "") or "").strip().lower()
+                    uid_val = str(getattr(evt, "uid", None) or getattr(evt, "id", None) or getattr(evt, "event_id", None) or "")
+                    evt_start = getattr(evt, "start", None)
+
+                if not evt_summary:
+                    continue
+
+                # Verify date if start available
+                if evt_start:
+                    evt_date_str = str(evt_start).split("T")[0].split(" ")[0]
+                    if evt_date_str and evt_date_str != clean_date:
+                        continue
+
+                if clean_summary == evt_summary or clean_summary in evt_summary or evt_summary in clean_summary:
+                    return uid_val if uid_val else "existing_event"
+
         except Exception as err:
-            _LOGGER.debug("Error finding event UID for %s on %s: %s", summary, target_calendar, err)
+            _LOGGER.warning("Error finding event UID for '%s' on %s: %s", summary, target_calendar, err)
         return None
 
     async def _async_sync_appointments_to_calendar(
@@ -1116,6 +1180,8 @@ def _register_services(hass: HomeAssistant) -> None:
             return 0
         created = 0
         domain, svc = _find_calendar_service("create")
+        seen_batch: set[tuple[str, str]] = set()
+
         for apt in appointments:
             if not isinstance(apt, dict):
                 continue
@@ -1124,12 +1190,22 @@ def _register_services(hass: HomeAssistant) -> None:
             if not date_str:
                 continue
 
+            # Skip duplicates within the same sync batch
+            batch_key = (title.strip().lower(), str(date_str).strip()[:10])
+            if batch_key in seen_batch:
+                continue
+            seen_batch.add(batch_key)
+
             try:
                 existing_uid = await _async_find_event_uid(target_calendar, title, date_str)
                 if existing_uid:
+                    _LOGGER.info(
+                        "Skipping already existing calendar event '%s' on %s (uid: %s)",
+                        title, date_str, existing_uid
+                    )
                     continue
-            except Exception:
-                pass
+            except Exception as find_err:
+                _LOGGER.warning("Could not check duplicate for '%s': %s", title, find_err)
 
             start_t = "08:00"
             if apt.get("start") and "T" in str(apt["start"]):
