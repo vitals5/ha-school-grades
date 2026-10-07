@@ -93,6 +93,10 @@
     "update_subject_aliases": {
       "name": "Update Subject Aliases",
       "description": "Updates mapping of subject abbreviations to full names."
+    },
+    "import_portal_exams": {
+      "name": "Import exams & appointments from Eltern-Portal",
+      "description": "Imports upcoming exams and appointments from Eltern-Portal into the calendar."
     }
   }
 }

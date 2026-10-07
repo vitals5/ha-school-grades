@@ -73,6 +73,10 @@
     "toggle_prepared_subject": {
       "name": "Przełącz przygotowanie przedmiotu",
       "description": "Oznacza wybrany przedmiot jako przygotowany lub nieprzygotowany na jutro."
+    },
+    "import_portal_exams": {
+      "name": "Importuj sprawdziany i terminy z Portalu Rodzica",
+      "description": "Importuje sprawdziany i terminy z Portalu Rodzica do kalendarza."
     }
   }
 }

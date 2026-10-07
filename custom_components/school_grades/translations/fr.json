@@ -73,6 +73,10 @@
     "toggle_prepared_subject": {
       "name": "Basculer la préparation d'une matière",
       "description": "Marque une matière spécifique comme préparée ou non pour demain."
+    },
+    "import_portal_exams": {
+      "name": "Importer les examens et rendez-vous du Portail Parents",
+      "description": "Importe les examens et rendez-vous du Portail Parents dans le calendrier."
     }
   }
 }

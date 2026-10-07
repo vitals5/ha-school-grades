@@ -73,6 +73,10 @@
     "toggle_prepared_subject": {
       "name": "切换学科准备状态",
       "description": "标记明天特定学科是否已准备完成。"
+    },
+    "import_portal_exams": {
+      "name": "从家长门户导入考试与日程",
+      "description": "从家长门户导入即将到来的考试与日程至日历。"
     }
   }
 }

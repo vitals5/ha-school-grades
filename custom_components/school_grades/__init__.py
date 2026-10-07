@@ -54,6 +54,7 @@ from .const import (
     SERVICE_ADD_CALENDAR_EVENT,
     SERVICE_ADD_GRADE,
     SERVICE_ADD_SUBJECT,
+    SERVICE_IMPORT_PORTAL_EXAMS,
     SERVICE_IMPORT_PORTAL_TIMETABLE,
     SERVICE_IMPORT_TIMETABLE,
     SERVICE_REMOVE_CALENDAR_EVENT,
@@ -76,6 +77,7 @@ from .portal import (
     async_fetch_child_portal_data,
     async_validate_and_get_students,
     convert_portal_lessons_to_timetable,
+    parse_appointments,
     parse_subject_aliases_yaml,
 )
 from .storage import SchoolGradesStorage
@@ -257,6 +259,12 @@ SCHEMA_IMPORT_PORTAL_TIMETABLE = vol.Schema(
     }
 )
 
+SCHEMA_IMPORT_PORTAL_EXAMS = vol.Schema(
+    {
+        vol.Required(CONF_CHILD_NAME): cv.string,
+    }
+)
+
 SCHEMA_UPDATE_SUBJECT_ALIASES = vol.Schema(
     {
         vol.Required(CONF_CHILD_NAME): cv.string,
@@ -300,7 +308,7 @@ async def _async_setup_frontend(hass: HomeAssistant) -> None:
     else:
         hass.http.register_static_path(URL_BASE, FRONTEND_DIR, cache_headers=False)
 
-    version_str = "1.2.8"
+    version_str = "1.2.9"
     try:
         js_file = os.path.join(FRONTEND_DIR, "school-grades-panel.js")
         if os.path.exists(js_file):
@@ -696,7 +704,11 @@ def _register_services(hass: HomeAssistant) -> None:
         result = await async_validate_and_get_students(session, school, username, password)
         connection.send_result(msg["id"], result)
 
-    async def _async_sync_child_portal(storage: SchoolGradesStorage, force_timetable: bool = False) -> dict[str, Any]:
+    async def _async_sync_child_portal(
+        storage: SchoolGradesStorage,
+        force_timetable: bool = False,
+        force_exams: bool = False,
+    ) -> dict[str, Any]:
         """Fetch and update data from Eltern-Portal for a child."""
         data = storage.data
         if not data.portal_enabled:
@@ -718,7 +730,7 @@ def _register_services(hass: HomeAssistant) -> None:
         cooldowns = hass.data.setdefault(f"{DOMAIN}_portal_sync_cooldowns", {})
         now_ts = time.time()
         last_ts = cooldowns.get(data.child_name, 0.0)
-        if not force_timetable and (now_ts - last_ts < 60.0):
+        if not force_timetable and not force_exams and (now_ts - last_ts < 60.0):
             wait_s = int(60.0 - (now_ts - last_ts))
             return {
                 "success": False,
@@ -730,6 +742,7 @@ def _register_services(hass: HomeAssistant) -> None:
         session = async_get_clientsession(hass)
         sync_tt = force_timetable or data.portal_sync_timetable
         sync_subst = data.portal_sync_substitutions
+        sync_exams = force_exams or data.portal_sync_exams
         res = await async_fetch_child_portal_data(
             session=session,
             school=data.portal_school,
@@ -738,6 +751,9 @@ def _register_services(hass: HomeAssistant) -> None:
             student_id=data.portal_student_id,
             fetch_timetable=sync_tt,
             fetch_substitutions=sync_subst,
+            fetch_appointments=sync_exams,
+            aliases=data.subject_aliases,
+            existing_subjects=data.subjects,
         )
         from datetime import datetime
         data.portal_last_sync = datetime.now().isoformat()
@@ -765,6 +781,21 @@ def _register_services(hass: HomeAssistant) -> None:
                 existing_slots=data.timetable.get("slots"),
             )
             data.import_timetable_data(tt_converted)
+
+        # Update appointments and sync to HA calendar if requested
+        if sync_exams and "appointments" in res and res["appointments"]:
+            data.set_portal_appointments(res["appointments"])
+            if data.calendar_entity:
+                synced_count = await _async_sync_appointments_to_calendar(
+                    data.calendar_entity, res["appointments"]
+                )
+                if synced_count > 0:
+                    _LOGGER.info(
+                        "Synchronized %d appointments to calendar %s for %s",
+                        synced_count,
+                        data.calendar_entity,
+                        data.child_name,
+                    )
 
         await storage.async_save()
         async_dispatcher_send(hass, SIGNAL_UPDATE_GRADES.format(entry_id=storage.entry_id))
@@ -795,6 +826,14 @@ def _register_services(hass: HomeAssistant) -> None:
         if not storage:
             return {"success": False, "error": "child_not_found", "message": f"Kind '{child_name}' nicht gefunden."}
         return await _async_sync_child_portal(storage, force_timetable=True)
+
+    async def handle_import_portal_exams(call: ServiceCall) -> dict[str, Any]:
+        """Import appointments and exams directly from Eltern-Portal into storage and HA calendar."""
+        child_name = call.data[CONF_CHILD_NAME]
+        storage = _get_storage(hass, child_name)
+        if not storage:
+            return {"success": False, "error": "child_not_found", "message": f"Kind '{child_name}' nicht gefunden."}
+        return await _async_sync_child_portal(storage, force_exams=True)
 
     async def handle_update_subject_aliases(call: ServiceCall) -> None:
         """Update subject aliases dictionary or YAML for a child."""
@@ -867,6 +906,27 @@ def _register_services(hass: HomeAssistant) -> None:
             connection.send_result(msg["id"], {"success": False, "error": "child_not_found"})
             return
         res = await _async_sync_child_portal(storage, force_timetable=True)
+        connection.send_result(msg["id"], res)
+
+    @websocket_api.websocket_command(
+        {
+            vol.Required("type"): "school_grades/import_portal_exams",
+            vol.Required("child_name"): str,
+        }
+    )
+    @websocket_api.async_response
+    async def ws_import_portal_exams(
+        hass_inner: HomeAssistant,
+        connection: websocket_api.ActiveConnection,
+        msg: dict[str, Any],
+    ) -> None:
+        """Handle websocket request to import exams directly from Eltern-Portal."""
+        child_name = msg["child_name"]
+        storage = _get_storage(hass, child_name)
+        if not storage:
+            connection.send_result(msg["id"], {"success": False, "error": "child_not_found"})
+            return
+        res = await _async_sync_child_portal(storage, force_exams=True)
         connection.send_result(msg["id"], res)
 
     @websocket_api.websocket_command(
@@ -1040,6 +1100,65 @@ def _register_services(hass: HomeAssistant) -> None:
         except Exception as err:
             _LOGGER.debug("Error finding event UID for %s on %s: %s", summary, target_calendar, err)
         return None
+
+    async def _async_sync_appointments_to_calendar(
+        target_calendar: str, appointments: list[dict[str, Any]]
+    ) -> int:
+        """Sync appointments to the assigned HA calendar entity, skipping duplicates."""
+        if not target_calendar or not appointments:
+            return 0
+        created = 0
+        domain, svc = _find_calendar_service("create")
+        for apt in appointments:
+            if not isinstance(apt, dict):
+                continue
+            title = apt.get("title") or apt.get("title_short") or "Termin"
+            date_str = apt.get("date") or apt.get("start")
+            if not date_str:
+                continue
+
+            try:
+                existing_uid = await _async_find_event_uid(target_calendar, title, date_str)
+                if existing_uid:
+                    continue
+            except Exception:
+                pass
+
+            start_t = "08:00"
+            if apt.get("start") and "T" in str(apt["start"]):
+                t_part = str(apt["start"]).split("T")[-1]
+                if len(t_part) >= 5 and ":" in t_part and t_part[:5] != "00:00":
+                    start_t = t_part[:5]
+
+            start_iso, end_iso = _parse_event_datetime(date_str, start_t)
+            desc_parts = []
+            if apt.get("is_exam"):
+                desc_parts.append("Prüfung / Klausur")
+            if apt.get("subject"):
+                desc_parts.append(f"Fach: {apt['subject']}")
+            if apt.get("class"):
+                desc_parts.append(f"Kategorie: {apt['class']}")
+            if apt.get("id"):
+                desc_parts.append(f"Eltern-Portal ID: {apt['id']}")
+            desc = " | ".join(desc_parts)
+
+            service_data = {
+                "entity_id": target_calendar,
+                "summary": title,
+                "start_date_time": start_iso,
+                "end_date_time": end_iso,
+            }
+            if desc:
+                service_data["description"] = desc
+
+            try:
+                await hass.services.async_call(domain, svc, service_data, blocking=True)
+                created += 1
+                _LOGGER.info("Synced Eltern-Portal event '%s' to calendar %s", title, target_calendar)
+            except Exception as err:
+                _LOGGER.warning("Could not sync event '%s' to calendar %s: %s", title, target_calendar, err)
+
+        return created
 
     async def _async_delete_calendar_event(target_calendar: str, uid: str) -> bool:
         """Helper to delete a calendar event using direct entity calls or service calls."""
@@ -1272,6 +1391,13 @@ def _register_services(hass: HomeAssistant) -> None:
     )
     hass.services.async_register(
         DOMAIN,
+        SERVICE_IMPORT_PORTAL_EXAMS,
+        handle_import_portal_exams,
+        schema=SCHEMA_IMPORT_PORTAL_EXAMS,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+    hass.services.async_register(
+        DOMAIN,
         SERVICE_UPDATE_SUBJECT_ALIASES,
         handle_update_subject_aliases,
         schema=SCHEMA_UPDATE_SUBJECT_ALIASES,
@@ -1279,6 +1405,7 @@ def _register_services(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_test_elternportal)
     websocket_api.async_register_command(hass, ws_sync_elternportal)
     websocket_api.async_register_command(hass, ws_import_portal_timetable)
+    websocket_api.async_register_command(hass, ws_import_portal_exams)
     websocket_api.async_register_command(hass, ws_update_subject_aliases)
     websocket_api.async_register_command(hass, ws_get_sibling_portal_credentials)
 
@@ -1303,6 +1430,7 @@ def _unregister_services(hass: HomeAssistant) -> None:
     hass.services.async_remove(DOMAIN, SERVICE_UPDATE_PORTAL_SETTINGS)
     hass.services.async_remove(DOMAIN, SERVICE_SYNC_ELTERNPORTAL)
     hass.services.async_remove(DOMAIN, SERVICE_IMPORT_PORTAL_TIMETABLE)
+    hass.services.async_remove(DOMAIN, SERVICE_IMPORT_PORTAL_EXAMS)
     hass.services.async_remove(DOMAIN, SERVICE_UPDATE_SUBJECT_ALIASES)
 
 

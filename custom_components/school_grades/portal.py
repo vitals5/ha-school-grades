@@ -1,10 +1,18 @@
 """Eltern-Portal (eltern-portal.org) integration helper for Schulnoten."""
 from __future__ import annotations
 
+from datetime import date, datetime, time as dt_time, timedelta
+import json
 import logging
 import re
 from typing import Any
 from urllib import parse
+
+try:
+    from zoneinfo import ZoneInfo
+    BERLIN_TZ = ZoneInfo("Europe/Berlin")
+except Exception:
+    BERLIN_TZ = None
 
 try:
     import aiohttp
@@ -585,6 +593,226 @@ def parse_substitutions(html: str) -> dict[str, Any]:
     return result
 
 
+DEMO_JSON_APPOINTMENT = """{
+    "success": 1,
+    "result": [
+        {
+            "id": "id_1",
+            "title": "Schulaufgabe in Englisch",
+            "title_short": "SA in Englisch",
+            "class": "event-important",
+            "start": "1729720800000",
+            "end": "1729799200000",
+            "bo_end": "0"
+        },
+        {
+            "id": "id_2",
+            "title": "Schulaufgabe in Deutsch",
+            "title_short": "SA in Deutsch",
+            "class": "event-important",
+            "start": "1730934000000",
+            "end": "1731012400000",
+            "bo_end": "0"
+        },
+        {
+            "id": "id_3",
+            "title": "Schulaufgabe in Mathematik",
+            "title_short": "SA in Mathematik",
+            "class": "event-important",
+            "start": "1732834800000",
+            "end": "1732913200000",
+            "bo_end": "0"
+        }
+    ]
+}"""
+
+_EXAM_KW_RE = re.compile(
+    r"\b(schulaufgabe|kurzarbeit|klausur|klassenarbeit|stegreifaufgabe|stehgreifaufgabe|"
+    r"extemporale|ex|test|vokabeltest|abfrage|vokabelabfrage|leistungskontrolle|probearbeit|"
+    r"kolloquium|prüfung|pruefung|sa|ka)\b|\b\w*(?:test|arbeit|klausur|prüfung|pruefung)\b",
+    re.IGNORECASE,
+)
+
+
+def extract_exam_subject(
+    title: str,
+    title_short: str = "",
+    aliases: dict[str, list[str]] | None = None,
+    existing_subjects: list[str] | None = None,
+) -> str:
+    """Extract and resolve subject name from exam title or short title."""
+    if not title and not title_short:
+        return ""
+
+    texts = [title.strip(), title_short.strip()]
+    existing = [s.strip() for s in (existing_subjects or []) if s.strip()]
+
+    # Pattern 1: Look for ' in <Candidate>'
+    for txt in texts:
+        if not txt:
+            continue
+        m = re.search(r"\bin\s+([A-Za-z0-9äöüÄÖÜß/\-_]+)", txt, re.IGNORECASE)
+        if m:
+            cand = m.group(1).strip()
+            resolved, _ = resolve_subject_with_index(cand, aliases, existing)
+            if resolved:
+                return resolved
+
+    # Pattern 2: Look for known subjects or aliases directly in text tokens
+    for txt in texts:
+        if not txt:
+            continue
+        for s in existing:
+            if re.search(r"\b" + re.escape(s) + r"\b", txt, re.IGNORECASE):
+                return s
+
+        if aliases:
+            for key, alias_list in aliases.items():
+                if re.search(r"\b" + re.escape(key) + r"\b", txt, re.IGNORECASE):
+                    return key
+                if isinstance(alias_list, list):
+                    for a in alias_list:
+                        a_clean = str(a).split("->")[0].split("➔")[0].strip()
+                        if a_clean and re.search(r"\b" + re.escape(a_clean) + r"\b", txt, re.IGNORECASE):
+                            return key
+
+        for key, alias_list in DEFAULT_SUBJECT_ALIASES.items():
+            if re.search(r"\b" + re.escape(key) + r"\b", txt, re.IGNORECASE):
+                return key
+            for a in alias_list:
+                a_clean = str(a).split("->")[0].split("➔")[0].strip()
+                if a_clean and re.search(r"\b" + re.escape(a_clean) + r"\b", txt, re.IGNORECASE):
+                    return key
+
+    return ""
+
+
+def parse_appointments(
+    raw_data: Any,
+    aliases: dict[str, list[str]] | None = None,
+    existing_subjects: list[str] | None = None,
+) -> list[dict[str, Any]]:
+    """Parse appointment and exam entries from JSON string, dict, or Appointment objects."""
+    if not raw_data:
+        return []
+
+    data: Any = raw_data
+    if isinstance(raw_data, str):
+        try:
+            data = json.loads(raw_data)
+        except Exception as json_err:
+            _LOGGER.debug("Could not parse appointments as JSON string: %s", json_err)
+            return []
+
+    items: list[Any] = []
+    if isinstance(data, dict):
+        if "result" in data and isinstance(data["result"], list):
+            items = data["result"]
+        elif "appointments" in data and isinstance(data["appointments"], list):
+            items = data["appointments"]
+        else:
+            items = [data]
+    elif isinstance(data, list):
+        items = data
+
+    out: list[dict[str, Any]] = []
+
+    def _parse_timestamp_or_dt(val: Any) -> datetime | None:
+        if isinstance(val, datetime):
+            return val
+        if isinstance(val, date):
+            return datetime.combine(val, dt_time(8, 0))
+        if isinstance(val, (int, float)):
+            sec = val / 1000.0 if val > 1e11 else float(val)
+            try:
+                return datetime.fromtimestamp(sec, tz=BERLIN_TZ) if BERLIN_TZ else datetime.fromtimestamp(sec)
+            except Exception:
+                return None
+        if isinstance(val, str):
+            s = val.strip()
+            if not s:
+                return None
+            if s.isdigit() or (s.replace(".", "", 1).isdigit() and "." in s):
+                try:
+                    num = float(s)
+                    sec = num / 1000.0 if num > 1e11 else num
+                    return datetime.fromtimestamp(sec, tz=BERLIN_TZ) if BERLIN_TZ else datetime.fromtimestamp(sec)
+                except Exception:
+                    pass
+            try:
+                return datetime.fromisoformat(s)
+            except Exception:
+                pass
+            m = re.match(r"^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{2}))?", s)
+            if m:
+                d, mo, yr = int(m.group(1)), int(m.group(2)), int(m.group(3))
+                hr = int(m.group(4)) if m.group(4) else 8
+                mi = int(m.group(5)) if m.group(5) else 0
+                return datetime(yr, mo, d, hr, mi)
+        return None
+
+    for item in items:
+        if not item:
+            continue
+
+        if isinstance(item, dict):
+            apt_id = str(item.get("id") or item.get("appointment_id") or "")
+            title = str(item.get("title") or "").strip()
+            title_short = str(item.get("title_short") or item.get("short") or "").strip()
+            classname = str(item.get("class") or item.get("classname") or item.get("className") or "").strip()
+            raw_start = item.get("start")
+            raw_end = item.get("end")
+        else:
+            apt_id = str(getattr(item, "appointment_id", getattr(item, "id", "")))
+            title = str(getattr(item, "title", "")).strip()
+            title_short = str(getattr(item, "short", getattr(item, "title_short", ""))).strip()
+            classname = str(getattr(item, "classname", getattr(item, "class", getattr(item, "className", "")))).strip()
+            raw_start = getattr(item, "start", None)
+            raw_end = getattr(item, "end", None)
+
+        if not title and not title_short:
+            continue
+
+        start_dt = _parse_timestamp_or_dt(raw_start)
+        end_dt = _parse_timestamp_or_dt(raw_end)
+
+        if start_dt is None:
+            continue
+
+        date_iso = start_dt.strftime("%Y-%m-%d")
+
+        is_exam = False
+        class_l = classname.lower()
+        if any(kw in class_l for kw in ("important", "klausur", "exam", "pruefung")):
+            is_exam = True
+        elif _EXAM_KW_RE.search(title) or _EXAM_KW_RE.search(title_short):
+            is_exam = True
+
+        subject = extract_exam_subject(title, title_short, aliases, existing_subjects)
+
+        start_iso = start_dt.isoformat()
+        end_iso = end_dt.isoformat() if end_dt else start_iso
+
+        out.append(
+            {
+                "id": apt_id,
+                "title": title or title_short,
+                "title_short": title_short,
+                "class": classname,
+                "class_name": classname,
+                "start": start_iso,
+                "end": end_iso,
+                "date": date_iso,
+                "is_exam": is_exam,
+                "subject": subject,
+                "origin": "elternportal",
+            }
+        )
+
+    out.sort(key=lambda x: (x["date"], x["start"], x["title"]))
+    return out
+
+
 def convert_portal_lessons_to_timetable(
     lessons: list[dict[str, Any]],
     aliases: dict[str, list[str]] | None = None,
@@ -788,15 +1016,18 @@ async def async_validate_and_get_students(
 
 
 async def async_fetch_child_portal_data(
-    session: aiohttp.ClientSession,
-    school: str,
-    username: str,
-    password: str,
-    student_id: str,
+    session: aiohttp.ClientSession | None = None,
+    school: str = "",
+    username: str = "",
+    password: str = "",
+    student_id: str = "",
     fetch_timetable: bool = True,
     fetch_substitutions: bool = True,
+    fetch_appointments: bool = True,
+    aliases: dict[str, list[str]] | None = None,
+    existing_subjects: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Fetch timetable and substitution data from Eltern-Portal for a specific child."""
+    """Fetch timetable, substitution, and appointment data from Eltern-Portal for a specific child."""
     clean_school = school_from_input(school)
     if not clean_school:
         return {"success": False, "error": "empty_school", "message": "Keine Schulkennung angegeben"}
@@ -849,6 +1080,7 @@ async def async_fetch_child_portal_data(
 
         timetable_data: list[dict[str, Any]] = []
         substitutions_data: dict[str, Any] = {"available": False, "stand": None, "days": []}
+        appointments_data: list[dict[str, Any]] = []
 
         # Fetch Timetable
         if fetch_timetable:
@@ -880,6 +1112,43 @@ async def async_fetch_child_portal_data(
             except Exception as subst_err:
                 _LOGGER.warning("Could not fetch substitutions from Eltern-Portal: %s", subst_err)
 
+        # Fetch Appointments / Exams
+        if fetch_appointments:
+            try:
+                if is_demo:
+                    demo_raw = DEMO_JSON_APPOINTMENT
+                    try:
+                        from pyelternportal.demo import DEMO_JSON_APPOINTMENT as PY_DEMO_JSON_APPOINTMENT
+                        demo_raw = PY_DEMO_JSON_APPOINTMENT
+                    except Exception:
+                        pass
+                    appointments_data = parse_appointments(
+                        demo_raw, aliases=aliases, existing_subjects=existing_subjects
+                    )
+                else:
+                    url = parse.urljoin(api.base_url, "/api/ws_get_termine.php")
+                    async with session.get(url) as resp:
+                        if resp.status == 200:
+                            try:
+                                json_data = await resp.json(content_type=None)
+                            except Exception:
+                                text_data = await resp.text()
+                                json_data = json.loads(text_data)
+                            appointments_data = parse_appointments(
+                                json_data, aliases=aliases, existing_subjects=existing_subjects
+                            )
+            except Exception as apt_err:
+                _LOGGER.warning("Could not fetch appointments from Eltern-Portal: %s", apt_err)
+
+            # Fallback if student has appointments populated on api
+            if not appointments_data and getattr(match_student, "appointments", None):
+                try:
+                    appointments_data = parse_appointments(
+                        match_student.appointments, aliases=aliases, existing_subjects=existing_subjects
+                    )
+                except Exception as fb_err:
+                    _LOGGER.debug("Could not parse student.appointments fallback: %s", fb_err)
+
         if not is_demo:
             try:
                 await api.async_logout_online()
@@ -893,6 +1162,7 @@ async def async_fetch_child_portal_data(
             "student_name": getattr(match_student, "fullname", ""),
             "timetable": timetable_data,
             "substitutions": substitutions_data,
+            "appointments": appointments_data,
         }
 
     except BadCredentialsException as err:

@@ -407,6 +407,10 @@ const I18N = {
     portal_sync_exams: "Klausuren & Termine abgleichen",
     portal_sync_now_btn: "🔄 Jetzt synchronisieren",
     portal_import_tt_btn: "📅 Stundenplan importieren",
+    portal_import_exams_btn: "📝 Klausuren importieren",
+    portal_sync_exams_title: "Klausuren importieren",
+    portal_exam_badge: "Klausur",
+    portal_exams_synced: "Klausuren & Termine erfolgreich synchronisiert!",
     portal_import_tt_confirm: "Möchtest du den aktuellen Stundenplan aus dem Eltern-Portal importieren und deinen lokalen Plan überschreiben?",
     portal_aliases_title: "🔤 Fach-Kürzel & Aliase (YAML)",
     portal_aliases_help: "Wandelt beim Import Kürzel (z. B. Ma) automatisch in Vollnamen (Mathematik) um und ordnet Vertretungen zu.",
@@ -581,6 +585,10 @@ const I18N = {
     portal_sync_exams: "Sync exams & appointments",
     portal_sync_now_btn: "🔄 Sync Now",
     portal_import_tt_btn: "📅 Import Timetable",
+    portal_import_exams_btn: "📝 Import Exams",
+    portal_sync_exams_title: "Import Exams",
+    portal_exam_badge: "Exam",
+    portal_exams_synced: "Exams & appointments successfully synchronized!",
     portal_import_tt_confirm: "Do you want to import the timetable from Eltern-Portal and overwrite your local timetable?",
     portal_aliases_title: "🔤 Subject Abbreviations & Aliases (YAML)",
     portal_aliases_help: "Converts abbreviations (e.g. Ma) to full subject names (Mathematics) during import and maps substitutions.",
@@ -1728,6 +1736,7 @@ class SchoolGradesPanel extends HTMLElement {
           portalLastStatus: '',
           subjectAliases: {},
           portalSubstitutions: { days: [], available: false },
+          portalAppointments: [],
         };
       }
 
@@ -1769,6 +1778,9 @@ class SchoolGradesPanel extends HTMLElement {
       }
       if (attrs.portal_substitutions !== undefined) {
         children[kindName].portalSubstitutions = attrs.portal_substitutions || { days: [], available: false };
+      }
+      if (attrs.portal_appointments !== undefined) {
+        children[kindName].portalAppointments = Array.isArray(attrs.portal_appointments) ? attrs.portal_appointments : [];
       }
 
       if (attrs.country) {
@@ -2003,57 +2015,54 @@ class SchoolGradesPanel extends HTMLElement {
 
     for (const [childName, childData] of Object.entries(data)) {
       const calEntity = childData.calendarEntity;
-      if (!calEntity || !this._hass || !this._hass.states[calEntity]) {
-        this._calendarEvents[childName] = [];
-        continue;
-      }
-
       let rawEvents = [];
 
-      // 1. Try WebSocket API (with start_date_time)
-      try {
-        const wsRes = await this._hass.callWS({
-          type: 'calendar/event/list',
-          entity_id: calEntity,
-          start_date_time: startIso,
-          end_date_time: endIso,
-        });
-        if (wsRes && Array.isArray(wsRes.events)) {
-          rawEvents = wsRes.events;
-        } else if (Array.isArray(wsRes)) {
-          rawEvents = wsRes;
-        }
-      } catch (err1) {
-        // 2. Try REST API
+      if (calEntity && this._hass && this._hass.states[calEntity]) {
+        // 1. Try WebSocket API (with start_date_time)
         try {
-          const apiRes = await this._hass.callApi(
-            'GET',
-            `calendars/${calEntity}?start=${encodeURIComponent(startIso)}&end=${encodeURIComponent(endIso)}`
-          );
-          if (Array.isArray(apiRes)) {
-            rawEvents = apiRes;
+          const wsRes = await this._hass.callWS({
+            type: 'calendar/event/list',
+            entity_id: calEntity,
+            start_date_time: startIso,
+            end_date_time: endIso,
+          });
+          if (wsRes && Array.isArray(wsRes.events)) {
+            rawEvents = wsRes.events;
+          } else if (Array.isArray(wsRes)) {
+            rawEvents = wsRes;
           }
-        } catch (err2) {
-          console.warn('SchoolGrades: Could not fetch calendar events via WS or REST', err2);
+        } catch (err1) {
+          // 2. Try REST API
+          try {
+            const apiRes = await this._hass.callApi(
+              'GET',
+              `calendars/${calEntity}?start=${encodeURIComponent(startIso)}&end=${encodeURIComponent(endIso)}`
+            );
+            if (Array.isArray(apiRes)) {
+              rawEvents = apiRes;
+            }
+          } catch (err2) {
+            console.warn('SchoolGrades: Could not fetch calendar events via WS or REST', err2);
+          }
         }
-      }
 
-      // 3. Fallback: Use backend total sensor upcoming_events attribute if available
-      if (rawEvents.length === 0 && childData.upcomingEvents && Array.isArray(childData.upcomingEvents)) {
-        rawEvents = childData.upcomingEvents;
-      }
+        // 3. Fallback: Use backend total sensor upcoming_events attribute if available
+        if (rawEvents.length === 0 && childData.upcomingEvents && Array.isArray(childData.upcomingEvents)) {
+          rawEvents = childData.upcomingEvents;
+        }
 
-      // Fallback: If no events array obtained, use state attributes as last resort
-      if (rawEvents.length === 0) {
-        const stateObj = this._hass.states[calEntity];
-        if (stateObj && stateObj.attributes && stateObj.attributes.start_time) {
-          rawEvents = [{
-            summary: stateObj.attributes.message || stateObj.state,
-            start: stateObj.attributes.start_time,
-            end: stateObj.attributes.end_time,
-            description: stateObj.attributes.description || '',
-            location: stateObj.attributes.location || '',
-          }];
+        // Fallback: If no events array obtained, use state attributes as last resort
+        if (rawEvents.length === 0) {
+          const stateObj = this._hass.states[calEntity];
+          if (stateObj && stateObj.attributes && stateObj.attributes.start_time) {
+            rawEvents = [{
+              summary: stateObj.attributes.message || stateObj.state,
+              start: stateObj.attributes.start_time,
+              end: stateObj.attributes.end_time,
+              description: stateObj.attributes.description || '',
+              location: stateObj.attributes.location || '',
+            }];
+          }
         }
       }
 
@@ -2080,8 +2089,58 @@ class SchoolGradesPanel extends HTMLElement {
           end: endVal,
           description: evt.description || '',
           location: evt.location || '',
+          isPortal: false,
+          isExam: false,
+          subject: '',
+          portalId: '',
         };
       }).filter(evt => evt.start);
+
+      // Merge Eltern-Portal appointments if available
+      const portalAppts = (childData && childData.portalAppointments) || [];
+      for (const apt of portalAppts) {
+        if (!apt || (!apt.start && !apt.date)) continue;
+        const aptDateStr = (apt.date || (typeof apt.start === 'string' ? apt.start : '') || '').split('T')[0];
+        const aptTitle = String(apt.title || apt.title_short || 'Termin').trim();
+
+        // Check if matching event already exists in parsedEvents from HA calendar
+        const existing = parsedEvents.find(e => {
+          const eDateStr = (typeof e.start === 'string' ? e.start : '').split('T')[0];
+          return eDateStr === aptDateStr && (
+            e.summary.toLowerCase() === aptTitle.toLowerCase() ||
+            e.summary.toLowerCase().includes(aptTitle.toLowerCase()) ||
+            aptTitle.toLowerCase().includes(e.summary.toLowerCase())
+          );
+        });
+
+        if (existing) {
+          existing.isPortal = true;
+          if (apt.is_exam) existing.isExam = true;
+          if (apt.subject && !existing.subject) existing.subject = apt.subject;
+          if (apt.id && !existing.portalId) existing.portalId = apt.id;
+        } else {
+          parsedEvents.push({
+            uid: 'portal_' + (apt.id || Math.random().toString(36).substring(7)),
+            summary: aptTitle,
+            start: apt.start || apt.date,
+            end: apt.end || apt.date,
+            description: apt.class || '',
+            location: '',
+            isPortal: true,
+            isExam: Boolean(apt.is_exam),
+            subject: apt.subject || '',
+            portalId: apt.id || '',
+          });
+        }
+      }
+
+      // Detect exam keywords on any events that aren't marked yet
+      const examKwRegex = /\b(schulaufgabe|kurzarbeit|klausur|klassenarbeit|stegreifaufgabe|stehgreifaufgabe|extemporale|ex|test|abfrage|leistungskontrolle|probearbeit|kolloquium|prüfung|pruefung|sa|ka)\b/i;
+      for (const evt of parsedEvents) {
+        if (!evt.isExam && (examKwRegex.test(evt.summary) || (evt.description && examKwRegex.test(evt.description)))) {
+          evt.isExam = true;
+        }
+      }
 
       // Filter out events in the past and sort chronologically
       parsedEvents.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
@@ -2953,7 +3012,7 @@ Natur und Technik:
                   <div class="exam-alert-content">
                     <strong>${this._t('prep_exam_alert')}</strong>
                     <div class="exam-alert-list">
-                      ${nextDay.exams.map(e => `• <b>${e.summary}</b> ${e.location ? ' (📍 ' + e.location + ')' : ''}`).join(' ')}
+                      ${nextDay.exams.map(e => `• <b>${e.summary}</b>${e.subject ? ' <span style="color:#6ee7b7; font-size:11px; font-weight:600;">[' + e.subject + ']</span>' : ''} ${e.location ? ' (📍 ' + e.location + ')' : ''}`).join(' ')}
                     </div>
                   </div>
                 </div>
@@ -3003,6 +3062,7 @@ Natur und Technik:
                       const isCancelled = matchingSubst && matchingSubst.kind === 'entfall';
 
                       const isExamSubject = nextDay.exams.some(e =>
+                        (e.subject && e.subject.toLowerCase() === l.subject.toLowerCase()) ||
                         e.summary.toLowerCase().includes(l.subject.toLowerCase()) ||
                         l.subject.toLowerCase().includes(e.summary.toLowerCase())
                       );
@@ -3044,6 +3104,11 @@ Natur und Technik:
             <div class="calendar-header">
               <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
                 <h3 style="margin: 0;">${this._t('calendar_title', { count: upcomingEvents.length })}</h3>
+                ${currentChild && currentChild.portalEnabled ? `
+                  <button class="pill-btn" id="sync-portal-exams-btn" style="padding: 6px 14px; font-size: 13px; font-weight: 600; background: rgba(59, 130, 246, 0.2); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.2s ease;" title="${this._t('portal_sync_exams_title')}" ${this._portalImportingExams ? 'disabled style="opacity:0.6;cursor:wait;"' : ''}>
+                    ${this._portalImportingExams ? '<span class="spin-icon">⏳</span> Lädt...' : `<span>📝</span> ${this._t('portal_sync_exams_title')}`}
+                  </button>
+                ` : ''}
                 ${currentChild && currentChild.calendarEntity ? `
                   <button class="pill-btn add-event-toggle-btn" id="toggle-add-event-btn" style="padding: 6px 14px; font-size: 13px; font-weight: 600; background: linear-gradient(135deg, #10b981, #059669); color: #fff; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35); transition: all 0.2s ease;">
                     ${this._showAddEventCard ? this._t('close_add_grade_btn') : this._t('add_event_btn')}
@@ -3095,7 +3160,7 @@ Natur und Technik:
             ` : ''}
 
             <div class="events-list">
-              ${!currentChild || !currentChild.calendarEntity ? `
+              ${!currentChild || (!currentChild.calendarEntity && upcomingEvents.length === 0) ? `
                 <div class="empty-events">
                   ${this._t('calendar_hint')}
                 </div>
@@ -3129,11 +3194,14 @@ Natur und Technik:
 
                     return `
                       <div class="event-item clickable-event" data-uid="${evt.uid || ''}" data-summary="${evt.summary || ''}" data-start="${evt.start || ''}" data-desc="${evt.description || ''}" style="cursor: pointer; ${borderStyle}" title="${this._t('edit_event_title')}">
-                        <div class="event-badge-row">
+                        <div class="event-badge-row" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                           <span class="event-countdown ${countdownText.cls}">${countdownText.text}</span>
                           <span class="event-time">${formattedDate} ${!isAllDay ? this._t('time_at', { time: formattedTime }) : this._t('all_day')}</span>
+                          ${evt.isExam ? `<span style="background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 4px; padding: 1px 6px; font-size: 11px; font-weight: 600;">📝 ${this._t('portal_exam_badge')}</span>` : ''}
+                          ${evt.isPortal ? `<span style="background: rgba(59, 130, 246, 0.2); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 4px; padding: 1px 6px; font-size: 11px; font-weight: 600;">🏫 Portal</span>` : ''}
                         </div>
                         <h4 class="event-title">${evt.summary}</h4>
+                        ${evt.subject ? `<div class="event-detail" style="color: #6ee7b7; font-weight: 600; font-size: 12px; margin-top: 2px;">📚 ${this._t('subject_label')}: ${evt.subject}</div>` : ''}
                         ${evt.location ? `<div class="event-detail">📍 ${evt.location}</div>` : ''}
                         ${evt.description ? `<div class="event-detail desc">📝 ${evt.description}</div>` : ''}
                       </div>
@@ -3686,6 +3754,9 @@ Natur und Technik:
                         </button>
                         <button type="button" id="settings-portal-import-tt-btn" class="submit-btn secondary" style="width: auto; padding: 8px 14px; font-size: 13px;" ${this._portalImportingTt ? 'disabled style="opacity:0.6;cursor:wait;"' : ''}>
                           ${this._portalImportingTt ? '⏳ Importiere...' : this._t('portal_import_tt_btn')}
+                        </button>
+                        <button type="button" id="settings-portal-import-exams-btn" class="submit-btn secondary" style="width: auto; padding: 8px 14px; font-size: 13px;" ${this._portalImportingExams ? 'disabled style="opacity:0.6;cursor:wait;"' : ''}>
+                          ${this._portalImportingExams ? '⏳ Importiere...' : this._t('portal_import_exams_btn')}
                         </button>
                       </div>
                       ${this._portalSyncFeedback ? `
@@ -4612,6 +4683,34 @@ Natur und Technik:
         });
       }
 
+      // Eltern-Portal Import Exams button
+      const importExamsBtn = root.querySelector('#settings-portal-import-exams-btn');
+      if (importExamsBtn) {
+        importExamsBtn.addEventListener('click', async () => {
+          this._portalImportingExams = true;
+          this._portalSyncFeedback = null;
+          this.render();
+          try {
+            const res = await this._hass.callWS({
+              type: 'school_grades/import_portal_exams',
+              child_name: this._selectedChild,
+            });
+            this._portalImportingExams = false;
+            if (res && res.success) {
+              await this._fetchCalendarEvents();
+              const calText = res.synced_to_calendar ? ' (in Kalender eingetragen)' : '';
+              this._portalSyncFeedback = `✅ ${this._t('portal_exams_synced')}${calText}`;
+            } else {
+              this._portalSyncFeedback = '❌ ' + ((res && res.message) || 'Fehler beim Importieren der Klausuren');
+            }
+          } catch (err) {
+            this._portalImportingExams = false;
+            this._portalSyncFeedback = '❌ ' + ((err && (err.message || err.error)) || String(err));
+          }
+          this.render();
+        });
+      }
+
       // Save Aliases YAML button
       const saveAliasesBtn = root.querySelector('#settings-portal-aliases-save-btn');
       if (saveAliasesBtn) {
@@ -4652,6 +4751,33 @@ Natur und Technik:
           }
         });
       }
+    }
+
+    // Sync Portal Exams Button in Calendar Card
+    const syncPortalExamsBtn = root.querySelector('#sync-portal-exams-btn');
+    if (syncPortalExamsBtn) {
+      syncPortalExamsBtn.addEventListener('click', async () => {
+        this._portalImportingExams = true;
+        this.render();
+        try {
+          const res = await this._hass.callWS({
+            type: 'school_grades/import_portal_exams',
+            child_name: this._selectedChild,
+          });
+          this._portalImportingExams = false;
+          if (res && res.success) {
+            await this._fetchCalendarEvents();
+            const calText = res.synced_to_calendar ? ' (inkl. Kalender)' : '';
+            alert(`✅ ${this._t('portal_exams_synced')}${calText}`);
+          } else {
+            alert(`❌ ${(res && res.message) || 'Fehler beim Importieren der Klausuren'}`);
+          }
+        } catch (err) {
+          this._portalImportingExams = false;
+          alert(`❌ ${(err && (err.message || err.error)) || String(err)}`);
+        }
+        this.render();
+      });
     }
 
     // Toggle Add Calendar Event Form

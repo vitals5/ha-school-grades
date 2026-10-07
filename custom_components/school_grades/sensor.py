@@ -238,6 +238,8 @@ class SchoolGradeTotalSensor(SensorEntity):
             "portal_last_status": self.storage.data.portal_last_status,
             "subject_aliases": copy.deepcopy(self.storage.data.subject_aliases),
             "portal_substitutions": copy.deepcopy(self.storage.data.portal_substitutions),
+            "portal_appointments": copy.deepcopy(self.storage.data.portal_appointments),
+            "portal_exams": copy.deepcopy(self.storage.data.get_portal_appointments(only_exams=True)),
         }
 
 

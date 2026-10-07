@@ -195,12 +195,14 @@ CONF_PORTAL_SYNC_EXAMS = "portal_sync_exams"
 
 CONF_SUBJECT_ALIASES = "subject_aliases"
 CONF_PORTAL_SUBSTITUTIONS = "portal_substitutions"
+CONF_PORTAL_APPOINTMENTS = "portal_appointments"
 CONF_ALIASES_YAML = "aliases_yaml"
 
 SERVICE_TEST_ELTERNPORTAL = "test_elternportal"
 SERVICE_UPDATE_PORTAL_SETTINGS = "update_portal_settings"
 SERVICE_SYNC_ELTERNPORTAL = "sync_elternportal"
 SERVICE_IMPORT_PORTAL_TIMETABLE = "import_portal_timetable"
+SERVICE_IMPORT_PORTAL_EXAMS = "import_portal_exams"
 SERVICE_UPDATE_SUBJECT_ALIASES = "update_subject_aliases"
 
 # Standard-Zeitraster für Schulstunden und Pausen

@@ -457,6 +457,7 @@ class TestMultiLanguageSupport(unittest.TestCase):
         "set_homework_done",
         "set_preparation_done",
         "toggle_prepared_subject",
+        "import_portal_exams",
     ]
     EXPECTED_DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 
@@ -1133,6 +1134,171 @@ Deutsch:
         self.assertEqual(child2.portal_username, "parent@example.com")
         self.assertEqual(child2.portal_password, "securePassword123!")
         self.assertEqual(child2.portal_student_id, "102")
+
+    def test_parse_appointments_and_exam_detection(self):
+        """Test parsing raw appointment JSON from Eltern-Portal, detecting exams and resolving subjects."""
+        demo_appointments = portal_mod.DEMO_JSON_APPOINTMENT
+        aliases = {"Englisch": ["E", "Eng"], "Mathematik": ["M", "Ma"], "Latein": ["L", "Lat"]}
+        subjects = ["Englisch", "Mathematik", "Deutsch", "Latein"]
+
+        parsed = portal_mod.parse_appointments(demo_appointments, aliases=aliases, existing_subjects=subjects)
+        self.assertIsInstance(parsed, list)
+        self.assertGreater(len(parsed), 0)
+
+        # Check the demo appointment item (ID id_1: Schulaufgabe in Englisch)
+        exam_item = next((a for a in parsed if a["id"] == "id_1"), None)
+        self.assertIsNotNone(exam_item)
+        self.assertEqual(exam_item["title"], "Schulaufgabe in Englisch")
+        self.assertEqual(exam_item["date"], "2024-10-24")
+        self.assertTrue(exam_item["is_exam"])
+        self.assertEqual(exam_item["subject"], "Englisch")
+        self.assertEqual(exam_item["class_name"], "event-important")
+
+        # Test additional appointment varieties
+        custom_raw = [
+            {
+                "id": "2",
+                "title": "Wandertag der 7. Klassen",
+                "start": "1729807200000",
+                "end": "1729836000000",
+                "className": "event-info",
+            },
+            {
+                "id": "3",
+                "title": "1. Schulaufgabe Mathematik",
+                "start": "1730000000000",
+                "end": "1730003600000",
+                "className": "",
+            },
+            {
+                "id": "4",
+                "title": "Vokabeltest L",
+                "start": "1730100000000",
+                "end": "1730103600000",
+                "className": "",
+            },
+        ]
+        parsed_custom = portal_mod.parse_appointments(custom_raw, aliases=aliases, existing_subjects=subjects)
+        self.assertEqual(len(parsed_custom), 3)
+
+        wandertag = parsed_custom[0]
+        self.assertFalse(wandertag["is_exam"])
+        self.assertEqual(wandertag["subject"], "")
+
+        mathe_exam = parsed_custom[1]
+        self.assertTrue(mathe_exam["is_exam"])
+        self.assertEqual(mathe_exam["subject"], "Mathematik")
+
+        latein_test = parsed_custom[2]
+        self.assertTrue(latein_test["is_exam"])
+        self.assertEqual(latein_test["subject"], "Latein")
+
+    def test_portal_appointments_storage_and_query(self):
+        """Test storing and querying portal appointments and exams in SchoolGradesData."""
+        child = SchoolGradesData("Richard")
+        self.assertEqual(child.get_portal_appointments(), [])
+        self.assertEqual(child.get_exams_for_date("2024-10-24"), [])
+
+        sample_appts = [
+            {
+                "id": "1",
+                "title": "Schulaufgabe in Englisch",
+                "title_short": "",
+                "class_name": "event-important",
+                "start": "2024-10-24T00:00:00+02:00",
+                "end": "2024-10-24T23:59:59+02:00",
+                "date": "2024-10-24",
+                "is_exam": True,
+                "subject": "Englisch",
+            },
+            {
+                "id": "2",
+                "title": "Herbstfest",
+                "title_short": "",
+                "class_name": "event-info",
+                "start": "2024-10-24T14:00:00+02:00",
+                "end": "2024-10-24T18:00:00+02:00",
+                "date": "2024-10-24",
+                "is_exam": False,
+                "subject": "",
+            },
+            {
+                "id": "3",
+                "title": "Klausur Deutsch",
+                "title_short": "",
+                "class_name": "",
+                "start": "2024-10-28T08:00:00+01:00",
+                "end": "2024-10-28T09:30:00+01:00",
+                "date": "2024-10-28",
+                "is_exam": True,
+                "subject": "Deutsch",
+            },
+        ]
+        child.set_portal_appointments(sample_appts)
+        self.assertEqual(len(child.get_portal_appointments()), 3)
+
+        # Query exams for date 2024-10-24 -> should only return the 1 exam, not the festival
+        exams_24 = child.get_exams_for_date("2024-10-24")
+        self.assertEqual(len(exams_24), 1)
+        self.assertEqual(exams_24[0]["title"], "Schulaufgabe in Englisch")
+        self.assertEqual(exams_24[0]["subject"], "Englisch")
+
+        # Query exams for date 2024-10-28 -> should return 1 exam
+        exams_28 = child.get_exams_for_date("2024-10-28")
+        self.assertEqual(len(exams_28), 1)
+        self.assertEqual(exams_28[0]["subject"], "Deutsch")
+
+        # Query exams for date without exams
+        exams_empty = child.get_exams_for_date("2024-10-25")
+        self.assertEqual(exams_empty, [])
+
+        # Test serialization to dict
+        data_dict = child.to_dict()
+        self.assertIn("portal_appointments", data_dict)
+        self.assertEqual(len(data_dict["portal_appointments"]), 3)
+
+        # Test reload from dict
+        child_restored = SchoolGradesData("Richard", data=data_dict)
+        self.assertEqual(len(child_restored.get_portal_appointments()), 3)
+        self.assertEqual(child_restored.get_exams_for_date("2024-10-24")[0]["subject"], "Englisch")
+
+    def test_async_fetch_child_portal_data_appointments(self):
+        """Test async fetching child portal appointments with demo data."""
+        import asyncio
+        from unittest.mock import AsyncMock, patch
+
+        class MockStudent:
+            student_id = "demo_1"
+            name = "Demo Kind"
+
+        async def run_test():
+            with patch.object(portal_mod, "HAVE_PYELTERNPORTAL", True), \
+                 patch.object(portal_mod, "ElternPortalAPI") as mock_api_cls:
+                mock_instance = mock_api_cls.return_value
+                mock_instance.students = [MockStudent()]
+                mock_instance.async_base_demo = AsyncMock()
+                mock_instance.async_login_demo = AsyncMock()
+                mock_instance.async_set_child_demo = AsyncMock()
+
+                result = await portal_mod.async_fetch_child_portal_data(
+                    session=None,
+                    school="demo",
+                    username="demo",
+                    password="demo",
+                    student_id="demo_1",
+                    fetch_timetable=False,
+                    fetch_substitutions=False,
+                    fetch_appointments=True,
+                )
+                self.assertTrue(result["success"])
+                self.assertIn("appointments", result)
+                appts = result["appointments"]
+                self.assertIsInstance(appts, list)
+                self.assertGreater(len(appts), 0)
+                self.assertTrue(any(a.get("is_exam") for a in appts))
+
+        asyncio.run(run_test())
+
 def validate_json_yaml_files():
     json_files = list(project_root.glob("**/*.json"))
     for jf in json_files:

@@ -73,6 +73,10 @@
     "toggle_prepared_subject": {
       "name": "Alternar preparación de asignatura",
       "description": "Marca una asignatura específica como preparada o no para mañana."
+    },
+    "import_portal_exams": {
+      "name": "Importar exámenes y citas de Eltern-Portal",
+      "description": "Importa los exámenes y citas de Eltern-Portal al calendario."
     }
   }
 }

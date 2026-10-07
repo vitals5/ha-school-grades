@@ -93,6 +93,10 @@
     "update_subject_aliases": {
       "name": "Fach-Aliase aktualisieren",
       "description": "Aktualisiert die Zuordnung von Fach-Kürzeln zu Langnamen."
+    },
+    "import_portal_exams": {
+      "name": "Termine & Klausuren aus Eltern-Portal importieren",
+      "description": "Importiert anstehende Schulaufgaben und Termine aus dem Eltern-Portal in den Kalender."
     }
   }
 }

@@ -73,6 +73,10 @@
     "toggle_prepared_subject": {
       "name": "Vak-voorbereiding schakelen",
       "description": "Markeert een specifiek vak als voorbereid of niet voorbereid voor morgen."
+    },
+    "import_portal_exams": {
+      "name": "Examens en afspraken importeren uit Ouderportaal",
+      "description": "Importeert examens en afspraken uit het Ouderportaal naar de agenda."
     }
   }
 }

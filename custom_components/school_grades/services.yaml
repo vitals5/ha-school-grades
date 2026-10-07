@@ -589,6 +589,18 @@ import_portal_timetable:
       selector:
         text:
 
+import_portal_exams:
+  name: "Termine & Klausuren aus Eltern-Portal importieren"
+  description: "Importiert anstehende Schulaufgaben und Termine aus dem Eltern-Portal und gleicht diese mit dem Kalender ab."
+  fields:
+    child_name:
+      name: "Name des Kindes"
+      description: "Name des Kindes."
+      required: true
+      example: "Max"
+      selector:
+        text:
+
 update_subject_aliases:
   name: "Fach-Aliase aktualisieren"
   description: "Aktualisiert die Zuordnung von Fach-Kürzeln zu Langnamen für ein Kind."

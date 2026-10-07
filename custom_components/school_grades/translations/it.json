@@ -73,6 +73,10 @@
     "toggle_prepared_subject": {
       "name": "Attiva/disattiva preparazione materia",
       "description": "Segna una materia specifica come preparata o non preparata per domani."
+    },
+    "import_portal_exams": {
+      "name": "Importa esami e appuntamenti da Eltern-Portal",
+      "description": "Importa esami e appuntamenti da Eltern-Portal nel calendario."
     }
   }
 }

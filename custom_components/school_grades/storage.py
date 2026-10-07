@@ -91,6 +91,7 @@ class SchoolGradesData:
             self.portal_last_status: str = ""
             self.subject_aliases: dict[str, list[str]] = dict(DEFAULT_SUBJECT_ALIASES)
             self.portal_substitutions: dict[str, Any] = {"days": [], "stand": None, "available": False}
+            self.portal_appointments: list[dict[str, Any]] = []
         else:
             self.child_name = data.get("child_name", child_name)
             self.country = str(data.get("country", DEFAULT_COUNTRY)).upper()
@@ -138,6 +139,11 @@ class SchoolGradesData:
             )
             if not isinstance(self.portal_substitutions, dict):
                 self.portal_substitutions = {"days": [], "stand": None, "available": False}
+            raw_appointments = data.get("portal_appointments")
+            if isinstance(raw_appointments, list):
+                self.portal_appointments = [dict(a) for a in raw_appointments if isinstance(a, dict)]
+            else:
+                self.portal_appointments = []
             # Ensure all subjects have an entry in grades dict
             for subj in self._subjects:
                 if subj not in self._grades:
@@ -173,6 +179,7 @@ class SchoolGradesData:
             "portal_last_status": self.portal_last_status,
             "subject_aliases": self.subject_aliases,
             "portal_substitutions": self.portal_substitutions,
+            "portal_appointments": self.portal_appointments,
         }
 
     def set_subject_aliases(self, aliases_dict_or_yaml: dict[str, list[str]] | str) -> None:
@@ -404,6 +411,72 @@ class SchoolGradesData:
                 return e
 
         return None
+
+    def set_portal_appointments(self, appointments: list[dict[str, Any]]) -> None:
+        """Store appointments/exams data and resolve subjects in entries."""
+        if not isinstance(appointments, list):
+            self.portal_appointments = []
+            return
+
+        resolved: list[dict[str, Any]] = []
+        for apt in appointments:
+            if not isinstance(apt, dict):
+                continue
+            item = dict(apt)
+            # Ensure subject is resolved if missing or not canonical
+            subj = str(item.get("subject", "")).strip()
+            if not subj or subj not in self.subjects:
+                title = str(item.get("title", "")).strip()
+                short = str(item.get("title_short", "")).strip()
+                from .portal import extract_exam_subject
+
+                cand = extract_exam_subject(title, short, self.subject_aliases, self.subjects)
+                if cand:
+                    item["subject"] = cand
+
+            resolved.append(item)
+
+        resolved.sort(key=lambda x: (x.get("date", ""), x.get("start", ""), x.get("title", "")))
+        self.portal_appointments = resolved
+
+    def get_portal_appointments(
+        self,
+        only_upcoming: bool = False,
+        only_exams: bool = False,
+        ref_date: dt_date | None = None,
+    ) -> list[dict[str, Any]]:
+        """Return stored appointments, optionally filtered by exams and date."""
+        if not self.portal_appointments:
+            return []
+
+        if ref_date is None:
+            ref_date = dt_date.today()
+        ref_iso = ref_date.isoformat()
+
+        res: list[dict[str, Any]] = []
+        for apt in self.portal_appointments:
+            if only_exams and not apt.get("is_exam"):
+                continue
+            if only_upcoming:
+                apt_date = apt.get("date", "")
+                if apt_date and apt_date < ref_iso:
+                    continue
+            res.append(dict(apt))
+        return res
+
+    def get_exams_for_date(
+        self, target_date: dt_date | str
+    ) -> list[dict[str, Any]]:
+        """Return exams on a specific target date."""
+        if not self.portal_appointments:
+            return []
+        date_iso = target_date.isoformat() if hasattr(target_date, "isoformat") else str(target_date).strip()
+        if "T" in date_iso:
+            date_iso = date_iso.split("T")[0]
+        return [
+            dict(a) for a in self.portal_appointments
+            if a.get("is_exam") and a.get("date") == date_iso
+        ]
 
     def set_portal_settings(
         self,
