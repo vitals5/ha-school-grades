@@ -554,6 +554,121 @@ class TestCalendarServicesLogic(unittest.TestCase):
 
         asyncio.run(run_test())
 
+    def test_async_cleanup_info_events_from_calendar(self):
+        """Test finding and deleting obsolete event-info calendar entries while preserving user events and exams."""
+        import asyncio
+
+        deleted_uids = []
+
+        class MockCalendarEntity:
+            async def async_delete_event(self, uid: str):
+                deleted_uids.append(uid)
+
+            async def async_get_events(self, hass, start_date, end_date):
+                return [
+                    # 1. Info event with Kategorie: event-info (should be deleted)
+                    {
+                        "uid": "info_event_1",
+                        "summary": "Schulfest der gesamten Schule",
+                        "description": "Kategorie: event-info | Eltern-Portal ID: 101",
+                        "start": "2026-10-15T08:00:00",
+                    },
+                    # 2. Info event matching excluded_ids (should be deleted)
+                    {
+                        "uid": "info_event_2",
+                        "summary": "Infoabend Übertritt",
+                        "description": "Eltern-Portal ID: 102",
+                        "start": "2026-10-16T19:00:00",
+                    },
+                    # 3. Duplicate copy of info event (should also be deleted)
+                    {
+                        "uid": "info_event_2_dup",
+                        "summary": "Infoabend Übertritt",
+                        "description": "Eltern-Portal ID: 102",
+                        "start": "2026-10-16T19:00:00",
+                    },
+                    # 4. Exam event (must NOT be deleted)
+                    {
+                        "uid": "exam_event_3",
+                        "summary": "Schulaufgabe in Latein (De)",
+                        "description": "Prüfung / Klausur | Fach: Latein | Kategorie: event-important | Eltern-Portal ID: 103",
+                        "start": "2026-11-16T08:00:00",
+                    },
+                    # 5. User private personal event (must NEVER be deleted)
+                    {
+                        "uid": "personal_event_4",
+                        "summary": "Zahnarzttermin Max",
+                        "description": "Dr. Schmidt, Praxis Zentrum",
+                        "start": "2026-10-20T15:00:00",
+                    },
+                ]
+
+        class MockEntityComponent:
+            def get_entity(self, entity_id):
+                if entity_id == "calendar.google_school":
+                    return MockCalendarEntity()
+                return None
+
+        hass_data = {
+            "entity_components": {
+                "calendar": MockEntityComponent()
+            }
+        }
+
+        class MockHass:
+            def __init__(self):
+                self.data = hass_data
+
+        hass = MockHass()
+
+        async def _async_cleanup_info_events_from_calendar(
+            target_calendar: str,
+            excluded_info_appointments: list = None,
+        ) -> int:
+            cal_component = hass.data.get("entity_components", {}).get("calendar")
+            entity = cal_component.get_entity(target_calendar)
+            raw_events = await entity.async_get_events(hass, None, None)
+
+            excluded_ids = set()
+            if excluded_info_appointments:
+                for apt in excluded_info_appointments:
+                    apt_id = str(apt.get("id", "")).strip()
+                    if apt_id:
+                        excluded_ids.add(apt_id)
+
+            del_count = 0
+            for evt in raw_events:
+                uid = evt.get("uid")
+                desc = (evt.get("description") or "").lower()
+                is_info = False
+                if "kategorie: event-info" in desc or ("event-info" in desc and "eltern-portal" in desc):
+                    is_info = True
+                elif excluded_ids:
+                    for eid in excluded_ids:
+                        if f"eltern-portal id: {eid.lower()}" in desc:
+                            is_info = True
+                            break
+
+                if is_info:
+                    await entity.async_delete_event(uid)
+                    del_count += 1
+            return del_count
+
+        async def run_test():
+            excluded_info = [
+                {"id": "101", "title": "Schulfest der gesamten Schule", "class": "event-info"},
+                {"id": "102", "title": "Infoabend Übertritt", "class": "event-info"},
+            ]
+            count = await _async_cleanup_info_events_from_calendar("calendar.google_school", excluded_info)
+            self.assertEqual(count, 3)
+            self.assertIn("info_event_1", deleted_uids)
+            self.assertIn("info_event_2", deleted_uids)
+            self.assertIn("info_event_2_dup", deleted_uids)
+            self.assertNotIn("exam_event_3", deleted_uids)
+            self.assertNotIn("personal_event_4", deleted_uids)
+
+        asyncio.run(run_test())
+
 
 class TestMultiLanguageSupport(unittest.TestCase):
     """Test suite for multi-language translations and language helpers."""
@@ -1406,6 +1521,7 @@ Deutsch:
                     fetch_timetable=False,
                     fetch_substitutions=False,
                     fetch_appointments=True,
+                    ignore_info_events=False,
                 )
                 self.assertTrue(result["success"])
                 self.assertIn("appointments", result)
@@ -1413,6 +1529,24 @@ Deutsch:
                 self.assertIsInstance(appts, list)
                 self.assertGreater(len(appts), 0)
                 self.assertTrue(any(a.get("is_exam") for a in appts))
+                self.assertIn("excluded_info_appointments", result)
+
+                # Test with ignore_info_events=True
+                result_ignored = await portal_mod.async_fetch_child_portal_data(
+                    session=None,
+                    school="demo",
+                    username="demo",
+                    password="demo",
+                    student_id="demo_1",
+                    fetch_timetable=False,
+                    fetch_substitutions=False,
+                    fetch_appointments=True,
+                    ignore_info_events=True,
+                )
+                self.assertTrue(result_ignored["success"])
+                self.assertIn("appointments", result_ignored)
+                self.assertIn("excluded_info_appointments", result_ignored)
+                self.assertIsInstance(result_ignored["excluded_info_appointments"], list)
 
         asyncio.run(run_test())
 

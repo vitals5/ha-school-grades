@@ -310,7 +310,7 @@ async def _async_setup_frontend(hass: HomeAssistant) -> None:
     else:
         hass.http.register_static_path(URL_BASE, FRONTEND_DIR, cache_headers=False)
 
-    version_str = "1.2.12"
+    version_str = "1.2.13"
     try:
         js_file = os.path.join(FRONTEND_DIR, "school-grades-panel.js")
         if os.path.exists(js_file):
@@ -637,6 +637,22 @@ def _register_services(hass: HomeAssistant) -> None:
                 child_name, enabled, school, student_id,
             )
 
+            # Proactively remove event-info appointments from calendar if option is checked
+            if ignore_info_events and storage.data.calendar_entity:
+                try:
+                    deleted_info = await _async_cleanup_info_events_from_calendar(
+                        storage.data.calendar_entity
+                    )
+                    if deleted_info > 0:
+                        _LOGGER.info(
+                            "Removed %d event-info appointments from calendar %s for %s on settings update",
+                            deleted_info,
+                            storage.data.calendar_entity,
+                            child_name,
+                        )
+                except Exception as clean_err:
+                    _LOGGER.warning("Could not cleanup calendar on settings update for %s: %s", child_name, clean_err)
+
     @websocket_api.websocket_command(
         {
             vol.Required("type"): "school_grades/get_sibling_portal_credentials",
@@ -788,18 +804,35 @@ def _register_services(hass: HomeAssistant) -> None:
             data.import_timetable_data(tt_converted)
 
         # Update appointments and sync to HA calendar if requested
-        if sync_exams and "appointments" in res and res["appointments"]:
-            data.set_portal_appointments(
-                res["appointments"], ignore_info_events=data.portal_ignore_info_events
-            )
-            if data.calendar_entity:
-                synced_count = await _async_sync_appointments_to_calendar(
-                    data.calendar_entity, data.portal_appointments
+        synced_count = 0
+        deleted_info = 0
+        if sync_exams:
+            if "appointments" in res and res["appointments"]:
+                data.set_portal_appointments(
+                    res["appointments"], ignore_info_events=data.portal_ignore_info_events
                 )
-                if synced_count > 0:
+                if data.calendar_entity:
+                    synced_count = await _async_sync_appointments_to_calendar(
+                        data.calendar_entity, data.portal_appointments
+                    )
+                    if synced_count > 0:
+                        _LOGGER.info(
+                            "Synchronized %d appointments to calendar %s for %s",
+                            synced_count,
+                            data.calendar_entity,
+                            data.child_name,
+                        )
+
+            # If ignore_info_events is enabled, cleanup unwanted event-info entries from calendar
+            if data.portal_ignore_info_events and data.calendar_entity:
+                deleted_info = await _async_cleanup_info_events_from_calendar(
+                    data.calendar_entity,
+                    excluded_info_appointments=res.get("excluded_info_appointments"),
+                )
+                if deleted_info > 0:
                     _LOGGER.info(
-                        "Synchronized %d appointments to calendar %s for %s",
-                        synced_count,
+                        "Removed %d obsolete event-info appointments from calendar %s for %s",
+                        deleted_info,
                         data.calendar_entity,
                         data.child_name,
                     )
@@ -807,7 +840,14 @@ def _register_services(hass: HomeAssistant) -> None:
         await storage.async_save()
         async_dispatcher_send(hass, SIGNAL_UPDATE_GRADES.format(entry_id=storage.entry_id))
         _LOGGER.info("Successfully synchronized Eltern-Portal for %s", data.child_name)
-        return {"success": True, "child_name": data.child_name, "last_sync": data.portal_last_sync}
+        return {
+            "success": True,
+            "child_name": data.child_name,
+            "last_sync": data.portal_last_sync,
+            "synced_to_calendar": bool(data.calendar_entity and sync_exams),
+            "created_count": synced_count,
+            "deleted_info_count": deleted_info,
+        }
 
     async def handle_sync_elternportal(call: ServiceCall) -> dict[str, Any]:
         """Synchronize data from Eltern-Portal."""
@@ -1261,26 +1301,180 @@ def _register_services(hass: HomeAssistant) -> None:
         except Exception as direct_err:
             _LOGGER.debug("Direct entity delete_event failed on %s: %s", target_calendar, direct_err)
 
-        # Method 2: Try calendar.delete_event service call with event_uid
-        del_domain, del_svc = _find_calendar_service("delete")
+        # Method 1b: Try hass.data.get("calendar") fallback
         try:
-            await hass.services.async_call(
-                del_domain, del_svc, {"entity_id": target_calendar, "event_uid": uid}, blocking=True
-            )
-            return True
-        except Exception as err1:
-            _LOGGER.debug("Delete action %s.%s with event_uid failed: %s", del_domain, del_svc, err1)
+            cal_comp = hass.data.get("calendar")
+            if cal_comp and hasattr(cal_comp, "get_entity"):
+                entity = cal_comp.get_entity(target_calendar)
+                if entity and hasattr(entity, "async_delete_event"):
+                    await entity.async_delete_event(uid)
+                    _LOGGER.info("Successfully deleted calendar event %s via fallback entity on %s", uid, target_calendar)
+                    return True
+        except Exception as direct_err2:
+            _LOGGER.debug("Fallback entity delete_event failed on %s: %s", target_calendar, direct_err2)
 
-        # Method 3: Try calendar.delete_event service call with uid
+        # Method 2: Try calendar.delete_event service call with uid
+        del_domain, del_svc = _find_calendar_service("delete")
         try:
             await hass.services.async_call(
                 del_domain, del_svc, {"entity_id": target_calendar, "uid": uid}, blocking=True
             )
             return True
+        except Exception as err1:
+            _LOGGER.debug("Delete action %s.%s with uid failed: %s", del_domain, del_svc, err1)
+
+        # Method 3: Try calendar.delete_event service call with event_uid
+        try:
+            await hass.services.async_call(
+                del_domain, del_svc, {"entity_id": target_calendar, "event_uid": uid}, blocking=True
+            )
+            return True
         except Exception as err2:
-            _LOGGER.debug("Delete action %s.%s with uid key failed: %s", del_domain, del_svc, err2)
+            _LOGGER.debug("Delete action %s.%s with event_uid failed: %s", del_domain, del_svc, err2)
 
         return False
+
+    async def _async_cleanup_info_events_from_calendar(
+        target_calendar: str,
+        excluded_info_appointments: list[dict[str, Any]] | None = None,
+    ) -> int:
+        """Find and remove unwanted event-info calendar entries from the target calendar."""
+        if not target_calendar:
+            return 0
+
+        import asyncio
+        from datetime import datetime, timedelta
+
+        try:
+            from homeassistant.util import dt as dt_util
+            tz = dt_util.get_default_time_zone()
+            now = datetime.now(tz)
+        except Exception:
+            now = datetime.now()
+
+        # Cover broad school year window: 180 days in past to 365 days in future
+        start_search = now - timedelta(days=180)
+        end_search = now + timedelta(days=365)
+
+        raw_events: list[Any] = []
+
+        entity = None
+        try:
+            entity_components = hass.data.get("entity_components", {})
+            cal_component = entity_components.get("calendar")
+            if cal_component and hasattr(cal_component, "get_entity"):
+                entity = cal_component.get_entity(target_calendar)
+
+            if not entity:
+                cal_comp = hass.data.get("calendar")
+                if cal_comp and hasattr(cal_comp, "get_entity"):
+                    entity = cal_comp.get_entity(target_calendar)
+        except Exception as ent_err:
+            _LOGGER.debug("Could not resolve calendar entity %s: %s", target_calendar, ent_err)
+
+        if entity and hasattr(entity, "async_get_events"):
+            try:
+                raw_events = await entity.async_get_events(hass, start_search, end_search)
+            except Exception as get_err:
+                _LOGGER.warning("Could not fetch events via entity from %s: %s", target_calendar, get_err)
+
+        if not raw_events:
+            try:
+                from homeassistant.components.calendar import async_get_events
+                raw_events = await async_get_events(hass, target_calendar, start_search, end_search)
+            except Exception as fb_err:
+                _LOGGER.debug("Fallback async_get_events on %s failed: %s", target_calendar, fb_err)
+
+        if not raw_events:
+            _LOGGER.debug("No calendar events found on %s to inspect for cleanup", target_calendar)
+            return 0
+
+        # Build lookup sets for excluded info appointments
+        excluded_ids: set[str] = set()
+        excluded_titles_by_date: dict[str, set[str]] = {}
+
+        if excluded_info_appointments:
+            for apt in excluded_info_appointments:
+                if not isinstance(apt, dict):
+                    continue
+                apt_id = str(apt.get("id") or apt.get("appointment_id") or "").strip()
+                if apt_id:
+                    excluded_ids.add(apt_id)
+
+                title = str(apt.get("title") or apt.get("title_short") or "").strip().lower()
+                date_str = str(apt.get("date") or apt.get("start") or "").strip()[:10]
+                if title and date_str:
+                    excluded_titles_by_date.setdefault(date_str, set()).add(title)
+
+        deleted_count = 0
+        deleted_uids: set[str] = set()
+
+        for evt in raw_events:
+            if isinstance(evt, dict):
+                uid = str(evt.get("uid") or evt.get("id") or "").strip()
+                summary = str(evt.get("summary") or evt.get("title") or "").strip()
+                desc = str(evt.get("description") or "").strip()
+                start_raw = evt.get("start")
+            else:
+                uid = str(getattr(evt, "uid", None) or getattr(evt, "id", None) or "").strip()
+                summary = str(getattr(evt, "summary", "") or getattr(evt, "title", "") or "").strip()
+                desc = str(getattr(evt, "description", "") or "").strip()
+                start_raw = getattr(evt, "start", None)
+
+            if not uid or uid in deleted_uids:
+                continue
+
+            evt_date_str = ""
+            if start_raw:
+                evt_date_str = str(start_raw).split("T")[0].split(" ")[0]
+
+            desc_l = desc.lower()
+            summary_l = summary.lower()
+
+            is_info_event = False
+
+            # Criterion 1: Directly tagged with event-info in description
+            # (Generated by SchoolGrades as 'Kategorie: event-info')
+            if "kategorie: event-info" in desc_l or ("event-info" in desc_l and "eltern-portal" in desc_l):
+                is_info_event = True
+
+            # Criterion 2: Matches excluded Eltern-Portal appointment ID in description
+            if not is_info_event and excluded_ids:
+                for eid in excluded_ids:
+                    if f"eltern-portal id: {eid.lower()}" in desc_l:
+                        is_info_event = True
+                        break
+
+            # Criterion 3: Matches title and date of an excluded info appointment
+            # AND confirmed to be an Eltern-Portal / SchoolGrades created event
+            if not is_info_event and evt_date_str in excluded_titles_by_date:
+                matching_titles = excluded_titles_by_date[evt_date_str]
+                for ex_title in matching_titles:
+                    if summary_l == ex_title or ex_title in summary_l or summary_l in ex_title:
+                        # Safety check: must have SchoolGrades markers in description
+                        if (
+                            any(marker in desc_l for marker in ("eltern-portal", "kategorie:", "prüfung", "fach:"))
+                            or "event-" in desc_l
+                        ):
+                            is_info_event = True
+                            break
+
+            if is_info_event:
+                try:
+                    deleted = await _async_delete_calendar_event(target_calendar, uid)
+                    if deleted:
+                        deleted_count += 1
+                        deleted_uids.add(uid)
+                        _LOGGER.info(
+                            "Deleted unwanted event-info calendar entry '%s' on %s (uid: %s) from %s",
+                            summary, evt_date_str, uid, target_calendar
+                        )
+                        # Throttle slightly to respect Google Calendar API quotas
+                        await asyncio.sleep(0.05)
+                except Exception as del_err:
+                    _LOGGER.warning("Could not delete calendar event '%s' (%s): %s", summary, uid, del_err)
+
+        return deleted_count
 
     async def handle_update_calendar_event(call: ServiceCall) -> None:
         """Handle update_calendar_event action call."""

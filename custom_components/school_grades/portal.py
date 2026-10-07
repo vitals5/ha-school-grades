@@ -1118,8 +1118,10 @@ async def async_fetch_child_portal_data(
                 _LOGGER.warning("Could not fetch substitutions from Eltern-Portal: %s", subst_err)
 
         # Fetch Appointments / Exams
+        excluded_info_appointments: list[dict[str, Any]] = []
         if fetch_appointments:
             try:
+                raw_apt_payload = None
                 if is_demo:
                     demo_raw = DEMO_JSON_APPOINTMENT
                     try:
@@ -1127,41 +1129,38 @@ async def async_fetch_child_portal_data(
                         demo_raw = PY_DEMO_JSON_APPOINTMENT
                     except Exception:
                         pass
-                    appointments_data = parse_appointments(
-                        demo_raw,
-                        aliases=aliases,
-                        existing_subjects=existing_subjects,
-                        ignore_info_events=ignore_info_events,
-                    )
+                    raw_apt_payload = demo_raw
                 else:
                     url = parse.urljoin(api.base_url, "/api/ws_get_termine.php")
                     async with session.get(url) as resp:
                         if resp.status == 200:
                             try:
-                                json_data = await resp.json(content_type=None)
+                                raw_apt_payload = await resp.json(content_type=None)
                             except Exception:
                                 text_data = await resp.text()
-                                json_data = json.loads(text_data)
-                            appointments_data = parse_appointments(
-                                json_data,
-                                aliases=aliases,
-                                existing_subjects=existing_subjects,
-                                ignore_info_events=ignore_info_events,
-                            )
-            except Exception as apt_err:
-                _LOGGER.warning("Could not fetch appointments from Eltern-Portal: %s", apt_err)
+                                raw_apt_payload = json.loads(text_data)
 
-            # Fallback if student has appointments populated on api
-            if not appointments_data and getattr(match_student, "appointments", None):
-                try:
-                    appointments_data = parse_appointments(
-                        match_student.appointments,
+                if raw_apt_payload is None and getattr(match_student, "appointments", None):
+                    raw_apt_payload = match_student.appointments
+
+                if raw_apt_payload is not None:
+                    all_parsed_apts = parse_appointments(
+                        raw_apt_payload,
                         aliases=aliases,
                         existing_subjects=existing_subjects,
-                        ignore_info_events=ignore_info_events,
+                        ignore_info_events=False,
                     )
-                except Exception as fb_err:
-                    _LOGGER.debug("Could not parse student.appointments fallback: %s", fb_err)
+                    if ignore_info_events:
+                        for apt_item in all_parsed_apts:
+                            class_l = str(apt_item.get("class") or "").lower()
+                            if "info" in class_l or class_l == "event-info":
+                                excluded_info_appointments.append(apt_item)
+                            else:
+                                appointments_data.append(apt_item)
+                    else:
+                        appointments_data = all_parsed_apts
+            except Exception as apt_err:
+                _LOGGER.warning("Could not fetch appointments from Eltern-Portal: %s", apt_err)
 
         if not is_demo:
             try:
@@ -1177,6 +1176,7 @@ async def async_fetch_child_portal_data(
             "timetable": timetable_data,
             "substitutions": substitutions_data,
             "appointments": appointments_data,
+            "excluded_info_appointments": excluded_info_appointments,
         }
 
     except BadCredentialsException as err:

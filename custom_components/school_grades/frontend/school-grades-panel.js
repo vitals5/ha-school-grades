@@ -2862,6 +2862,7 @@ Natur und Technik:
       });
       this._portalHeaderSyncing = false;
       if (res && res.success) {
+        await this._fetchUpcomingCalendarEvents();
         this._portalHeaderSyncSuccess = true;
         this.render();
         setTimeout(() => {
@@ -4696,7 +4697,12 @@ Natur und Technik:
             });
             this._portalSyncing = false;
             if (res && res.success) {
-              this._portalSyncFeedback = '✅ Synchronisierung erfolgreich!';
+              await this._fetchUpcomingCalendarEvents();
+              let syncFeedback = '✅ Synchronisierung erfolgreich!';
+              if (res.deleted_info_count > 0) {
+                syncFeedback += ` (${res.deleted_info_count} Info-Termine aus Kalender entfernt)`;
+              }
+              this._portalSyncFeedback = syncFeedback;
             } else {
               this._portalSyncFeedback = '❌ ' + ((res && res.message) || 'Fehler beim Synchronisieren');
             }
@@ -4769,7 +4775,12 @@ Natur und Technik:
             this._portalImportingExams = false;
             if (res && res.success) {
               await this._fetchUpcomingCalendarEvents();
-              const calText = res.synced_to_calendar ? ' (in Kalender eingetragen)' : '';
+              let calText = '';
+              if (res.deleted_info_count > 0) {
+                calText = ` (${res.deleted_info_count} Info-Termine aus Kalender entfernt)`;
+              } else if (res.synced_to_calendar) {
+                calText = ' (in Kalender eingetragen)';
+              }
               this._portalSyncFeedback = `✅ ${this._t('portal_exams_synced')}${calText}`;
             } else {
               this._portalSyncFeedback = '❌ ' + ((res && res.message) || 'Fehler beim Importieren der Klausuren');
@@ -4838,7 +4849,12 @@ Natur und Technik:
           this._portalImportingExams = false;
           if (res && res.success) {
             await this._fetchUpcomingCalendarEvents();
-            const calText = res.synced_to_calendar ? ' (inkl. Kalender)' : '';
+            let calText = '';
+            if (res.deleted_info_count > 0) {
+              calText = `\n(${res.deleted_info_count} Info-Termine aus Kalender entfernt)`;
+            } else if (res.synced_to_calendar) {
+              calText = ' (inkl. Kalender)';
+            }
             alert(`✅ ${this._t('portal_exams_synced')}${calText}`);
           } else {
             alert(`❌ ${(res && res.message) || 'Fehler beim Importieren der Klausuren'}`);
