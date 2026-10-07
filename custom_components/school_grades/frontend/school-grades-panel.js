@@ -2997,11 +2997,6 @@ Natur und Technik:
                 </button>
               `;
             }).join('')}
-            ${currentChild && currentChild.portalEnabled ? `
-              <button class="settings-badge-btn ${this._portalHeaderSyncing ? 'syncing' : ''}" id="header-portal-sync-btn" aria-label="Eltern-Portal synchronisieren" title="Eltern-Portal jetzt synchronisieren (max. 1x/Min)" style="margin-right: 4px; ${this._portalHeaderSyncSuccess ? 'border-color: #22c55e; color: #86efac; background: rgba(34,197,94,0.15);' : ''}">
-                <span class="${this._portalHeaderSyncing ? 'spin-icon' : ''}" style="font-size: 16px;">${this._portalHeaderSyncing ? '⏳' : (this._portalHeaderSyncSuccess ? '✅' : '🔄')}</span>
-              </button>
-            ` : ''}
             <button class="settings-badge-btn" id="open-settings-btn" aria-label="${this._t('settings_btn')}" title="${this._t('settings_btn')}">
               <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="3"></circle>
@@ -4015,16 +4010,6 @@ Natur und Technik:
         this._triggerPortalSync(cName);
       });
     });
-
-    // Header Portal Sync Button
-    const headerSyncBtn = root.querySelector('#header-portal-sync-btn');
-    if (headerSyncBtn) {
-      headerSyncBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        this._triggerPortalSync(this._selectedChild);
-      });
-    }
 
     // Summary Banner Interactive Toggles
     const toggleHomeworkBtn = root.querySelector('#toggle-homework-btn');

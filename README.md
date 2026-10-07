@@ -1,4 +1,4 @@
-# 🎓 Schulnoten & Stundenplan - Home Assistant Integration (HACS)
+# 🎓 Schulnoten & Stundenplan (inkl. Eltern-Portal Sync) - Home Assistant Integration (HACS)
 
 <p align="center">
   <img src="custom_components/school_grades/brand/logo.png" alt="Schulnoten Logo" width="450">
@@ -16,7 +16,7 @@
 
 ## 🇩🇪 Deutsch
 
-Eine moderne, umfassende Home Assistant Custom Integration zur einfachen Verwaltung von Schulnoten, Klausuren-Kalendern, Vorbereitung für den nächsten Schultag und interaktiven Wochenstundenplänen für deine Kinder.
+Eine moderne, umfassende Home Assistant Custom Integration zur einfachen Verwaltung von Schulnoten, Klausuren-Kalendern, Vorbereitung für den nächsten Schultag und interaktiven Wochenstundenplänen für deine Kinder – **inklusive optionaler Synchronisation mit dem Eltern-Portal** (`eltern-portal.org`) für Termine, Klausuren, Vertretungspläne und Stundenpläne!
 
 Mit dem **integrierten Sidebar-Panel** (`/schulnoten`) verwaltest du Noten, Fächer, Klausurtermine, Hausaufgaben-Status, Vorbereitung und Stundenpläne bequem an einem zentralen Ort – komplett ohne Dashboard-YAML-Cards!
 
@@ -25,9 +25,17 @@ Mit dem **integrierten Sidebar-Panel** (`/schulnoten`) verwaltest du Noten, Fäc
 - 📱 **Zentrales Custom Sidebar-Panel (`🎓 Schulnoten`)**:
   - Erscheint automatisch in der linken Menüleiste von Home Assistant.
   - Komplette Verwaltung von Kindern, Noten, Fächern, Kalendern & Stundenplänen direkt in der Benutzeroberfläche.
+- 🏫 **Optionale Eltern-Portal Synchronisation (`eltern-portal.org`)**:
+  - Nahtlose, optionale Anbindung an das bayerische Eltern-Portal (über die Python-Bibliothek `pyelternportal`).
+  - **Automatischer Datenabruf**: Synchronisiert Termine, Klausuren/Schulaufgaben, den tagesaktuellen Vertretungsplan sowie den Stundenplan.
+  - **Vertretungsplan-Live-Integration**: Ausfälle, Vertretungen und Raumänderungen werden farblich hervorgehoben und fließen direkt in den Stundenplan sowie in die Schultaschen-Vorbereitung für den nächsten Schultag ein!
+  - **Klausuren & Termine im Kalender**: Automatisches Übertragen von Schulklausuren und Terminen in deinen verknüpften Home Assistant Kalender – mit integriertem Filter gegen irrelevante Info-Termine (`event-info`) und intelligenter Duplikatsvermeidung.
+  - **Fächer-Kürzel & Aliase**: Flexibler YAML-Editor in den Einstellungen zur perfekten Zuordnung schulischer Kürzel (z. B. `M -> Mathematik`, `NT -> Natur und Technik`).
+  - **Geschwister-Komfort**: Anmeldedaten und Schulkennung können mit einem Klick für Geschwisterkinder übernommen werden.
+  - **Schnell-Synchronisation**: Über das dezente `🏫`-Badge direkt am Kind-Reiter im Header (max. 1x pro Minute).
 - 👨‍👩‍👧‍👦 **Multi-Kind Verwaltung**: Beliebig viele Kinder-Instanzen anlegen (z. B. Richard, Max, Emma) und per Tab-Reiter umschalten (inkl. Klassenanzeige z. B. `👤 Richard (5a)`).
 - 🎒 **Vorbereitung auf den nächsten Schultag & interaktiver Abhaken-Modus**:
-  - Unterrichtsfächer für den morgigen Schultag werden übersichtlich aufgelistet.
+  - Unterrichtsfächer für den morgigen Schultag werden übersichtlich aufgelistet (unter Berücksichtigung des Vertretungsplans!).
   - Durch Klick auf ein Fach wird dieses grün umrandet und als vorbereitet markiert.
   - **Gesamt-Status binary_sensor (`binary_sensor.<kind>_vorbereitung_erledigt`)**: Wechselt automatisch auf `on`, wenn alle Schulfächer für morgen als vorbereitet abgehakt wurden.
 - 📝 **Hausaufgaben-Status (`binary_sensor.<kind>_hausaufgaben_erledigt`)**:
@@ -42,15 +50,17 @@ Mit dem **integrierten Sidebar-Panel** (`/schulnoten`) verwaltest du Noten, Fäc
 - 📆 **Klausuren- & Termine-Kalender**:
   - Verknüpfung mit jedem beliebigen Home Assistant Kalender (z. B. Google Kalender, CalDAV, lokaler Kalender).
   - Übersicht anstehender Klausuren mit Countdown-Badges (`⚡ HEUTE`, `⚠️ Morgen`, `In X Tagen`) und **Farbkodierung nach Dringlichkeit** (Rot ≤ 1 Tag, Orange 2-3 Tage, Gelb 4-7 Tage).
+  - Interaktives Bearbeiten und Löschen von Terminen direkt per Klick im Modal.
 - 📘 **Fächer- & Notenverwaltung**:
   - **Einklappbares Noten-Formular (`➕ Neue Note eintragen`)**: Standardmäßig ausgeblendet für ein aufgeräumtes Dashboard; lässt sich per Action-Button aufklappen.
   - Eintragen von Noten (1.0 bis 6.0) mit frei wählbarer Gewichtung (1-fach, 2-fach, 3-fach, 4-fach).
   - Automatische Errechnung des gewichteten Fachdurchschnitts sowie des Gesamtdurchschnitts.
   - Notenhistorie mit Datum, Bezeichnung (z. B. *1. Schulaufgabe*) und Löschoption.
-- ⚙️ **3-Tab Einstellungen-Modal (`⚙️ Allgemein`, `📘 Fächer verwalten` & `📅 Stundenplan`)**:
+- ⚙️ **4-Tab Einstellungen-Modal (`⚙️ Allgemein`, `📘 Fächer verwalten`, `📅 Stundenplan YAML` & `🏫 Eltern-Portal`)**:
   - **Allgemein**: Notenskala (🇩🇪, 🇦🇹, 🇨🇭, 🇫🇷, 🇮🇹, 🇪🇸, 🇳🇱, 🇵🇱, 🇬🇧, 🇺🇸, 🇷🇺, 🇨🇳), Eingabe der Klasse (z. B. `5a`), Kalender-Auswahl sowie Bereichs-Sichtbarkeiten.
   - **Fächer verwalten**: Bequemes Anlegen neuer Schulfächer sowie Löschen bestehender Fächer.
-  - **Stundenplan**: Direkter YAML-Import/Export.
+  - **Stundenplan YAML**: Direkter YAML-Import/Export des Wochenstundenplans.
+  - **Eltern-Portal**: Zugangsdaten (Schulkennung, Benutzername, Passwort), Kind-Verknüpfung, Synchronisations-Optionen (Klausuren, Vertretungen, Stundenplan, Info-Termine filtern), Fächer-Aliase bearbeiten, Geschwister-Zugangsdaten kopieren und Verbindungstest.
 - 🌐 **Mehrsprachigkeit (Multi-Language i18n)**:
   - Vollständige Lokalisierung für alle unterstützten Ländernormen: **Deutsch 🇩🇪**, **Englisch 🇬🇧/🇺🇸**, **Französisch 🇫🇷**, **Italienisch 🇮🇹**, **Spanisch 🇪🇸**, **Niederländisch 🇳🇱**, **Polnisch 🇵🇱**, **Russisch 🇷🇺** und **Chinesisch 🇨🇳**.
   - Passt sich automatisch der eingestellten Home Assistant Sprache des Benutzers an (inkl. UI-Panel, Sensoren-Statusansagen und Dienste-Beschreibungen).
@@ -98,9 +108,17 @@ Die Integration stellt folgende Aktionen (Services) für Automatisierungen oder 
 | `school_grades.set_preparation_done` | Vorbereitungs-Status setzen | `child_name`, `preparation_done` (boolean) |
 | `school_grades.toggle_prepared_subject` | Schulfach-Vorbereitung umschalten | `child_name`, `subject` |
 | `school_grades.set_calendar` | Kalender zuweisen | `child_name`, `calendar_entity` |
+| `school_grades.add_calendar_event` | Termin/Klausur im Kalender eintragen | `child_name`, `summary`, `start_time`, `end_time`, `description` |
+| `school_grades.update_calendar_event` | Kalendertermin bearbeiten | `child_name`, `event_uid`, `summary`, `start_time`, `end_time`, `description` |
+| `school_grades.remove_calendar_event` | Termin aus Kalender löschen | `child_name`, `event_uid` |
 | `school_grades.update_timetable_cell` | Stundenplan-Zelle bearbeiten | `child_name`, `slot_id`, `day`, `subject`, `room`, `teacher` |
 | `school_grades.import_timetable` | Stundenplan per YAML importieren | `child_name`, `yaml_content` |
 | `school_grades.update_settings` | Land, Klasse & Einstellungen aktualisieren | `child_name`, `country`, `grade_level`, `calendar_entity`, `show_prep_card`, ... |
+| `school_grades.sync_elternportal` | Eltern-Portal synchronisieren | `child_name` (optional: leer für alle Kinder) |
+| `school_grades.import_portal_exams` | Klausuren aus Eltern-Portal importieren | `child_name` |
+| `school_grades.import_portal_timetable` | Stundenplan aus Eltern-Portal importieren | `child_name` |
+| `school_grades.update_portal_settings` | Eltern-Portal Zugangsdaten & Optionen speichern | `child_name`, `portal_enabled`, `portal_school`, `portal_username`, `portal_password`, `portal_student_id`, `portal_student_name`, `portal_sync_timetable`, `portal_sync_substitutions`, `portal_sync_exams`, `portal_ignore_info_events` |
+| `school_grades.update_subject_aliases` | Fächer-Kürzel/Aliase per YAML aktualisieren | `child_name`, `aliases_yaml` |
 
 ### 🤖 Automatischer Stundenplan-Import per KI (Prompt-Vorlage)
 
@@ -110,7 +128,7 @@ Hast du den Stundenplan deines Kindes als **PDF, Bild oder Foto** vorliegen? Du 
 1. Kopiere die untenstehende **KI Prompt-Vorlage**.
 2. Lade dein Stundenplan-Foto oder ein PDF zusammen mit dem Prompt in ChatGPT, Claude oder Gemini hoch.
 3. Kopiere den von der KI generierten YAML-Code.
-4. Klicke im Schulnoten-Panel im Bereich Stundenplan auf **`📋 YAML Import / Export`** und füge den Code ein. Fertig!
+4. Klicke im Schulnoten-Panel im Einstellungen-Modal auf den Tab **`📅 Stundenplan YAML`** und füge den Code ein. Fertig!
 
 > 📄 **Beispiel-Vorlage im Repository**: [example_timetable.yaml](file:///example_timetable.yaml)
 
@@ -159,8 +177,8 @@ Regeln:
 ### 🔔 Binary Sensoren für Sprachansagen & Benachrichtigungen
 
 Die Integration erstellt für jedes Kind automatisch folgende Binary Sensoren:
-- `binary_sensor.<kind_name>_anstehende_termine_morgen`
-- `binary_sensor.<kind_name>_hausaufgaben_erledigt`
+- `binary_sensor.<kind_name>_anstehende_termine_morgen`: Steht auf `on`, wenn am nächsten Schultag Klausuren oder Termine anstehen. Attribute wie `event_titles`, `target_day_name`, `message` und `kind_name` ermöglichen einfache Sprachansagen.
+- `binary_sensor.<kind_name>_hausaufgaben_erledigt`: Zeigt an, ob die Hausaufgaben für heute erledigt sind.
 - `binary_sensor.<kind_name>_vorbereitung_erledigt`: Schaltet automatisch auf `on`, sobald alle Schulfächer für den nächsten Schultag als vorbereitet angeklickt wurden (oder programmatisch per Service). Stellt nützliche Attribute wie `missing_subjects`, `needed_subjects` und `target_school_day` für Automationen bereit.
 - `binary_sensor.<kind_name>_schulzeit`: Steht auf `on` (`true`), solange sich das Kind aktuell in einer regulären Unterrichtsstunde befindet. Wechselt auf `off` (`false`) bei Pausen, Freistunden, vor der Schule, nach Schulende sowie am Wochenende. Bietet viele Attribute wie `current_subject`, `current_room`, `current_teacher`, `current_slot`, `current_slot_start`, `current_slot_end`, `is_break`, `is_free_period`, `school_finished`, `next_subject`, `next_slot_start` u.v.m.
 
@@ -221,7 +239,34 @@ data:
   preparation_done: true
 ```
 
-##### 2. Benachrichtigungs-Erinnerung für Hausaufgaben & Klausuren
+##### 2. Abendliche Klausur-Erinnerung per Sprachansage (TTS)
+
+Erinnert das Kind abends automatisch über Smart Speaker (z. B. Google Home, Amazon Echo / Alexa oder Home Assistant Voice / Piper) an Klausuren und Tests am nächsten Schultag:
+
+```yaml
+alias: "Schulnoten - Klausur-Ansage für morgen"
+description: "Erinnert das Kind abends per Sprachansage an anstehende Klausuren/Termine am nächsten Schultag"
+trigger:
+  - platform: time
+    at: "18:00:00"
+condition:
+  - condition: state
+    entity_id: binary_sensor.richard_anstehende_termine_morgen
+    state: "on"
+action:
+  - service: tts.speak
+    target:
+      entity_id: tts.google_de_de   # oder tts.piper / tts.cloud
+    data:
+      media_player_entity_id: media_player.kinderzimmer_lautsprecher
+      message: >-
+        {% set kind = state_attr('binary_sensor.richard_anstehende_termine_morgen', 'kind_name') %}
+        {% set tag = state_attr('binary_sensor.richard_anstehende_termine_morgen', 'target_day_name') %}
+        {% set termine = state_attr('binary_sensor.richard_anstehende_termine_morgen', 'event_titles') %}
+        Achtung {{ kind }}! Am morgigen {{ tag }} steht folgende Klausur an: {{ termine }}. Bitte denke daran, deine Schulsachen vorzubereiten und noch einmal zu wiederholen!
+```
+
+##### 3. Benachrichtigungs-Erinnerung für Hausaufgaben
 
 ```yaml
 alias: "Schulnoten - Abendliche Erinnerung an unerledigte Hausaufgaben"
@@ -239,7 +284,7 @@ action:
       message: "Du hast deine Hausaufgaben für heute noch nicht als erledigt markiert!"
 ```
 
-##### 3. Smartphone-Einschränkung während der Schulzeit (z. B. mit Google Family Link)
+##### 4. Smartphone-Einschränkung während der Schulzeit (z. B. mit Google Family Link)
 
 Sperrt während des Unterrichts das Smartphone (oder aktiviert den Schulmodus) und gibt es in Pausen oder nach Schulschluss automatisch wieder frei:
 
@@ -278,7 +323,7 @@ action:
 
 ## 🇬🇧 English
 
-A modern, comprehensive Home Assistant Custom Integration for easily managing school grades, exam calendars, next-day preparations, and interactive weekly timetables for your children.
+A modern, comprehensive Home Assistant Custom Integration for easily managing school grades, exam calendars, next-day preparations, and interactive weekly timetables for your children — **featuring optional direct synchronization with Eltern-Portal** (`eltern-portal.org`) for appointments, exams, substitution schedules, and timetables!
 
 With the **built-in Sidebar Panel** (`/schulnoten`), you can manage grades, subjects, exam dates, homework status, preparations, and timetables conveniently in one central location — completely without dashboard YAML cards!
 
@@ -287,9 +332,17 @@ With the **built-in Sidebar Panel** (`/schulnoten`), you can manage grades, subj
 - 📱 **Central Custom Sidebar Panel (`🎓 Schulnoten`)**:
   - Automatically appears in Home Assistant's left navigation sidebar.
   - Complete management of children, grades, subjects, calendars & timetables directly inside the interface.
+- 🏫 **Optional Eltern-Portal Synchronization (`eltern-portal.org`)**:
+  - Seamless, optional integration with the Bavarian Eltern-Portal (via the `pyelternportal` Python library).
+  - **Automatic Data Fetching**: Synchronizes appointments, exams/class tests, the daily substitution plan, and the school timetable.
+  - **Live Substitution Schedule**: Cancelled classes, room changes, and substitute teachers are highlighted with colored tags and dynamically factored into the timetable and school bag preparation for the next day!
+  - **Exams & Events in Calendar**: Automatically syncs school exams and events to your linked Home Assistant calendar — with an intelligent filter to exclude irrelevant info events (`event-info`) and automatic duplicate prevention.
+  - **Subject Aliases & Abbreviations**: Flexible YAML editor in settings for mapping school subject codes (e.g., `M -> Mathematics`, `NT -> Science and Technology`).
+  - **Sibling Convenience**: Portal login credentials can be copied to sibling children with a single click.
+  - **Quick Sync**: Compact `🏫` badge on each child tab in the top header for on-demand synchronization (rate-limited to 1x/minute).
 - 👨‍👩‍👧‍👦 **Multi-Child Management**: Create as many child instances as needed (e.g. Richard, Max, Emma) and switch between them via tab buttons (including class/grade display e.g. `👤 Richard (5a)`).
 - 🎒 **Preparation for Next School Day & Interactive Check-off Mode**:
-  - Clear overview of subjects scheduled for the next school day.
+  - Clear overview of subjects scheduled for the next school day (taking substitution changes into account!).
   - Click any subject card to highlight it with a green border and mark it as prepared.
   - **Overall Status Binary Sensor (`binary_sensor.<child>_preparation_done`)**: Automatically turns `on` when all subjects for tomorrow are checked off as prepared.
 - 📝 **Homework Status (`binary_sensor.<child>_homework_done`)**:
@@ -299,20 +352,22 @@ With the **built-in Sidebar Panel** (`/schulnoten`), you can manage grades, subj
   - Clear timetable from Monday to Friday including lesson periods & breaks.
   - **Day Highlighting**: Automatically highlights current day in header and columns (`TODAY`).
   - **Live Class Indicator (`⚡ NOW`)**: Marks the currently active lesson period in real time.
-  - **Visual Cell Editor**: Click any cell to edit subject, room number (📍), and teacher (👨‍🏫). Custom subjects can be created directly within the dialog.
+  - **Visual Cell Editor**: Click any cell to edit subject, room number (📍), and teacher (👨🏫). Custom subjects can be created directly within the dialog.
   - **YAML Import & Export**: Import or export timetables conveniently in YAML format.
 - 📆 **Exams & Events Calendar**:
   - Link any Home Assistant calendar (e.g. Google Calendar, CalDAV, Local HA Calendar).
   - Overview of upcoming exams with countdown badges (`⚡ TODAY`, `⚠️ Tomorrow`, `In X days`) and **urgency color-coding** (Red ≤ 1 day, Orange 2-3 days, Yellow 4-7 days).
+  - Interactive modal dialog to view, edit, or delete events directly.
 - 📘 **Subject & Grade Management**:
   - **Collapsible Grade Form (`➕ Record New Grade`)**: Hidden by default for a clean UI; can be expanded on demand via an action button.
   - Record grades (1.0 to 6.0) with configurable weights (1x, 2x, 3x, 4x).
   - Automatic calculation of weighted subject average and overall GPA.
   - Grade history with date, label (e.g., *1st Exam*), and deletion option.
-- ⚙️ **3-Tab Settings Modal (`⚙️ General`, `📘 Manage Subjects` & `📅 Timetable`)**:
+- ⚙️ **4-Tab Settings Modal (`⚙️ General`, `📘 Manage Subjects`, `📅 Timetable YAML` & `🏫 Eltern-Portal`)**:
   - **General**: Customize country-specific grading systems (🇩🇪, 🇦🇹, 🇨🇭, 🇫🇷, 🇮🇹, 🇪🇸, 🇳🇱, 🇵🇱, 🇬🇧, 🇺🇸, 🇷🇺, 🇨🇳), class level (e.g. `5a`), calendar selection, and section visibilities.
   - **Manage Subjects**: Easily add new subjects or delete existing ones.
-  - **Timetable**: Direct YAML import/export.
+  - **Timetable YAML**: Direct YAML import/export of weekly timetables.
+  - **Eltern-Portal**: Credentials (school ID, username, password), student linking, sync toggles (exams, substitutions, timetable, exclude info events), subject aliases editor, copy sibling credentials, and connection test.
 - 🌐 **Multi-Language Support (i18n)**:
   - Complete native localization for all supported country standards: **German 🇩🇪**, **English 🇬🇧/🇺🇸**, **French 🇫🇷**, **Italian 🇮🇹**, **Spanish 🇪🇸**, **Dutch 🇳🇱**, **Polish 🇵🇱**, **Russian 🇷🇺**, and **Chinese 🇨🇳**.
   - Automatically adapts to the active Home Assistant user language (including UI panel, sensor TTS announcements, and service descriptions).
@@ -360,9 +415,17 @@ The integration provides the following actions (services) for automations and sc
 | `school_grades.set_preparation_done` | Set preparation status | `child_name`, `preparation_done` (boolean) |
 | `school_grades.toggle_prepared_subject` | Toggle subject preparation | `child_name`, `subject` |
 | `school_grades.set_calendar` | Assign calendar | `child_name`, `calendar_entity` |
+| `school_grades.add_calendar_event` | Add exam/event to calendar | `child_name`, `summary`, `start_time`, `end_time`, `description` |
+| `school_grades.update_calendar_event` | Update calendar event | `child_name`, `event_uid`, `summary`, `start_time`, `end_time`, `description` |
+| `school_grades.remove_calendar_event` | Delete event from calendar | `child_name`, `event_uid` |
 | `school_grades.update_timetable_cell` | Edit timetable slot | `child_name`, `slot_id`, `day`, `subject`, `room`, `teacher` |
 | `school_grades.import_timetable` | Import timetable via YAML | `child_name`, `yaml_content` |
 | `school_grades.update_settings` | Update settings & grade level | `child_name`, `country`, `grade_level`, `calendar_entity`, ... |
+| `school_grades.sync_elternportal` | Synchronize Eltern-Portal | `child_name` (optional: empty for all children) |
+| `school_grades.import_portal_exams` | Import exams from Eltern-Portal | `child_name` |
+| `school_grades.import_portal_timetable` | Import timetable from Eltern-Portal | `child_name` |
+| `school_grades.update_portal_settings` | Save Eltern-Portal credentials & options | `child_name`, `portal_enabled`, `portal_school`, `portal_username`, `portal_password`, `portal_student_id`, `portal_student_name`, `portal_sync_timetable`, `portal_sync_substitutions`, `portal_sync_exams`, `portal_ignore_info_events` |
+| `school_grades.update_subject_aliases` | Update subject aliases via YAML | `child_name`, `aliases_yaml` |
 
 ### 🤖 Automatic Timetable Import via AI (Prompt Template)
 
@@ -372,7 +435,7 @@ Do you have your child's timetable as a **PDF, photo, or image**? You can use an
 1. Copy the **AI Prompt Template** below.
 2. Upload a picture or PDF of the timetable together with the prompt into ChatGPT, Claude, or Gemini.
 3. Copy the resulting YAML code snippet.
-4. In the Schulnoten sidebar panel, click **`📋 YAML Import / Export`** on the timetable card, paste the YAML, and click Import. Done!
+4. In the Schulnoten sidebar panel, open the Settings modal and go to the **`📅 Timetable YAML`** tab, paste the YAML, and click Import. Done!
 
 > 📄 **Example template file in repository**: [example_timetable.yaml](file:///example_timetable.yaml)
 
@@ -416,10 +479,10 @@ Rules:
 ### 🔔 Binary Sensors for Voice Announcements & Notifications
 
 The integration automatically creates binary sensors for each child:
-- `binary_sensor.<child_name>_upcoming_events_tomorrow` / `binary_sensor.<kind_name>_anstehende_termine_morgen`
-- `binary_sensor.<child_name>_homework_done` / `binary_sensor.<kind_name>_hausaufgaben_erledigt`
-- `binary_sensor.<kind_name>_vorbereitung_erledigt`: Automatically switches to `on` once all subjects scheduled for the next school day have been checked off in the panel (or programmatically via service). Provides useful attributes like `missing_subjects`, `needed_subjects`, and `target_school_day` for automations.
-- `binary_sensor.<kind_name>_schulzeit`: Stays `on` (`true`) as long as the child is currently in an active school lesson period. Switches to `off` (`false`) during breaks, free periods, before school, after school ends, and on weekends. Exposes rich attributes like `current_subject`, `current_room`, `current_teacher`, `current_slot`, `current_slot_start`, `current_slot_end`, `is_break`, `is_free_period`, `school_finished`, `next_subject`, `next_slot_start`, and more.
+- `binary_sensor.<child_name>_anstehende_termine_morgen`: Turns `on` if exams or appointments are scheduled for the next school day. Exposes attributes such as `event_titles`, `target_day_name`, `message`, and `kind_name` for voice announcements.
+- `binary_sensor.<child_name>_hausaufgaben_erledigt`: Indicates whether homework has been completed for today.
+- `binary_sensor.<child_name>_vorbereitung_erledigt`: Automatically switches to `on` once all subjects scheduled for the next school day have been checked off in the panel (or programmatically via service). Provides useful attributes like `missing_subjects`, `needed_subjects`, and `target_school_day` for automations.
+- `binary_sensor.<child_name>_schulzeit`: Stays `on` (`true`) as long as the child is currently in an active school lesson period. Switches to `off` (`false`) during breaks, free periods, before school, after school ends, and on weekends. Exposes rich attributes like `current_subject`, `current_room`, `current_teacher`, `current_slot`, `current_slot_start`, `current_slot_end`, `is_break`, `is_free_period`, `school_finished`, `next_subject`, `next_slot_start`, and more.
 
 #### 🤖 Example Automations
 
@@ -478,7 +541,34 @@ data:
   preparation_done: true
 ```
 
-##### 2. Notification Reminder for Unfinished Homework
+##### 2. Evening Exam Reminder via Voice Announcement (TTS)
+
+Reminds the child in the evening via smart speaker (e.g. Google Home, Amazon Echo / Alexa or Home Assistant Voice / Piper) about exams and tests scheduled for the next school day:
+
+```yaml
+alias: "School Grades - Exam Voice Announcement for Tomorrow"
+description: "Reminds the child in the evening via smart speaker about upcoming exams/events on the next school day"
+trigger:
+  - platform: time
+    at: "18:00:00"
+condition:
+  - condition: state
+    entity_id: binary_sensor.richard_anstehende_termine_morgen
+    state: "on"
+action:
+  - service: tts.speak
+    target:
+      entity_id: tts.google_en
+    data:
+      media_player_entity_id: media_player.kids_room_speaker
+      message: >-
+        {% set child = state_attr('binary_sensor.richard_anstehende_termine_morgen', 'kind_name') %}
+        {% set day = state_attr('binary_sensor.richard_anstehende_termine_morgen', 'target_day_name') %}
+        {% set events = state_attr('binary_sensor.richard_anstehende_termine_morgen', 'event_titles') %}
+        Attention {{ child }}! On {{ day }} you have: {{ events }}. Please make sure your school supplies are ready!
+```
+
+##### 3. Notification Reminder for Unfinished Homework
 
 ```yaml
 alias: "School Grades - Evening Homework Reminder"
@@ -487,7 +577,7 @@ trigger:
     at: "18:30:00"
 condition:
   - condition: state
-    entity_id: binary_sensor.richard_homework_done
+    entity_id: binary_sensor.richard_hausaufgaben_erledigt
     state: "off"
 action:
   - service: notify.mobile_app_richard
@@ -496,7 +586,7 @@ action:
       message: "You haven't marked your homework as completed today yet!"
 ```
 
-##### 3. Restrict Smartphone Usage During School Lessons (e.g. Google Family Link / Focus Mode)
+##### 4. Restrict Smartphone Usage During School Lessons (e.g. Google Family Link / Focus Mode)
 
 Locks the child's smartphone during active lessons and automatically restores access during breaks or after school:
 
