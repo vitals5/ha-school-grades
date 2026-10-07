@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 import re
 import uuid
-from datetime import date as dt_date, datetime as dt_datetime, timedelta
+from datetime import date as dt_date, datetime as dt_datetime, time as dt_time, timedelta
 from typing import Any
 
 from .const import (
@@ -205,6 +205,117 @@ class SchoolGradesData:
         """Resolve a raw subject abbreviation and return matched index if slash-separated."""
         return resolve_subject_with_index(raw_name, self.subject_aliases, self._subjects)
 
+    def is_substitution_relevant_for_child(
+        self, entry: dict[str, Any], date_str: str | dt_date | None = None
+    ) -> bool:
+        """Check if a substitution entry applies to this child.
+
+        If the substitution is for a subject that the child does not take
+        (e.g., Evangelisch when child only takes Catholic Religion), it returns False.
+        """
+        subj_raw = str(entry.get("subject", "")).strip()
+        subj_res = str(entry.get("subject_resolved", "")).strip()
+        old_subj_raw = str(entry.get("old_subject", "")).strip()
+        old_subj_res = str(entry.get("old_subject_resolved", "")).strip()
+
+        if not subj_res and subj_raw:
+            subj_res = self.resolve_subject(subj_raw)
+        if not old_subj_res and old_subj_raw:
+            old_subj_res = self.resolve_subject(old_subj_raw)
+
+        # If no subject is mentioned at all, it's a general class event/cancellation
+        if not subj_raw and not subj_res and not old_subj_raw and not old_subj_res:
+            return True
+
+        child_subjects = [s.strip().lower() for s in (self._subjects or []) if s.strip()]
+        if not child_subjects:
+            return True
+
+        # Collect raw candidates and expand tokens (e.g. 'Sm Sm', 'Sm (Fb)')
+        base_cands = [s for s in [subj_res, subj_raw, old_subj_res, old_subj_raw] if s]
+        cands: list[str] = []
+        for c in base_cands:
+            if c not in cands:
+                cands.append(c)
+            no_dig = re.sub(r"\d+$", "", c).strip()
+            if no_dig and no_dig not in cands:
+                cands.append(no_dig)
+            toks = [t.strip() for t in re.split(r"[\s\-_–➔>(),/]+", c) if t.strip()]
+            for t in toks:
+                if t not in cands:
+                    cands.append(t)
+                t_no_dig = re.sub(r"\d+$", "", t).strip()
+                if t_no_dig and t_no_dig not in cands:
+                    cands.append(t_no_dig)
+
+        # Religion branch filter: if substitution is specifically for a religion branch
+        # the child does not attend (e.g. single 'Ev' or 'Eth' for Catholic student), reject.
+        # Note: Do not reject slash subjects (e.g. 'Eth/K/Ev') where the child's branch was resolved.
+        if "/" not in subj_raw and "/" not in old_subj_raw:
+            is_ev_subst = any(
+                "evangelisch" in c.lower() or c.lower() in ("ev", "evrel", "er", "evan")
+                for c in cands
+            )
+            is_eth_subst = any(
+                "ethik" in c.lower() or c.lower() in ("eth",)
+                for c in cands
+            )
+            is_kat_subst = any(
+                "katholisch" in c.lower() or c.lower() in ("k", "rk", "kk", "katrel", "kr")
+                for c in cands
+            )
+
+            child_has_ev = any("evangelisch" in cs or cs == "ev" for cs in child_subjects)
+            child_has_eth = any("ethik" in cs or cs == "eth" for cs in child_subjects)
+            child_has_kat = any("katholisch" in cs or "religion" in cs or cs == "k" for cs in child_subjects)
+
+            if is_ev_subst and not child_has_ev:
+                return False
+            if is_eth_subst and not child_has_eth:
+                return False
+            if is_kat_subst and not child_has_kat:
+                return False
+
+        for c in cands:
+            c_l = c.lower()
+            if any(c_l == cs for cs in child_subjects):
+                return True
+
+            # Check if cand is an alias for an enrolled subject
+            for s in self._subjects:
+                s_aliases = list(self.subject_aliases.get(s, []))
+                if not s_aliases:
+                    s_aliases = DEFAULT_SUBJECT_ALIASES.get(s, [])
+                if any(c_l == str(a).strip().lower() for a in s_aliases):
+                    return True
+
+        # Also check timetable: does the child have a scheduled lesson at that slot & weekday?
+        if date_str:
+            target_date = None
+            if isinstance(date_str, dt_date):
+                target_date = date_str
+            else:
+                try:
+                    target_date = dt_date.fromisoformat(str(date_str).split("T")[0])
+                except (ValueError, TypeError):
+                    pass
+            if target_date:
+                w_num = target_date.weekday()
+                day_keys = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+                day_key = day_keys[w_num]
+                lesson_str = str(entry.get("lesson", "")).strip()
+                timetable = self.timetable or {}
+                schedule = timetable.get("schedule", {})
+                for sid, days_map in schedule.items():
+                    slot_match = (sid == f"slot_{lesson_str}" or lesson_str in sid)
+                    if slot_match:
+                        scheduled_cell = days_map.get(day_key, {})
+                        sched_subj = str(scheduled_cell.get("subject", "")).strip().lower()
+                        if sched_subj and any(c.lower() == sched_subj for c in cands):
+                            return True
+
+        return False
+
     def set_portal_substitutions(self, subst_data: dict[str, Any]) -> None:
         """Store substitutions data and resolve subject names in entries."""
         if isinstance(subst_data, dict):
@@ -239,6 +350,9 @@ class SchoolGradesData:
                             if 0 <= matched_idx < len(r_parts):
                                 item["room"] = r_parts[matched_idx]
 
+                    # Check if substitution actually applies to this child
+                    item["applies_to_child"] = self.is_substitution_relevant_for_child(item, d.get("date"))
+
                     resolved_entries.append(item)
                 resolved_days.append({"date": d.get("date"), "entries": resolved_entries})
             self.portal_substitutions = {
@@ -247,8 +361,10 @@ class SchoolGradesData:
                 "days": resolved_days,
             }
 
-    def get_substitutions_for_date(self, target_date: dt_date | str) -> list[dict[str, Any]]:
-        """Return all substitution entries for a given date."""
+    def get_substitutions_for_date(
+        self, target_date: dt_date | str, only_relevant: bool = True
+    ) -> list[dict[str, Any]]:
+        """Return substitution entries for a given date."""
         if not self.portal_substitutions or not isinstance(self.portal_substitutions, dict):
             return []
         date_iso = target_date.isoformat() if hasattr(target_date, "isoformat") else str(target_date).strip()
@@ -259,7 +375,10 @@ class SchoolGradesData:
             return []
         for d in days:
             if isinstance(d, dict) and d.get("date") == date_iso:
-                return list(d.get("entries", []))
+                entries = list(d.get("entries", []))
+                if only_relevant:
+                    return [e for e in entries if e.get("applies_to_child", True)]
+                return entries
         return []
 
     def get_substitution_for_slot(
@@ -329,35 +448,56 @@ class SchoolGradesData:
             return True
         return False
 
-    def get_next_school_day_date(self, ref_date: dt_date | None = None) -> tuple[str, dt_date]:
-        """Return (day_key, target_date) for the next school day.
+    def get_next_school_day_date(
+        self, ref_date: dt_date | None = None, ref_dt: dt_datetime | None = None
+    ) -> tuple[str, dt_date]:
+        """Return (day_key, target_date) for the active preparation school day.
 
-        day_key is one of: monday, tuesday, wednesday, thursday, friday.
+        If today is a school day and we are currently BEFORE school starts
+        (e.g., 00:00 to 08:00), target is TODAY.
+        Once school starts or finishes, target is the NEXT school day.
         """
-        if ref_date is None:
-            ref_date = dt_date.today()
+        if ref_dt is None and ref_date is None:
+            ref_dt = dt_datetime.now()
+            ref_date = ref_dt.date()
+        elif ref_date is not None and ref_dt is None:
+            if ref_date == dt_date.today():
+                ref_dt = dt_datetime.now()
+            else:
+                ref_dt = dt_datetime.combine(ref_date, dt_time(12, 0))
+        elif ref_dt is not None and ref_date is None:
+            ref_date = ref_dt.date()
 
-        w = ref_date.weekday()  # Monday is 0, Sunday is 6
-        if w == 4:  # Friday -> Monday (+3 days)
+        weekday = ref_date.weekday()  # Monday is 0, Sunday is 6
+        day_keys = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+        day_key_today = day_keys[weekday]
+
+        if weekday < 5 and ref_dt is not None:
+            _, status = self.get_current_school_status(ref_dt)
+            if status.get("is_school_day") and status.get("before_school"):
+                return day_key_today, ref_date
+
+        if weekday == 4:  # Friday -> Monday (+3 days)
             days_ahead = 3
             day_key = "monday"
-        elif w == 5:  # Saturday -> Monday (+2 days)
+        elif weekday == 5:  # Saturday -> Monday (+2 days)
             days_ahead = 2
             day_key = "monday"
-        elif w == 6:  # Sunday -> Monday (+1 day)
+        elif weekday == 6:  # Sunday -> Monday (+1 day)
             days_ahead = 1
             day_key = "monday"
         else:  # Monday (0) -> Tue, etc.
-            day_keys = ["monday", "tuesday", "wednesday", "thursday", "friday"]
             days_ahead = 1
-            day_key = day_keys[w + 1]
+            day_key = day_keys[weekday + 1]
 
         target_date = ref_date + timedelta(days=days_ahead)
         return day_key, target_date
 
-    def get_next_school_day_subjects(self, ref_date: dt_date | None = None) -> list[str]:
+    def get_next_school_day_subjects(
+        self, ref_date: dt_date | None = None, ref_dt: dt_datetime | None = None
+    ) -> list[str]:
         """Return unique list of subjects on the timetable for the next school day."""
-        day_key, target_date = self.get_next_school_day_date(ref_date)
+        day_key, target_date = self.get_next_school_day_date(ref_date, ref_dt)
         timetable = self.timetable or {}
         slots = timetable.get("slots", [])
         schedule = timetable.get("schedule", {})
@@ -374,8 +514,8 @@ class SchoolGradesData:
             if subj and subj not in needed:
                 needed.append(subj)
 
-        # Incorporate substitutions for the target date if available
-        substs = self.get_substitutions_for_date(target_date)
+        # Incorporate substitutions for the target date if available (only relevant ones)
+        substs = self.get_substitutions_for_date(target_date, only_relevant=True)
         if substs:
             for e in substs:
                 if not isinstance(e, dict):

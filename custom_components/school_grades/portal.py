@@ -110,6 +110,18 @@ def resolve_subject_with_index(
         if no_digits and no_digits.lower() != c.lower():
             candidates.append(no_digits)
 
+        # 2. Try handling delimited or duplicated tokens (e.g. 'Sm Sm', 'Sm (Fb)', 'Sm - Sp')
+        if any(sep in c for sep in (" ", "-", "–", "➔", "->", "(", ")", ",")):
+            tokens = [w.strip() for w in re.split(r"[\s\-_–➔>(),]+", c) if w.strip()]
+            if tokens:
+                unique_tokens = list(dict.fromkeys(tokens))
+                for tok in unique_tokens:
+                    if tok not in candidates:
+                        candidates.append(tok)
+                    tok_no_digits = re.sub(r"\d+$", "", tok).strip()
+                    if tok_no_digits and tok_no_digits not in candidates:
+                        candidates.append(tok_no_digits)
+
         for cand in candidates:
             cand_l = cand.lower()
 
@@ -148,6 +160,16 @@ def resolve_subject_with_index(
                             if s.lower() == key.lower() or any(s.lower() == str(al).strip().lower() for al in alias_list):
                                 return s
                         return key
+
+            # Fallback to DEFAULT_SUBJECT_ALIASES for enrolled existing subjects
+            # (e.g. Sport when user only customized Religion in aliases YAML)
+            if aliases_dict is not None and existing:
+                for s in existing:
+                    if s in aliases:
+                        continue
+                    def_aliases = DEFAULT_SUBJECT_ALIASES.get(s, [])
+                    if any(cand_l == str(a).strip().lower() for a in def_aliases):
+                        return s
 
             # Prefix match against existing subjects (at least 2 chars)
             if len(cand) >= 2:
@@ -493,7 +515,11 @@ def parse_substitutions(html: str) -> dict[str, Any]:
                 teacher = cells[1].get_text(strip=True)
                 substitute = cells[2].get_text(strip=True)
                 if len(cells) >= 6:
-                    subject = cells[3].get_text(" ", strip=True)
+                    pieces = [t.strip() for t in cells[3].stripped_strings if t.strip()]
+                    if pieces and len(list(dict.fromkeys(pieces))) == 1:
+                        subject = pieces[0]
+                    else:
+                        subject = cells[3].get_text(" ", strip=True)
                     room = cells[4].get_text(strip=True)
                     info = cells[5].get_text(" ", strip=True)
                 else:
@@ -532,7 +558,12 @@ def parse_substitutions(html: str) -> dict[str, Any]:
                 teacher = texts[1]
                 substitute = texts[2]
                 if len(tds) >= 6:
-                    subject = texts[3]
+                    raw_subj = texts[3]
+                    pieces = [t.strip() for t in re.split(r"[\s\n\r]+", raw_subj) if t.strip()]
+                    if pieces and len(list(dict.fromkeys(pieces))) == 1:
+                        subject = pieces[0]
+                    else:
+                        subject = raw_subj
                     room = texts[4]
                     info = texts[5]
                 else:

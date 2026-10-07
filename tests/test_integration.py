@@ -2,7 +2,7 @@ import sys
 import unittest
 import json
 import importlib.util
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 project_root = Path(__file__).parent.parent
@@ -876,6 +876,114 @@ Deutsch:
         self.assertEqual(entries_slash[0]["subject_resolved"], "Religion")
         self.assertEqual(entries_slash[0]["teacher"], "Li")
         self.assertEqual(entries_slash[0]["room"], "853")
+
+    def test_substitution_subject_resolution_and_elective_filtering_and_prep_timing(self):
+        """Test multi-token subject resolution, elective filtering, and prep timing."""
+        # 1. Multi-token resolution ('Sm Sm', 'Sm (Fb)' -> 'Sport')
+        aliases = const_mod.DEFAULT_SUBJECT_ALIASES
+        enrolled = ["Mathematik", "Deutsch", "Religion", "Sport"]
+        self.assertEqual(portal_mod.resolve_subject_name("Sm Sm", aliases, enrolled), "Sport")
+        self.assertEqual(portal_mod.resolve_subject_name("Sm (Fb)", aliases, enrolled), "Sport")
+
+        # 2. HTML deduplication in parse_substitutions
+        html_dup = """
+        <div id="asam_content">
+          <div class="main_center">
+            <div class="list">Mittwoch, 07.10.2026</div>
+            <table class="table-striped">
+              <tr>
+                <td>5</td><td>LehrerA</td><td>VertretungB</td>
+                <td><span>Sm</span> <span>Sm</span></td>
+                <td>TH1</td><td>Vertretung</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+        """
+        parsed_subst = portal_mod.parse_substitutions(html_dup)
+        self.assertTrue(parsed_subst.get("available"))
+        self.assertEqual(parsed_subst["days"][0]["entries"][0]["subject"], "Sm")
+
+        # 3. Elective filtering in SchoolGradesData
+        child = SchoolGradesData("Felix")
+        child._subjects = ["Mathematik", "Deutsch", "Religion", "Sport"]
+        child.subject_aliases = {"Religion": ["Rel", "K"]}
+
+        # Catholic/Religion enrolled: 'K' is relevant, 'Ev' is NOT relevant
+        self.assertTrue(child.is_substitution_relevant_for_child({"subject": "K", "lesson": "3"}))
+        self.assertFalse(child.is_substitution_relevant_for_child({"subject": "Ev", "lesson": "3"}))
+        self.assertFalse(child.is_substitution_relevant_for_child({"subject": "Eth", "lesson": "3"}))
+
+        # Enrolled in Sport: 'Sm' and 'Sm Sm' are relevant
+        self.assertTrue(child.is_substitution_relevant_for_child({"subject": "Sm Sm", "lesson": "5"}))
+        self.assertTrue(child.is_substitution_relevant_for_child({"subject": "Sm", "lesson": "5"}))
+
+        # Not enrolled in Französisch: 'F' is NOT relevant
+        self.assertFalse(child.is_substitution_relevant_for_child({"subject": "F", "lesson": "2"}))
+
+        # Set portal substitutions with both relevant and irrelevant entries
+        subst_bundle = {
+            "days": [
+                {
+                    "date": "2026-10-07",
+                    "entries": [
+                        {"lesson": "3", "subject": "Ev", "kind": "entfall"},
+                        {"lesson": "5", "subject": "Sm Sm", "kind": "vertretung", "substitute": "Hr. Schmidt"},
+                    ]
+                }
+            ]
+        }
+        child.set_portal_substitutions(subst_bundle)
+        # only_relevant=True returns only the Sport entry
+        rel_entries = child.get_substitutions_for_date("2026-10-07", only_relevant=True)
+        self.assertEqual(len(rel_entries), 1)
+        self.assertEqual(rel_entries[0]["subject_resolved"], "Sport")
+        self.assertEqual(rel_entries[0]["substitute"], "Hr. Schmidt")
+
+        # only_relevant=False returns all entries
+        all_entries = child.get_substitutions_for_date("2026-10-07", only_relevant=False)
+        self.assertEqual(len(all_entries), 2)
+
+        # 4. Preparation timing logic (before school vs during school vs after school)
+        child.timetable = {
+            "slots": [
+                {"id": "slot_1", "type": "lesson", "number": "1", "label": "1. Stunde", "start": "08:00", "end": "08:45"},
+                {"id": "slot_2", "type": "lesson", "number": "2", "label": "2. Stunde", "start": "08:45", "end": "09:30"},
+                {"id": "slot_3", "type": "lesson", "number": "3", "label": "3. Stunde", "start": "09:45", "end": "10:30"},
+                {"id": "slot_4", "type": "lesson", "number": "4", "label": "4. Stunde", "start": "10:30", "end": "11:15"},
+                {"id": "slot_5", "type": "lesson", "number": "5", "label": "5. Stunde", "start": "11:30", "end": "12:15"},
+                {"id": "slot_6", "type": "lesson", "number": "6", "label": "6. Stunde", "start": "12:15", "end": "13:00"},
+            ],
+            "schedule": {
+                "slot_1": {"wednesday": {"subject": "Mathematik"}},
+                "slot_2": {"wednesday": {"subject": "Deutsch"}},
+                "slot_3": {"wednesday": {"subject": "Religion"}},
+                "slot_4": {"wednesday": {"subject": "Geschichte"}},
+                "slot_5": {"wednesday": {"subject": "Sport"}},
+                "slot_6": {"wednesday": {"subject": "Sport"}},
+            }
+        }
+
+        # Wednesday 2026-10-07 at 07:15 AM (before school start of 1st lesson):
+        # Must return TODAY (Wednesday)
+        wed_morning = datetime(2026, 10, 7, 7, 15)
+        day_key, target_date = child.get_next_school_day_date(ref_dt=wed_morning)
+        self.assertEqual(day_key, "wednesday")
+        self.assertEqual(target_date, date(2026, 10, 7))
+
+        # Wednesday 2026-10-07 at 14:00 (after school end):
+        # Must advance to tomorrow (Thursday)
+        wed_afternoon = datetime(2026, 10, 7, 14, 0)
+        day_key, target_date = child.get_next_school_day_date(ref_dt=wed_afternoon)
+        self.assertEqual(day_key, "thursday")
+        self.assertEqual(target_date, date(2026, 10, 8))
+
+        # Friday 2026-10-09 at 14:00 (after school):
+        # Must advance to Monday
+        fri_afternoon = datetime(2026, 10, 9, 14, 0)
+        day_key, target_date = child.get_next_school_day_date(ref_dt=fri_afternoon)
+        self.assertEqual(day_key, "monday")
+        self.assertEqual(target_date, date(2026, 10, 12))
 
     def test_convert_portal_lessons_to_timetable(self):
         """Test converting parsed portal lessons into SchoolGrades timetable structure."""

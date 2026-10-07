@@ -263,6 +263,33 @@ const DEFAULT_TIMETABLE = {
   schedule: {},
 };
 
+const DEFAULT_ALIASES_MAP = {
+  "Mathematik": ["m", "ma", "math", "mathe"],
+  "Deutsch": ["d", "de", "deu"],
+  "Englisch": ["e", "en", "eng"],
+  "Latein": ["l", "lat"],
+  "Französisch": ["f", "fr", "frz"],
+  "Spanisch": ["sp", "spa"],
+  "Italienisch": ["it", "ita"],
+  "Biologie": ["b", "bio"],
+  "Physik": ["ph", "phy"],
+  "Chemie": ["c", "ch", "che"],
+  "Geschichte": ["g", "ge", "gesch"],
+  "Geographie": ["geo", "erd", "erdkunde"],
+  "Sozialkunde": ["sk", "soz"],
+  "Wirtschaft und Recht": ["wr", "wire", "wirtschaft"],
+  "Informatik": ["inf", "it"],
+  "Kunst": ["ku", "bk"],
+  "Musik": ["mu"],
+  "Sport": ["sp", "spo", "sm", "sw", "smd", "swd", "out"],
+  "Chor": ["cho"],
+  "Religion": ["rel"],
+  "Ethik": ["eth"],
+  "Evangelische Religion": ["ev", "evrel", "er", "evan", "evangelisch"],
+  "Katholische Religion": ["kk", "rk", "katrel", "kr", "katholisch"],
+  "Natur und Technik": ["nut", "ntg", "nutb", "nutp", "nut_b", "nut_nw"]
+};
+
 const I18N = {
   de: {
     panel_title: "🎓 Schulnoten & Stundenplan",
@@ -276,7 +303,9 @@ const I18N = {
     
     // Prep card
     prep_title: "🎒 Vorbereitung für den nächsten Schultag",
+    prep_title_today: "🎒 Vorbereitung für den heutigen Schultag",
     prep_badge_weekday: "⏰ Morgen auf dem Stundenplan",
+    prep_badge_today: "⚡ Heute auf dem Stundenplan",
     prep_badge_weekend: "📅 Wochenend-Vorbereitung",
     prep_exam_alert: "Achtung! Prüfungen / Klausuren an diesem Tag:",
     prep_empty: "Am {day} stehen laut Stundenplan keine Unterrichtsfächer an!",
@@ -389,6 +418,7 @@ const I18N = {
     portal_last_sync_label: "Letzter Sync:",
     portal_subst_stand: "Vertretungsplan Stand:",
     prep_subst_alert: "Vertretungsplan für nächsten Schultag",
+    prep_subst_alert_today: "Vertretungsplan für heutigen Schultag",
     subst_badge_cancelled: "🚫 Entfällt",
     subst_badge_room: "📍 Raumänderung",
     subst_badge_subst: "🔄 Vertretung",
@@ -447,7 +477,9 @@ const I18N = {
     
     // Prep card
     prep_title: "🎒 Preparation for the Next School Day",
+    prep_title_today: "🎒 Preparation for Today's School Day",
     prep_badge_weekday: "⏰ Tomorrow's Schedule",
+    prep_badge_today: "⚡ Today's Schedule",
     prep_badge_weekend: "📅 Weekend Preparation",
     prep_exam_alert: "Warning! Upcoming exams on this day:",
     prep_empty: "No subjects scheduled for {day} according to the timetable!",
@@ -560,6 +592,7 @@ const I18N = {
     portal_last_sync_label: "Last sync:",
     portal_subst_stand: "Substitutions update:",
     prep_subst_alert: "Substitutions for next school day",
+    prep_subst_alert_today: "Substitutions for today",
     subst_badge_cancelled: "🚫 Cancelled",
     subst_badge_room: "📍 Room change",
     subst_badge_subst: "🔄 Substitution",
@@ -2062,36 +2095,88 @@ class SchoolGradesPanel extends HTMLElement {
   _getNextSchoolDayInfo(timetable, calendarEvents) {
     const now = new Date();
     const currentDay = now.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
-
-    let daysToAdd = 1;
-    let targetDayKey = '';
-
-    if (currentDay === 5) { // Friday -> prepare for Monday
-      daysToAdd = 3;
-      targetDayKey = 'monday';
-    } else if (currentDay === 6) { // Saturday -> prepare for Monday
-      daysToAdd = 2;
-      targetDayKey = 'monday';
-    } else if (currentDay === 0) { // Sunday -> prepare for Monday
-      daysToAdd = 1;
-      targetDayKey = 'monday';
-    } else {
-      const dayKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-      targetDayKey = dayKeys[currentDay + 1];
-      daysToAdd = 1;
-    }
-
-    const dayNames = this._t('days');
-    const targetDayName = dayNames[targetDayKey] || 'Morgen';
-
-    const targetDate = new Date(now.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
-    const dateFormatted = targetDate.toLocaleDateString(this._getLocale(), { weekday: 'long', day: '2-digit', month: '2-digit' });
+    const currentMins = now.getHours() * 60 + now.getMinutes();
 
     const slots = (timetable && timetable.slots) || [];
     const schedule = (timetable && timetable.schedule) || {};
 
-    // Group lesson slots by subject so double periods or multiple periods of the
-    // same subject on the same day form a single consolidated subject preparation card.
+    const dayMap = { 1: 'monday', 2: 'tuesday', 3: 'wednesday', 4: 'thursday', 5: 'friday' };
+    const todayKey = dayMap[currentDay] || '';
+
+    let isToday = false;
+    let isDuringSchool = false;
+    let daysToAdd = 1;
+    let targetDayKey = '';
+
+    // Check school timing for today if it is a school weekday (Monday to Friday)
+    if (todayKey) {
+      let todayFirstStart = null;
+      let todayLastEnd = null;
+
+      for (const slot of slots) {
+        if (slot.type === 'break') continue;
+        const cell = schedule[slot.id] && schedule[slot.id][todayKey];
+        if (cell && cell.subject) {
+          if (slot.start) {
+            const [sh, sm] = slot.start.split(':').map(Number);
+            const sMins = sh * 60 + sm;
+            if (todayFirstStart === null || sMins < todayFirstStart) {
+              todayFirstStart = sMins;
+            }
+          }
+          if (slot.end) {
+            const [eh, em] = slot.end.split(':').map(Number);
+            const eMins = eh * 60 + em;
+            if (todayLastEnd === null || eMins > todayLastEnd) {
+              todayLastEnd = eMins;
+            }
+          }
+        }
+      }
+
+      // Default fallback if no scheduled lessons for today: 08:00 (480) and 13:00 (780)
+      if (todayFirstStart === null) todayFirstStart = 8 * 60;
+      if (todayLastEnd === null) todayLastEnd = 13 * 60;
+
+      if (currentMins < todayFirstStart) {
+        // Morning before school starts (00:00 until 1st lesson):
+        // Show preparation for TODAY
+        isToday = true;
+        isDuringSchool = false;
+        daysToAdd = 0;
+        targetDayKey = todayKey;
+      } else if (currentMins >= todayFirstStart && currentMins < todayLastEnd) {
+        // School is currently active:
+        // Completely hide preparation card
+        isDuringSchool = true;
+      }
+    }
+
+    if (!isToday) {
+      // After school ends or on weekends: prepare for next school day
+      if (currentDay === 5) { // Friday -> Monday (+3 days)
+        daysToAdd = 3;
+        targetDayKey = 'monday';
+      } else if (currentDay === 6) { // Saturday -> Monday (+2 days)
+        daysToAdd = 2;
+        targetDayKey = 'monday';
+      } else if (currentDay === 0) { // Sunday -> Monday (+1 day)
+        daysToAdd = 1;
+        targetDayKey = 'monday';
+      } else { // Monday-Thursday -> next day (+1 day)
+        const dayKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        targetDayKey = dayKeys[currentDay + 1];
+        daysToAdd = 1;
+      }
+    }
+
+    const dayNames = this._t('days');
+    const targetDayName = dayNames[targetDayKey] || (isToday ? 'Heute' : 'Morgen');
+
+    const targetDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + daysToAdd);
+    const dateFormatted = targetDate.toLocaleDateString(this._getLocale(), { weekday: 'long', day: '2-digit', month: '2-digit' });
+
+    // Group lesson slots by subject so double periods form a single card
     const subjectMap = new Map();
     for (const slot of slots) {
       if (slot.type === 'break') continue;
@@ -2171,7 +2256,11 @@ class SchoolGradesPanel extends HTMLElement {
       });
     }
 
-    const targetDateIso = targetDate.toISOString().split('T')[0];
+    const y = targetDate.getFullYear();
+    const m = String(targetDate.getMonth() + 1).padStart(2, '0');
+    const d = String(targetDate.getDate()).padStart(2, '0');
+    const targetDateIso = `${y}-${m}-${d}`;
+
     const matchingExams = (calendarEvents || []).filter(evt => {
       if (!evt.start) return false;
       const evtDateIso = new Date(evt.start).toISOString().split('T')[0];
@@ -2185,7 +2274,9 @@ class SchoolGradesPanel extends HTMLElement {
       targetDateIso: targetDateIso,
       lessons: lessons,
       exams: matchingExams,
-      isWeekend: currentDay === 5 || currentDay === 6 || currentDay === 0,
+      isWeekend: !isToday && (currentDay === 5 || currentDay === 6 || currentDay === 0),
+      isToday: isToday,
+      isDuringSchool: isDuringSchool,
     };
   }
 
@@ -2204,64 +2295,265 @@ class SchoolGradesPanel extends HTMLElement {
     return `${y}-${m}-${d}`;
   }
 
-  _getSubstitution(substitutions, dateIso, slotId, slotNum, subject) {
+  _resolveSubjectName(rawSubj, child) {
+    if (!rawSubj) return '';
+    const clean = String(rawSubj).trim();
+    if (!clean) return '';
+
+    const enrolled = (child && child.subjects && Object.keys(child.subjects)) || [];
+    const directMatch = enrolled.find(s => s.toLowerCase() === clean.toLowerCase());
+    if (directMatch) return directMatch;
+
+    const candidates = [clean];
+    const noDigits = clean.replace(/\d+$/, '').trim();
+    if (noDigits && noDigits !== clean) candidates.push(noDigits);
+    const tokens = clean.split(/[\s\-_–➔>(),]+/).map(t => t.trim()).filter(Boolean);
+    if (tokens.length > 0) {
+      const uniqTokens = Array.from(new Set(tokens));
+      for (const t of uniqTokens) {
+        if (!candidates.includes(t)) candidates.push(t);
+        const tNoDig = t.replace(/\d+$/, '').trim();
+        if (tNoDig && !candidates.includes(tNoDig)) candidates.push(tNoDig);
+      }
+    }
+
+    const childAliases = (child && child.subjectAliases) || {};
+    // 1. Check child-specific aliases first against enrolled subjects
+    for (const cand of candidates) {
+      const candL = cand.toLowerCase();
+      for (const subj of enrolled) {
+        const aList = childAliases[subj] || [];
+        if (aList.some(a => String(a).trim().toLowerCase() === candL)) {
+          return subj;
+        }
+      }
+    }
+
+    // 2. Check DEFAULT_ALIASES_MAP against enrolled subjects
+    for (const cand of candidates) {
+      const candL = cand.toLowerCase();
+      for (const subj of enrolled) {
+        const defAliasList = DEFAULT_ALIASES_MAP[subj] || [];
+        if (defAliasList.some(a => a.toLowerCase() === candL)) {
+          return subj;
+        }
+      }
+    }
+
+    // 3. Check DEFAULT_ALIASES_MAP across all known default subjects
+    for (const cand of candidates) {
+      const candL = cand.toLowerCase();
+      for (const [defSubj, defAliasList] of Object.entries(DEFAULT_ALIASES_MAP)) {
+        if (defSubj.toLowerCase() === candL || defAliasList.some(a => a.toLowerCase() === candL)) {
+          if (defSubj.includes('Religion') && enrolled.some(e => e.toLowerCase() === 'religion')) {
+            const relEnrolled = enrolled.find(e => e.toLowerCase() === 'religion');
+            if (relEnrolled) return relEnrolled;
+          }
+          return defSubj;
+        }
+      }
+    }
+
+    return clean;
+  }
+
+  _isSubstRelevantForChild(s, child, dayKey) {
+    if (!s) return false;
+    if (s.applies_to_child === false) return false;
+    if (s.applies_to_child === true) return true;
+
+    if (!child) return true;
+    const enrolled = Object.keys(child.subjects || {});
+    if (enrolled.length === 0) return true;
+
+    const enrolledLower = enrolled.map(x => x.toLowerCase());
+    const cands = [
+      s.subject_resolved,
+      s.subject,
+      s.old_subject_resolved,
+      s.old_subject,
+    ].filter(Boolean);
+
+    if (cands.length === 0) {
+      return true; // General announcement / cancellation without subject
+    }
+
+    const allCands = [];
+    for (const c of cands) {
+      allCands.push(c);
+      const noDig = c.replace(/\d+$/, '').trim();
+      if (noDig && !allCands.includes(noDig)) allCands.push(noDig);
+      const toks = c.split(/[\s\-_–➔>(),]+/).map(t => t.trim()).filter(Boolean);
+      for (const t of toks) {
+        if (!allCands.includes(t)) allCands.push(t);
+        const tNoDig = t.replace(/\d+$/, '').trim();
+        if (tNoDig && !allCands.includes(tNoDig)) allCands.push(tNoDig);
+      }
+    }
+
+    const childAliases = (child && child.subjectAliases) || {};
+
+    for (const cand of allCands) {
+      const cL = cand.toLowerCase();
+
+      // Check religion branches specifically to prevent Protestant/Catholic/Ethics overlap
+      const isEv = cL.includes('evangelisch') || ['ev', 'evrel', 'er', 'evan'].includes(cL);
+      const isKat = cL.includes('katholisch') || ['k', 'rk', 'kk', 'katrel', 'kr'].includes(cL);
+      const isEth = cL.includes('ethik') || ['eth'].includes(cL);
+
+      if (isEv) {
+        if (enrolledLower.some(cs => cs.includes('evangelisch') || cs === 'ev')) return true;
+        continue;
+      }
+      if (isKat) {
+        if (enrolledLower.some(cs => cs.includes('katholisch') || cs === 'religion' || cs === 'k')) return true;
+        continue;
+      }
+      if (isEth) {
+        if (enrolledLower.some(cs => cs.includes('ethik') || cs === 'eth')) return true;
+        continue;
+      }
+
+      // Direct match
+      if (enrolledLower.includes(cL)) return true;
+
+      // Check child subject aliases
+      for (const subj of enrolled) {
+        const sAliases = (childAliases[subj] || []).concat(DEFAULT_ALIASES_MAP[subj] || []);
+        if (sAliases.some(a => String(a).trim().toLowerCase() === cL)) {
+          return true;
+        }
+      }
+    }
+
+    // Check if slot has a scheduled lesson on timetable for that day matching candidate
+    if (dayKey && child.timetable && child.timetable.schedule) {
+      const lessonNum = String(s.lesson || '').trim();
+      const schedule = child.timetable.schedule;
+      for (const [sid, daysMap] of Object.entries(schedule)) {
+        if (sid === `slot_${lessonNum}` || sid.includes(lessonNum)) {
+          const scheduledCell = daysMap[dayKey];
+          if (scheduledCell && scheduledCell.subject) {
+            const schedSubj = scheduledCell.subject.toLowerCase();
+            if (allCands.some(c => c.toLowerCase() === schedSubj)) return true;
+          }
+        }
+      }
+    }
+
+    return false;
+  }
+
+  _isSubstMatchingSubject(s, lessonSubject, child) {
+    if (!s) return false;
+    if (s.applies_to_child === false) return false;
+
+    const subjStr = String(lessonSubject || '').trim().toLowerCase();
+    if (!subjStr) return false;
+
+    const eSubj = String(s.subject || '').trim();
+    const eSubjRes = String(s.subject_resolved || '').trim();
+    const eOldSubj = String(s.old_subject || '').trim();
+    const eOldSubjRes = String(s.old_subject_resolved || '').trim();
+
+    // If substitution entry has no subject at all, it's a general announcement/cancellation for this lesson slot
+    if (!eSubj && !eSubjRes && !eOldSubj && !eOldSubjRes) {
+      return true;
+    }
+
+    const cands = [eSubjRes, eSubj, eOldSubjRes, eOldSubj].filter(Boolean);
+    const allCands = [];
+    for (const c of cands) {
+      allCands.push(c);
+      const noDig = c.replace(/\d+$/, '').trim();
+      if (noDig && !allCands.includes(noDig)) allCands.push(noDig);
+      const toks = c.split(/[\s\-_–➔>(),]+/).map(t => t.trim()).filter(Boolean);
+      for (const t of toks) {
+        if (!allCands.includes(t)) allCands.push(t);
+        const tNoDig = t.replace(/\d+$/, '').trim();
+        if (tNoDig && !allCands.includes(tNoDig)) allCands.push(tNoDig);
+      }
+    }
+
+    const subjBase = subjStr.replace(/\d+$/, '').trim();
+
+    // Check Religion / branch compatibility
+    const isLessonKatOrRel = subjStr.includes('religion') || subjStr.includes('katholisch') || subjStr === 'k';
+    const isLessonEv = subjStr.includes('evangelisch') || subjStr === 'ev';
+    const isLessonEth = subjStr.includes('ethik') || subjStr === 'eth';
+
+    for (const cand of allCands) {
+      const cL = cand.toLowerCase();
+      const cBase = cL.replace(/\d+$/, '').trim();
+
+      // Check religion conflicts
+      if (isLessonKatOrRel) {
+        if (cL.includes('evangelisch') || ['ev', 'evrel', 'er'].includes(cL)) return false;
+        if (cL.includes('ethik') || cL === 'eth') return false;
+        if (cL.includes('katholisch') || ['k', 'rk', 'kk', 'katrel', 'kr', 'rel', 'religion'].includes(cL)) return true;
+      } else if (isLessonEv) {
+        if (cL.includes('katholisch') || ['k', 'rk', 'kk'].includes(cL)) return false;
+        if (cL.includes('ethik') || cL === 'eth') return false;
+        if (cL.includes('evangelisch') || ['ev', 'evrel', 'er', 'rel', 'religion'].includes(cL)) return true;
+      } else if (isLessonEth) {
+        if (cL.includes('katholisch') || cL.includes('evangelisch')) return false;
+        if (cL.includes('ethik') || cL === 'eth') return true;
+      }
+
+      // Direct match
+      if (cL === subjStr || (cBase && subjBase && cBase === subjBase)) {
+        return true;
+      }
+
+      // Child aliases & default aliases for this lesson subject
+      const childAliases = (child && child.subjectAliases) || {};
+      const actualSubjectKey = Object.keys(childAliases).find(k => k.toLowerCase() === subjStr) ||
+                               Object.keys(DEFAULT_ALIASES_MAP).find(k => k.toLowerCase() === subjStr);
+      const aliasesList = (actualSubjectKey ? (childAliases[actualSubjectKey] || []) : [])
+        .concat(actualSubjectKey ? (DEFAULT_ALIASES_MAP[actualSubjectKey] || []) : []);
+
+      if (aliasesList.some(a => String(a).trim().toLowerCase() === cL || String(a).trim().toLowerCase() === cBase)) {
+        return true;
+      }
+
+      // Slash-separated electives (e.g. Mu/Cho or Eth/K/Ev on timetable cell)
+      if (subjStr.includes('/')) {
+        const parts = subjStr.split('/').map(p => p.trim().toLowerCase()).filter(Boolean);
+        for (const p of parts) {
+          const pBase = p.replace(/\d+$/, '').trim();
+          if (p === cL || (pBase && cBase && pBase === cBase)) return true;
+          for (const [k, alist] of Object.entries(DEFAULT_ALIASES_MAP)) {
+            if (alist.includes(p) && (alist.includes(cL) || k.toLowerCase() === cL)) {
+              return true;
+            }
+          }
+        }
+      }
+    }
+
+    return false;
+  }
+
+  _getSubstitution(substitutions, dateIso, slotId, slotNum, subject, child) {
     if (!substitutions || !Array.isArray(substitutions.days) || !dateIso) return null;
     const dayObj = substitutions.days.find(d => d.date === dateIso);
     if (!dayObj || !Array.isArray(dayObj.entries)) return null;
 
     // A substitution only matches if the timetable cell actually has a scheduled subject
-    const subjStr = String(subject || '').trim().toLowerCase();
+    const subjStr = String(subject || '').trim();
     if (!subjStr) return null;
 
     const numStr = String(slotNum || slotId || '').replace(/^slot_/, '').trim();
     for (const e of dayObj.entries) {
+      if (e.applies_to_child === false) continue;
+
       const eLesson = String(e.lesson || '').trim();
       const digits = eLesson.match(/\d+/g) || [];
       const lessonMatches = (eLesson === numStr) || digits.includes(numStr);
       if (!lessonMatches) continue;
 
-      const eSubj = String(e.subject || '').trim().toLowerCase();
-      const eSubjRes = String(e.subject_resolved || '').trim().toLowerCase();
-      const eOldSubj = String(e.old_subject || '').trim().toLowerCase();
-      const eOldSubjRes = String(e.old_subject_resolved || '').trim().toLowerCase();
-
-      // If substitution entry has no subject at all, it's a general cancellation/substitution for this lesson
-      if (!eSubj && !eSubjRes && !eOldSubj && !eOldSubjRes) {
+      if (this._isSubstMatchingSubject(e, subject, child)) {
         return e;
-      }
-
-      // Exact match with subject or resolved subject
-      if (
-        eSubj === subjStr ||
-        eSubjRes === subjStr ||
-        eOldSubj === subjStr ||
-        eOldSubjRes === subjStr
-      ) {
-        return e;
-      }
-
-      // Check base names without trailing numbers (e.g. L1 vs L)
-      const subjBase = subjStr.replace(/\d+$/, '').trim();
-      const eSubjBase = eSubj.replace(/\d+$/, '').trim();
-      if (subjBase && eSubjBase && subjBase === eSubjBase) {
-        return e;
-      }
-
-      // Handle slash-separated electives (e.g. Mu/Cho or Eth/K/Ev)
-      if (subjStr.includes('/')) {
-        const parts = subjStr.split('/').map(p => p.trim()).filter(Boolean);
-        for (const p of parts) {
-          const pBase = p.replace(/\d+$/, '').trim();
-          if (
-            p === eSubj ||
-            p === eSubjRes ||
-            p === eOldSubj ||
-            p === eOldSubjRes ||
-            (pBase && eSubjBase && pBase === eSubjBase)
-          ) {
-            return e;
-          }
-        }
       }
     }
     return null;
@@ -2642,15 +2934,16 @@ Natur und Technik:
         <!-- Preparation Card for Next School Day (Interactive Clickable Subjects) -->
         ${secVis.show_prep_card ? (() => {
           const nextDay = this._getNextSchoolDayInfo(timetable, upcomingEvents);
+          if (nextDay.isDuringSchool) return '';
           return `
             <div class="card prep-card" style="margin-bottom: 24px;">
               <div class="prep-header">
                 <div class="prep-title-group">
-                  <h3>${this._t('prep_title')}</h3>
+                  <h3>${nextDay.isToday ? this._t('prep_title_today') : this._t('prep_title')}</h3>
                   <span class="prep-subtitle">${nextDay.dateFormatted}</span>
                 </div>
-                <span class="prep-badge ${nextDay.isWeekend ? 'weekend' : 'weekday'}">
-                  ${nextDay.isWeekend ? this._t('prep_badge_weekend') : this._t('prep_badge_weekday')}
+                <span class="prep-badge ${nextDay.isToday ? 'today' : (nextDay.isWeekend ? 'weekend' : 'weekday')}">
+                  ${nextDay.isToday ? this._t('prep_badge_today') : (nextDay.isWeekend ? this._t('prep_badge_weekend') : this._t('prep_badge_weekday'))}
                 </span>
               </div>
 
@@ -2669,20 +2962,22 @@ Natur und Technik:
               ${(() => {
                 const substDays = (currentChild && currentChild.portalSubstitutions && currentChild.portalSubstitutions.days) || [];
                 const nextDaySubst = substDays.find(d => d.date === nextDay.targetDateIso);
-                const entries = (nextDaySubst && nextDaySubst.entries) || [];
+                const rawEntries = (nextDaySubst && nextDaySubst.entries) || [];
+                const entries = rawEntries.filter(s => this._isSubstRelevantForChild(s, currentChild, nextDay.dayKey));
                 if (entries.length === 0) return '';
                 return `
                   <div class="prep-subst-alert" style="background: rgba(249, 115, 22, 0.12); border: 1px solid rgba(249, 115, 22, 0.35); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; display: flex; align-items: flex-start; gap: 10px;">
                     <span style="font-size: 18px;">🔄</span>
                     <div>
-                      <strong style="color: #fdba74; font-size: 13px;">${this._t('prep_subst_alert')} (${nextDay.dateFormatted}):</strong>
+                      <strong style="color: #fdba74; font-size: 13px;">${nextDay.isToday ? this._t('prep_subst_alert_today') : this._t('prep_subst_alert')} (${nextDay.dateFormatted}):</strong>
                       <div style="font-size: 12px; color: #fff; margin-top: 4px; display: flex; flex-direction: column; gap: 3px;">
                         ${entries.map(s => {
                           const kindText = s.kind === 'entfall' ? this._t('subst_badge_cancelled') : (s.kind === 'raum' ? this._t('subst_badge_room') : this._t('subst_badge_subst'));
                           const infoDetail = s.info ? ` (${s.info})` : '';
                           const roomDetail = s.room ? ` in ${s.room}` : '';
                           const teacherDetail = s.substitute ? ` durch ${s.substitute}` : '';
-                          return `<div>• <b>${s.lesson}. Std:</b> ${s.subject_resolved || s.subject} — <span style="font-weight:600;">${kindText}</span>${teacherDetail}${roomDetail}${infoDetail}</div>`;
+                          const displaySubj = this._resolveSubjectName(s.subject_resolved || s.subject, currentChild) || s.subject;
+                          return `<div>• <b>${s.lesson}. Std:</b> ${displaySubj} — <span style="font-weight:600;">${kindText}</span>${teacherDetail}${roomDetail}${infoDetail}</div>`;
                         }).join('')}
                       </div>
                     </div>
@@ -2701,7 +2996,10 @@ Natur und Technik:
                       const substDays = (currentChild && currentChild.portalSubstitutions && currentChild.portalSubstitutions.days) || [];
                       const nextDaySubst = substDays.find(d => d.date === nextDay.targetDateIso);
                       const nextEntries = (nextDaySubst && nextDaySubst.entries) || [];
-                      const matchingSubst = nextEntries.find(s => (s.subject_resolved === l.subject || s.subject === l.subject));
+                      const matchingSubst = nextEntries.find(s =>
+                        this._isSubstRelevantForChild(s, currentChild, nextDay.dayKey) &&
+                        this._isSubstMatchingSubject(s, l.subject, currentChild)
+                      );
                       const isCancelled = matchingSubst && matchingSubst.kind === 'entfall';
 
                       const isExamSubject = nextDay.exams.some(e =>
@@ -2721,7 +3019,7 @@ Natur und Technik:
                           <div class="prep-subject-name" style="display: flex; align-items: center; justify-content: space-between;">
                             <span style="${isCancelled ? 'text-decoration: line-through;' : ''}">${l.subject}</span>
                             <div style="display: flex; align-items: center; gap: 4px;">
-                              ${isCancelled ? `<span style="font-size: 10px; font-weight: 700; background: rgba(239,68,68,0.25); color: #fca5a5; border: 1px solid rgba(239,68,68,0.4); border-radius: 4px; padding: 1px 5px;">${this._t('subst_badge_cancelled')}</span>` : ''}
+                              ${isCancelled ? `<span style="font-size: 10px; font-weight: 700; background: rgba(239,68,68,0.25); color: #fca5a5; border: 1px solid rgba(239,68,68,0.4); border-radius: 4px; padding: 1px 5px;">${this._t('subst_badge_cancelled')}</span>` : (matchingSubst && matchingSubst.kind === 'vertretung' ? `<span style="font-size: 10px; font-weight: 700; background: rgba(59,130,246,0.25); color: #93c5fd; border: 1px solid rgba(59,130,246,0.4); border-radius: 4px; padding: 1px 5px;">${this._t('subst_badge_subst')}</span>` : (matchingSubst && matchingSubst.kind === 'raum' ? `<span style="font-size: 10px; font-weight: 700; background: rgba(234,179,8,0.25); color: #fde047; border: 1px solid rgba(234,179,8,0.4); border-radius: 4px; padding: 1px 5px;">${this._t('subst_badge_room')}</span>` : ''))}
                               <span class="prep-check-icon" style="color: #22c55e; font-size: 16px; font-weight: bold; ${isPrepared ? 'display: inline;' : 'display: none;'}">✓</span>
                             </div>
                           </div>
@@ -2908,11 +3206,11 @@ Natur und Technik:
                           const isToday = this._isToday(d.key);
                           const hasSubject = !!cellData.subject;
                           const colDateIso = this._getDateForDayKey(d.key);
-                          const subst = (currentChild && currentChild.portalSubstitutions) ? this._getSubstitution(currentChild.portalSubstitutions, colDateIso, slot.id, slot.number, cellData.subject) : null;
+                          const subst = (currentChild && currentChild.portalSubstitutions) ? this._getSubstitution(currentChild.portalSubstitutions, colDateIso, slot.id, slot.number, cellData.subject, currentChild) : null;
                           const isEntfall = subst && subst.kind === 'entfall';
                           const isRaum = subst && subst.kind === 'raum';
                           const isVertretung = subst && subst.kind === 'vertretung';
-                          const displaySubject = subst ? (subst.subject_resolved || subst.subject || cellData.subject) : cellData.subject;
+                          const displaySubject = subst ? (this._resolveSubjectName(subst.subject_resolved || subst.subject, currentChild) || cellData.subject) : cellData.subject;
                           const displayRoom = subst && subst.room ? subst.room : cellData.room;
                           const displayTeacher = subst && subst.substitute ? subst.substitute : (subst && subst.teacher ? subst.teacher : cellData.teacher);
 
@@ -4991,6 +5289,12 @@ Natur und Technik:
         padding: 4px 10px;
         border-radius: 8px;
         text-transform: uppercase;
+      }
+
+      .prep-badge.today {
+        background: rgba(16, 185, 129, 0.2);
+        color: #6ee7b7;
+        border: 1px solid rgba(16, 185, 129, 0.35);
       }
 
       .prep-badge.weekday {
