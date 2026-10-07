@@ -405,6 +405,8 @@ const I18N = {
     portal_sync_tt_help: "Nicht empfohlen bei manuellen Stundenplan-Anpassungen. Der Stundenplan kann gezielt über den Button 'Stundenplan importieren' aktualisiert werden.",
     portal_sync_subst: "Vertretungsplan abgleichen (Ausfälle & Raumänderungen)",
     portal_sync_exams: "Klausuren & Termine abgleichen",
+    portal_ignore_info_label: "Info-Termine ('event-info') ausschließen",
+    portal_ignore_info_help: "Allgemeine Info-Termine ('event-info') der Schule ignorieren und nur Klausuren/wichtige Termine importieren.",
     portal_sync_now_btn: "🔄 Jetzt synchronisieren",
     portal_import_tt_btn: "📅 Stundenplan importieren",
     portal_import_exams_btn: "📝 Klausuren importieren",
@@ -583,6 +585,8 @@ const I18N = {
     portal_sync_tt_help: "Not recommended if you customized your timetable. You can import on demand using the 'Import Timetable' button below.",
     portal_sync_subst: "Sync substitutions (cancellations & changes)",
     portal_sync_exams: "Sync exams & appointments",
+    portal_ignore_info_label: "Exclude general info events ('event-info')",
+    portal_ignore_info_help: "Ignore general school info notices ('event-info') and only import exams and important appointments.",
     portal_sync_now_btn: "🔄 Sync Now",
     portal_import_tt_btn: "📅 Import Timetable",
     portal_import_exams_btn: "📝 Import Exams",
@@ -1614,6 +1618,7 @@ class SchoolGradesPanel extends HTMLElement {
     this._settingsTab = 'general';
     this._showAddGradeCard = false;
     this._showAddEventCard = false;
+    this._showAddEventModal = false;
     this._editingEvent = null;
     this._localPreparedSubjects = {}; // { [childName]: { [subject]: boolean } }
     this._localPreparationDone = {}; // { [childName]: boolean }
@@ -1675,6 +1680,16 @@ class SchoolGradesPanel extends HTMLElement {
     return localeMap[langKey] || 'de-DE';
   }
 
+  _escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
   _hasGradesDataChanged(oldHass, newHass) {
     if (!oldHass || !newHass) return true;
     if (oldHass.states !== newHass.states) {
@@ -1732,6 +1747,7 @@ class SchoolGradesPanel extends HTMLElement {
           portalSyncTimetable: true,
           portalSyncSubstitutions: true,
           portalSyncExams: true,
+          portalIgnoreInfoEvents: false,
           portalLastSync: '',
           portalLastStatus: '',
           subjectAliases: {},
@@ -1766,6 +1782,9 @@ class SchoolGradesPanel extends HTMLElement {
       }
       if (attrs.portal_sync_exams !== undefined) {
         children[kindName].portalSyncExams = Boolean(attrs.portal_sync_exams);
+      }
+      if (attrs.portal_ignore_info_events !== undefined) {
+        children[kindName].portalIgnoreInfoEvents = Boolean(attrs.portal_ignore_info_events);
       }
       if (attrs.portal_last_sync !== undefined) {
         children[kindName].portalLastSync = String(attrs.portal_last_sync || '');
@@ -2097,7 +2116,14 @@ class SchoolGradesPanel extends HTMLElement {
       }).filter(evt => evt.start);
 
       // Merge Eltern-Portal appointments if available
-      const portalAppts = (childData && childData.portalAppointments) || [];
+      let portalAppts = (childData && childData.portalAppointments) || [];
+      if (childData && childData.portalIgnoreInfoEvents) {
+        portalAppts = portalAppts.filter(apt => {
+          if (apt.is_exam) return true;
+          const c = String(apt.class || apt.className || apt.class_name || '').toLowerCase();
+          return !c.includes('info') && c !== 'event-info';
+        });
+      }
       for (const apt of portalAppts) {
         if (!apt || (!apt.start && !apt.date)) continue;
         const aptDateStr = (apt.date || (typeof apt.start === 'string' ? apt.start : '') || '').split('T')[0];
@@ -2143,9 +2169,21 @@ class SchoolGradesPanel extends HTMLElement {
       }
 
       // Filter out events in the past and sort chronologically
-      parsedEvents.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+      const todayStartMs = now.getTime();
+      const upcomingFiltered = parsedEvents.filter(evt => {
+        const val = evt.end || evt.start;
+        if (!val) return false;
+        if (typeof val === 'string' && val.length === 10) {
+          const d = new Date(val + 'T23:59:59');
+          return d.getTime() >= todayStartMs;
+        }
+        const d = new Date(val);
+        return d.getTime() >= todayStartMs;
+      });
 
-      this._calendarEvents[childName] = parsedEvents;
+      upcomingFiltered.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+
+      this._calendarEvents[childName] = upcomingFiltered;
     }
 
     this.render();
@@ -3111,53 +3149,11 @@ Natur und Technik:
                 ` : ''}
                 ${currentChild && currentChild.calendarEntity ? `
                   <button class="pill-btn add-event-toggle-btn" id="toggle-add-event-btn" style="padding: 6px 14px; font-size: 13px; font-weight: 600; background: linear-gradient(135deg, #10b981, #059669); color: #fff; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35); transition: all 0.2s ease;">
-                    ${this._showAddEventCard ? this._t('close_add_grade_btn') : this._t('add_event_btn')}
+                    ${this._t('add_event_btn')}
                   </button>
                 ` : ''}
               </div>
             </div>
-
-            ${this._showAddEventCard ? `
-              <div class="add-event-form-container" style="background: rgba(0, 0, 0, 0.25); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); border-radius: 12px; padding: 16px; margin: 16px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-                  <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: #fff;">
-                    ${this._editingEvent ? this._t('edit_event_title') : this._t('add_event_title')}
-                  </h4>
-                  <button type="button" id="close-add-event-x" style="background: none; border: none; color: rgba(255,255,255,0.6); cursor: pointer; font-size: 16px; padding: 4px;">✖</button>
-                </div>
-                <form id="add-event-form">
-                  <div class="form-group" style="margin-bottom: 12px;">
-                    <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: #fff;">${this._t('event_summary_label')}</label>
-                    <input type="text" id="event-summary-input" required value="${this._editingEvent ? this._editingEvent.summary : ''}" placeholder="${this._t('event_summary_placeholder')}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 13px; box-sizing: border-box;">
-                  </div>
-                  <div class="form-row" style="display: flex; gap: 12px; margin-bottom: 12px;">
-                    <div class="form-group half" style="flex: 1;">
-                      <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: #fff;">${this._t('event_date_label')}</label>
-                      <input type="date" id="event-date-input" required value="${this._editingEvent ? this._editingEvent.date : new Date().toISOString().split('T')[0]}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 13px; box-sizing: border-box;">
-                    </div>
-                    <div class="form-group half" style="flex: 1;">
-                      <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: #fff;">${this._t('event_time_label')}</label>
-                      <input type="time" id="event-time-input" required value="${this._editingEvent ? this._editingEvent.time : '08:00'}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 13px; box-sizing: border-box;">
-                    </div>
-                  </div>
-                  <div class="form-group" style="margin-bottom: 16px;">
-                    <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: #fff;">${this._t('event_desc_label')}</label>
-                    <input type="text" id="event-desc-input" value="${this._editingEvent ? (this._editingEvent.description || '') : ''}" placeholder="${this._t('event_desc_placeholder')}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 13px; box-sizing: border-box;">
-                  </div>
-                  <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
-                    ${this._editingEvent ? `
-                      <button type="button" class="delete-btn" id="delete-event-btn" style="padding: 8px 16px; font-size: 13px;">${this._t('delete_event_btn')}</button>
-                    ` : `<div></div>`}
-                    <div style="display: flex; gap: 10px;">
-                      <button type="button" class="submit-btn secondary" id="cancel-add-event-btn" style="width: auto; padding: 8px 16px; font-size: 13px;">${this._t('cancel_btn')}</button>
-                      <button type="submit" class="submit-btn" style="width: auto; padding: 8px 18px; font-size: 13px; background: linear-gradient(135deg, #10b981, #059669); color: #fff; border: none; border-radius: 8px; cursor: pointer;">
-                        ${this._editingEvent ? this._t('submit_update_event') : this._t('submit_add_event')}
-                      </button>
-                    </div>
-                  </div>
-                </form>
-              </div>
-            ` : ''}
 
             <div class="events-list">
               ${!currentChild || (!currentChild.calendarEntity && upcomingEvents.length === 0) ? `
@@ -3193,7 +3189,7 @@ Natur und Technik:
                     }
 
                     return `
-                      <div class="event-item clickable-event" data-uid="${evt.uid || ''}" data-summary="${evt.summary || ''}" data-start="${evt.start || ''}" data-desc="${evt.description || ''}" style="cursor: pointer; ${borderStyle}" title="${this._t('edit_event_title')}">
+                      <div class="event-item clickable-event" data-uid="${evt.uid || ''}" data-summary="${this._escapeHtml(evt.summary || '')}" data-start="${evt.start || ''}" data-desc="${this._escapeHtml(evt.description || '')}" data-subject="${this._escapeHtml(evt.subject || '')}" data-is-portal="${evt.isPortal ? '1' : '0'}" data-is-exam="${evt.isExam ? '1' : '0'}" style="cursor: pointer; ${borderStyle}" title="${this._t('edit_event_title')}">
                         <div class="event-badge-row" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                           <span class="event-countdown ${countdownText.cls}">${countdownText.text}</span>
                           <span class="event-time">${formattedDate} ${!isAllDay ? this._t('time_at', { time: formattedTime }) : this._t('all_day')}</span>
@@ -3446,6 +3442,57 @@ Natur und Technik:
           </div>
         ` : ''}
       </div>
+
+      <!-- Calendar Event Edit / Add Modal -->
+      ${this._showAddEventModal ? `
+        <div class="modal-backdrop" id="event-modal-backdrop">
+          <div class="modal-card event-modal-card" style="max-width: 520px; width: 100%;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <div>
+                <h3 style="margin: 0; font-size: 18px;">${this._editingEvent ? this._t('edit_event_title') : this._t('add_event_title')}</h3>
+                <div style="display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap;">
+                  ${this._editingEvent && this._editingEvent.isExam ? `<span style="background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 600;">📝 ${this._t('portal_exam_badge')}</span>` : ''}
+                  ${this._editingEvent && this._editingEvent.isPortal ? `<span style="background: rgba(59, 130, 246, 0.2); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 600;">🏫 Portal</span>` : ''}
+                  ${this._editingEvent && this._editingEvent.subject ? `<span style="background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 600;">📚 ${this._escapeHtml(this._editingEvent.subject)}</span>` : ''}
+                </div>
+              </div>
+              <button class="icon-btn" id="close-event-modal-x" style="font-size: 20px; border: none; background: none; color: #fff; cursor: pointer; padding: 4px 8px;">✖</button>
+            </div>
+
+            <form id="add-event-form">
+              <div class="form-group" style="margin-bottom: 12px;">
+                <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: #fff;">${this._t('event_summary_label')}</label>
+                <input type="text" id="event-summary-input" required value="${this._escapeHtml(this._editingEvent ? this._editingEvent.summary : '')}" placeholder="${this._t('event_summary_placeholder')}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 13px; box-sizing: border-box;">
+              </div>
+              <div class="form-row" style="display: flex; gap: 12px; margin-bottom: 12px;">
+                <div class="form-group half" style="flex: 1;">
+                  <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: #fff;">${this._t('event_date_label')}</label>
+                  <input type="date" id="event-date-input" required value="${this._editingEvent ? this._editingEvent.date : new Date().toISOString().split('T')[0]}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 13px; box-sizing: border-box;">
+                </div>
+                <div class="form-group half" style="flex: 1;">
+                  <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: #fff;">${this._t('event_time_label')}</label>
+                  <input type="time" id="event-time-input" required value="${this._editingEvent ? this._editingEvent.time : '08:00'}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 13px; box-sizing: border-box;">
+                </div>
+              </div>
+              <div class="form-group" style="margin-bottom: 16px;">
+                <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: #fff;">${this._t('event_desc_label')}</label>
+                <input type="text" id="event-desc-input" value="${this._escapeHtml(this._editingEvent ? (this._editingEvent.description || '') : '')}" placeholder="${this._t('event_desc_placeholder')}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 13px; box-sizing: border-box;">
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 20px;">
+                ${this._editingEvent ? `
+                  <button type="button" class="delete-btn" id="delete-event-btn" style="padding: 8px 16px; font-size: 13px;">${this._t('delete_event_btn')}</button>
+                ` : `<div></div>`}
+                <div style="display: flex; gap: 10px;">
+                  <button type="button" class="submit-btn secondary" id="cancel-add-event-btn" style="width: auto; padding: 8px 16px; font-size: 13px;">${this._t('cancel_btn')}</button>
+                  <button type="submit" class="submit-btn" style="width: auto; padding: 8px 18px; font-size: 13px; background: linear-gradient(135deg, #10b981, #059669); color: #fff; border: none; border-radius: 8px; cursor: pointer;">
+                    ${this._editingEvent ? this._t('submit_update_event') : this._t('submit_add_event')}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      ` : ''}
 
       <!-- Timetable Edit Modal -->
       ${this._editingCell ? `
@@ -3725,6 +3772,13 @@ Natur und Technik:
                         <input type="checkbox" id="settings-portal-sync-exams" ${currentChild.portalSyncExams ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: #3b82f6; cursor: pointer;">
                         <span>📝 ${this._t('portal_sync_exams')}</span>
                       </label>
+                      <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13px;">
+                        <input type="checkbox" id="settings-portal-ignore-info" ${currentChild.portalIgnoreInfoEvents ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: #3b82f6; cursor: pointer;">
+                        <span>🚫 ${this._t('portal_ignore_info_label')}</span>
+                      </label>
+                      <div style="font-size: 11px; color: rgba(255,255,255,0.5); margin-left: 26px; margin-top: -4px; margin-bottom: 4px; line-height: 1.3;">
+                        ${this._t('portal_ignore_info_help')}
+                      </div>
                     </div>
                   </div>
 
@@ -4547,6 +4601,7 @@ Natur und Technik:
           const syncTt = root.querySelector('#settings-portal-sync-tt')?.checked ?? true;
           const syncSubst = root.querySelector('#settings-portal-sync-subst')?.checked ?? true;
           const syncExams = root.querySelector('#settings-portal-sync-exams')?.checked ?? true;
+          const ignoreInfo = root.querySelector('#settings-portal-ignore-info')?.checked ?? false;
           const copySib = this._portalCopySibling;
 
           // Also save subject aliases textarea if present before closing modal
@@ -4589,6 +4644,7 @@ Natur und Technik:
               portal_sync_timetable: syncTt,
               portal_sync_substitutions: syncSubst,
               portal_sync_exams: syncExams,
+              portal_ignore_info_events: ignoreInfo,
             };
             if (copySib) {
               payload.copy_sibling_name = copySib;
@@ -4697,7 +4753,7 @@ Natur und Technik:
             });
             this._portalImportingExams = false;
             if (res && res.success) {
-              await this._fetchCalendarEvents();
+              await this._fetchUpcomingCalendarEvents();
               const calText = res.synced_to_calendar ? ' (in Kalender eingetragen)' : '';
               this._portalSyncFeedback = `✅ ${this._t('portal_exams_synced')}${calText}`;
             } else {
@@ -4766,7 +4822,7 @@ Natur und Technik:
           });
           this._portalImportingExams = false;
           if (res && res.success) {
-            await this._fetchCalendarEvents();
+            await this._fetchUpcomingCalendarEvents();
             const calText = res.synced_to_calendar ? ' (inkl. Kalender)' : '';
             alert(`✅ ${this._t('portal_exams_synced')}${calText}`);
           } else {
@@ -4780,25 +4836,20 @@ Natur und Technik:
       });
     }
 
-    // Toggle Add Calendar Event Form
+    // Open Add Calendar Event Modal
     const toggleAddEventBtn = root.querySelector('#toggle-add-event-btn');
     if (toggleAddEventBtn) {
       toggleAddEventBtn.addEventListener('click', () => {
-        if (this._showAddEventCard) {
-          this._showAddEventCard = false;
-          this._editingEvent = null;
-        } else {
-          this._editingEvent = null;
-          this._showAddEventCard = true;
-        }
+        this._editingEvent = null;
+        this._showAddEventModal = true;
         this.render();
       });
     }
 
-    const closeAddEventX = root.querySelector('#close-add-event-x');
-    if (closeAddEventX) {
-      closeAddEventX.addEventListener('click', () => {
-        this._showAddEventCard = false;
+    const closeEventModalX = root.querySelector('#close-event-modal-x') || root.querySelector('#close-add-event-x');
+    if (closeEventModalX) {
+      closeEventModalX.addEventListener('click', () => {
+        this._showAddEventModal = false;
         this._editingEvent = null;
         this.render();
       });
@@ -4807,9 +4858,20 @@ Natur und Technik:
     const cancelAddEventBtn = root.querySelector('#cancel-add-event-btn');
     if (cancelAddEventBtn) {
       cancelAddEventBtn.addEventListener('click', () => {
-        this._showAddEventCard = false;
+        this._showAddEventModal = false;
         this._editingEvent = null;
         this.render();
+      });
+    }
+
+    const eventBackdrop = root.querySelector('#event-modal-backdrop');
+    if (eventBackdrop) {
+      eventBackdrop.addEventListener('click', (e) => {
+        if (e.target === eventBackdrop) {
+          this._showAddEventModal = false;
+          this._editingEvent = null;
+          this.render();
+        }
       });
     }
 
@@ -4820,6 +4882,9 @@ Natur und Technik:
         const summary = e.currentTarget.dataset.summary || '';
         const startIso = e.currentTarget.dataset.start || '';
         const description = e.currentTarget.dataset.desc || '';
+        const subject = e.currentTarget.dataset.subject || '';
+        const isPortal = e.currentTarget.dataset.isPortal === '1';
+        const isExam = e.currentTarget.dataset.isExam === '1';
 
         let dateStr = new Date().toISOString().split('T')[0];
         let timeStr = '08:00';
@@ -4842,8 +4907,11 @@ Natur und Technik:
           date: dateStr,
           time: timeStr,
           description: description,
+          subject: subject,
+          isPortal: isPortal,
+          isExam: isExam,
         };
-        this._showAddEventCard = true;
+        this._showAddEventModal = true;
         this.render();
       });
     });
@@ -4866,6 +4934,7 @@ Natur und Technik:
             date: this._editingEvent ? this._editingEvent.date : '',
             original_date: this._editingEvent ? this._editingEvent.date : '',
           });
+          this._showAddEventModal = false;
           this._showAddEventCard = false;
           this._editingEvent = null;
           this.render();
@@ -4917,6 +4986,7 @@ Natur und Technik:
           }
 
           await this._hass.callService('school_grades', serviceName, payload);
+          this._showAddEventModal = false;
           this._showAddEventCard = false;
           this._editingEvent = null;
           this.render();

@@ -34,6 +34,7 @@ from .const import (
     CONF_PORTAL_SYNC_EXAMS,
     CONF_PORTAL_SYNC_SUBSTITUTIONS,
     CONF_PORTAL_SYNC_TIMETABLE,
+    CONF_PORTAL_IGNORE_INFO_EVENTS,
     CONF_PORTAL_USERNAME,
     CONF_PREPARATION_DONE,
     CONF_ROOM,
@@ -243,6 +244,7 @@ SCHEMA_UPDATE_PORTAL_SETTINGS = vol.Schema(
         vol.Optional(CONF_PORTAL_SYNC_TIMETABLE, default=False): cv.boolean,
         vol.Optional(CONF_PORTAL_SYNC_SUBSTITUTIONS, default=True): cv.boolean,
         vol.Optional(CONF_PORTAL_SYNC_EXAMS, default=True): cv.boolean,
+        vol.Optional(CONF_PORTAL_IGNORE_INFO_EVENTS, default=False): cv.boolean,
         vol.Optional("copy_sibling_name"): cv.string,
     }
 )
@@ -308,7 +310,7 @@ async def _async_setup_frontend(hass: HomeAssistant) -> None:
     else:
         hass.http.register_static_path(URL_BASE, FRONTEND_DIR, cache_headers=False)
 
-    version_str = "1.2.9"
+    version_str = "1.2.10"
     try:
         js_file = os.path.join(FRONTEND_DIR, "school-grades-panel.js")
         if os.path.exists(js_file):
@@ -604,6 +606,7 @@ def _register_services(hass: HomeAssistant) -> None:
         sync_timetable = call.data.get(CONF_PORTAL_SYNC_TIMETABLE, False)
         sync_substitutions = call.data.get(CONF_PORTAL_SYNC_SUBSTITUTIONS, True)
         sync_exams = call.data.get(CONF_PORTAL_SYNC_EXAMS, True)
+        ignore_info_events = call.data.get(CONF_PORTAL_IGNORE_INFO_EVENTS, False)
 
         copy_sibling = call.data.get("copy_sibling_name")
         storage = _get_storage(hass, child_name)
@@ -623,6 +626,7 @@ def _register_services(hass: HomeAssistant) -> None:
                 sync_timetable=sync_timetable,
                 sync_substitutions=sync_substitutions,
                 sync_exams=sync_exams,
+                ignore_info_events=ignore_info_events,
             )
             await storage.async_save()
             async_dispatcher_send(
@@ -754,6 +758,7 @@ def _register_services(hass: HomeAssistant) -> None:
             fetch_appointments=sync_exams,
             aliases=data.subject_aliases,
             existing_subjects=data.subjects,
+            ignore_info_events=data.portal_ignore_info_events,
         )
         from datetime import datetime
         data.portal_last_sync = datetime.now().isoformat()
@@ -784,10 +789,12 @@ def _register_services(hass: HomeAssistant) -> None:
 
         # Update appointments and sync to HA calendar if requested
         if sync_exams and "appointments" in res and res["appointments"]:
-            data.set_portal_appointments(res["appointments"])
+            data.set_portal_appointments(
+                res["appointments"], ignore_info_events=data.portal_ignore_info_events
+            )
             if data.calendar_entity:
                 synced_count = await _async_sync_appointments_to_calendar(
-                    data.calendar_entity, res["appointments"]
+                    data.calendar_entity, data.portal_appointments
                 )
                 if synced_count > 0:
                     _LOGGER.info(

@@ -691,6 +691,7 @@ def parse_appointments(
     raw_data: Any,
     aliases: dict[str, list[str]] | None = None,
     existing_subjects: list[str] | None = None,
+    ignore_info_events: bool = False,
 ) -> list[dict[str, Any]]:
     """Parse appointment and exam entries from JSON string, dict, or Appointment objects."""
     if not raw_data:
@@ -787,6 +788,9 @@ def parse_appointments(
             is_exam = True
         elif _EXAM_KW_RE.search(title) or _EXAM_KW_RE.search(title_short):
             is_exam = True
+
+        if ignore_info_events and not is_exam and ("info" in class_l or class_l == "event-info"):
+            continue
 
         subject = extract_exam_subject(title, title_short, aliases, existing_subjects)
 
@@ -1026,6 +1030,7 @@ async def async_fetch_child_portal_data(
     fetch_appointments: bool = True,
     aliases: dict[str, list[str]] | None = None,
     existing_subjects: list[str] | None = None,
+    ignore_info_events: bool = False,
 ) -> dict[str, Any]:
     """Fetch timetable, substitution, and appointment data from Eltern-Portal for a specific child."""
     clean_school = school_from_input(school)
@@ -1123,7 +1128,10 @@ async def async_fetch_child_portal_data(
                     except Exception:
                         pass
                     appointments_data = parse_appointments(
-                        demo_raw, aliases=aliases, existing_subjects=existing_subjects
+                        demo_raw,
+                        aliases=aliases,
+                        existing_subjects=existing_subjects,
+                        ignore_info_events=ignore_info_events,
                     )
                 else:
                     url = parse.urljoin(api.base_url, "/api/ws_get_termine.php")
@@ -1135,7 +1143,10 @@ async def async_fetch_child_portal_data(
                                 text_data = await resp.text()
                                 json_data = json.loads(text_data)
                             appointments_data = parse_appointments(
-                                json_data, aliases=aliases, existing_subjects=existing_subjects
+                                json_data,
+                                aliases=aliases,
+                                existing_subjects=existing_subjects,
+                                ignore_info_events=ignore_info_events,
                             )
             except Exception as apt_err:
                 _LOGGER.warning("Could not fetch appointments from Eltern-Portal: %s", apt_err)
@@ -1144,7 +1155,10 @@ async def async_fetch_child_portal_data(
             if not appointments_data and getattr(match_student, "appointments", None):
                 try:
                     appointments_data = parse_appointments(
-                        match_student.appointments, aliases=aliases, existing_subjects=existing_subjects
+                        match_student.appointments,
+                        aliases=aliases,
+                        existing_subjects=existing_subjects,
+                        ignore_info_events=ignore_info_events,
                     )
                 except Exception as fb_err:
                     _LOGGER.debug("Could not parse student.appointments fallback: %s", fb_err)

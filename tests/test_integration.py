@@ -1299,6 +1299,76 @@ Deutsch:
 
         asyncio.run(run_test())
 
+    def test_portal_ignore_info_events_filter(self):
+        """Test filtering out 'event-info' non-exam appointments while preserving exams and warning/important events."""
+        from custom_components.school_grades.portal import parse_appointments
+        from custom_components.school_grades.storage import SchoolGradesData
+        from datetime import date, timedelta
+
+        raw_events = [
+            {
+                "id": 1,
+                "title": "Schulfest der gesamten Schule",
+                "class": "event-info",
+                "start": (date.today() + timedelta(days=2)).isoformat(),
+            },
+            {
+                "id": 2,
+                "title": "Vokabeltest Englisch",
+                "class": "event-info",
+                "start": (date.today() + timedelta(days=3)).isoformat(),
+            },
+            {
+                "id": 3,
+                "title": "Wichtiger Elternabend",
+                "class": "event-important",
+                "start": (date.today() + timedelta(days=4)).isoformat(),
+            },
+            {
+                "id": 4,
+                "title": "Hitzefrei Warnung",
+                "class": "event-warning",
+                "start": (date.today() + timedelta(days=5)).isoformat(),
+            },
+            {
+                "id": 5,
+                "title": "Vergangener Termin",
+                "class": "event-important",
+                "start": (date.today() - timedelta(days=5)).isoformat(),
+            },
+        ]
+
+        # 1. With ignore_info_events=False: all 5 are parsed
+        all_parsed = parse_appointments(raw_events, ignore_info_events=False)
+        self.assertEqual(len(all_parsed), 5)
+
+        # 2. With ignore_info_events=True: Schulfest is ignored, but Vokabeltest (exam) is kept!
+        filtered = parse_appointments(raw_events, ignore_info_events=True)
+        self.assertEqual(len(filtered), 4)
+        titles = [e["title"] for e in filtered]
+        self.assertNotIn("Schulfest der gesamten Schule", titles)
+        self.assertIn("Vokabeltest Englisch", titles)
+        self.assertIn("Wichtiger Elternabend", titles)
+        self.assertIn("Hitzefrei Warnung", titles)
+        self.assertIn("Vergangener Termin", titles)
+
+        # 3. Test storage integration and retroactive re-filtering
+        data = SchoolGradesData("Max")
+        data.set_portal_settings(enabled=True, ignore_info_events=False)
+        data.set_portal_appointments(all_parsed)
+        self.assertEqual(len(data.portal_appointments), 5)
+
+        # Update settings to ignore info events -> re-filters existing appointments
+        data.set_portal_settings(enabled=True, ignore_info_events=True)
+        self.assertEqual(len(data.portal_appointments), 4)
+        self.assertNotIn("Schulfest der gesamten Schule", [e["title"] for e in data.portal_appointments])
+
+        # 4. Test only_upcoming in get_portal_appointments
+        upcoming = data.get_portal_appointments(only_upcoming=True)
+        upcoming_titles = [e["title"] for e in upcoming]
+        self.assertNotIn("Vergangener Termin", upcoming_titles)
+        self.assertIn("Vokabeltest Englisch", upcoming_titles)
+
 def validate_json_yaml_files():
     json_files = list(project_root.glob("**/*.json"))
     for jf in json_files:

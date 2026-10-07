@@ -87,6 +87,7 @@ class SchoolGradesData:
             self.portal_sync_timetable: bool = False
             self.portal_sync_substitutions: bool = True
             self.portal_sync_exams: bool = True
+            self.portal_ignore_info_events: bool = False
             self.portal_last_sync: str = ""
             self.portal_last_status: str = ""
             self.subject_aliases: dict[str, list[str]] = dict(DEFAULT_SUBJECT_ALIASES)
@@ -123,6 +124,7 @@ class SchoolGradesData:
             self.portal_sync_timetable = bool(data.get("portal_sync_timetable", False))
             self.portal_sync_substitutions = bool(data.get("portal_sync_substitutions", True))
             self.portal_sync_exams = bool(data.get("portal_sync_exams", True))
+            self.portal_ignore_info_events = bool(data.get("portal_ignore_info_events", False))
             self.portal_last_sync = str(data.get("portal_last_sync", ""))
             self.portal_last_status = str(data.get("portal_last_status", ""))
             raw_aliases = data.get("subject_aliases")
@@ -175,6 +177,7 @@ class SchoolGradesData:
             "portal_sync_timetable": self.portal_sync_timetable,
             "portal_sync_substitutions": self.portal_sync_substitutions,
             "portal_sync_exams": self.portal_sync_exams,
+            "portal_ignore_info_events": self.portal_ignore_info_events,
             "portal_last_sync": self.portal_last_sync,
             "portal_last_status": self.portal_last_status,
             "subject_aliases": self.subject_aliases,
@@ -412,17 +415,31 @@ class SchoolGradesData:
 
         return None
 
-    def set_portal_appointments(self, appointments: list[dict[str, Any]]) -> None:
+    def set_portal_appointments(
+        self,
+        appointments: list[dict[str, Any]],
+        ignore_info_events: bool | None = None,
+    ) -> None:
         """Store appointments/exams data and resolve subjects in entries."""
         if not isinstance(appointments, list):
             self.portal_appointments = []
             return
+
+        if ignore_info_events is None:
+            ignore_info_events = self.portal_ignore_info_events
 
         resolved: list[dict[str, Any]] = []
         for apt in appointments:
             if not isinstance(apt, dict):
                 continue
             item = dict(apt)
+
+            # Filter info events if configured
+            if ignore_info_events and not item.get("is_exam"):
+                class_str = str(item.get("class") or item.get("class_name") or item.get("className") or "").lower()
+                if "info" in class_str or class_str == "event-info":
+                    continue
+
             # Ensure subject is resolved if missing or not canonical
             subj = str(item.get("subject", "")).strip()
             if not subj or subj not in self.subjects:
@@ -489,6 +506,7 @@ class SchoolGradesData:
         sync_timetable: bool | None = None,
         sync_substitutions: bool | None = None,
         sync_exams: bool | None = None,
+        ignore_info_events: bool | None = None,
     ) -> None:
         """Update Eltern-Portal configuration."""
         self.portal_enabled = bool(enabled)
@@ -504,6 +522,10 @@ class SchoolGradesData:
             self.portal_sync_substitutions = bool(sync_substitutions)
         if sync_exams is not None:
             self.portal_sync_exams = bool(sync_exams)
+        if ignore_info_events is not None:
+            self.portal_ignore_info_events = bool(ignore_info_events)
+            if self.portal_ignore_info_events and self.portal_appointments:
+                self.set_portal_appointments(self.portal_appointments, ignore_info_events=True)
 
     def set_grade_level(self, grade_level: str) -> None:
         """Set or update class / grade level."""

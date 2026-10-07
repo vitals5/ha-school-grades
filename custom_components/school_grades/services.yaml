@@ -565,6 +565,12 @@ update_portal_settings:
       example: true
       selector:
         boolean:
+    portal_ignore_info_events:
+      name: "Info-Termine ('event-info') ausschließen"
+      description: "Allgemeine Info-Termine ('event-info') der Schule ignorieren und nur Klausuren/wichtige Termine importieren."
+      example: false
+      selector:
+        boolean:
 
 sync_elternportal:
   name: "Eltern-Portal jetzt synchronisieren"

@@ -234,6 +234,7 @@ class SchoolGradeTotalSensor(SensorEntity):
             "portal_sync_timetable": self.storage.data.portal_sync_timetable,
             "portal_sync_substitutions": self.storage.data.portal_sync_substitutions,
             "portal_sync_exams": self.storage.data.portal_sync_exams,
+            "portal_ignore_info_events": self.storage.data.portal_ignore_info_events,
             "portal_last_sync": self.storage.data.portal_last_sync,
             "portal_last_status": self.storage.data.portal_last_status,
             "subject_aliases": copy.deepcopy(self.storage.data.subject_aliases),

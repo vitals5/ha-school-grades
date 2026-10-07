@@ -192,6 +192,7 @@ CONF_PORTAL_STUDENT_NAME = "portal_student_name"
 CONF_PORTAL_SYNC_TIMETABLE = "portal_sync_timetable"
 CONF_PORTAL_SYNC_SUBSTITUTIONS = "portal_sync_substitutions"
 CONF_PORTAL_SYNC_EXAMS = "portal_sync_exams"
+CONF_PORTAL_IGNORE_INFO_EVENTS = "portal_ignore_info_events"
 
 CONF_SUBJECT_ALIASES = "subject_aliases"
 CONF_PORTAL_SUBSTITUTIONS = "portal_substitutions"
