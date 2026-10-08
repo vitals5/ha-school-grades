@@ -244,6 +244,8 @@ class SchoolGradeNextDayExamsBinarySensor(BinarySensorEntity):
                 unique_events.append(e)
 
         self._is_on = len(unique_events) > 0
+        if unique_events and not getattr(self.storage.data, "calendar_events", None):
+            self.storage.data.calendar_events = unique_events
 
         # Primary target date
         primary_target_date = target_dates[0] if target_dates else tomorrow

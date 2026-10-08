@@ -199,11 +199,14 @@ class SchoolGradeTotalSensor(SensorEntity):
                         "location": getattr(evt, "location", "") or "",
                     })
                 self._upcoming_events = sorted(events, key=lambda x: str(x["start"]))
+                self.storage.data.calendar_events = self._upcoming_events
             except Exception as err:
                 _LOGGER.debug("Could not fetch calendar events in sensor for %s: %s", cal_entity, err)
                 self._upcoming_events = []
+                self.storage.data.calendar_events = []
         else:
             self._upcoming_events = []
+            self.storage.data.calendar_events = []
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

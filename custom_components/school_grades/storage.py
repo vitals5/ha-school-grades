@@ -93,6 +93,7 @@ class SchoolGradesData:
             self.subject_aliases: dict[str, list[str]] = dict(DEFAULT_SUBJECT_ALIASES)
             self.portal_substitutions: dict[str, Any] = {"days": [], "stand": None, "available": False}
             self.portal_appointments: list[dict[str, Any]] = []
+            self.calendar_events: list[dict[str, Any]] = []
         else:
             self.child_name = data.get("child_name", child_name)
             self.country = str(data.get("country", DEFAULT_COUNTRY)).upper()
@@ -146,6 +147,7 @@ class SchoolGradesData:
                 self.portal_appointments = [dict(a) for a in raw_appointments if isinstance(a, dict)]
             else:
                 self.portal_appointments = []
+            self.calendar_events = [dict(e) for e in data.get("calendar_events", []) if isinstance(e, dict)]
             # Ensure all subjects have an entry in grades dict
             for subj in self._subjects:
                 if subj not in self._grades:
@@ -183,6 +185,7 @@ class SchoolGradesData:
             "subject_aliases": self.subject_aliases,
             "portal_substitutions": self.portal_substitutions,
             "portal_appointments": self.portal_appointments,
+            "calendar_events": getattr(self, "calendar_events", []),
         }
 
     def set_subject_aliases(self, aliases_dict_or_yaml: dict[str, list[str]] | str) -> None:
@@ -594,6 +597,153 @@ class SchoolGradesData:
         target_date = ref_date + timedelta(days=days_ahead)
         return day_key, target_date
 
+    def get_events_for_date(self, target_date: dt_date) -> list[dict[str, Any]]:
+        """Return all appointments/events for the given target date from both calendar and portal."""
+        events: list[dict[str, Any]] = []
+        target_iso = target_date.isoformat()
+
+        # 1. From portal appointments
+        for apt in getattr(self, "portal_appointments", []):
+            if not isinstance(apt, dict):
+                continue
+            if apt.get("date") == target_iso:
+                title = str(apt.get("title", "") or "")
+                events.append({
+                    "title": title,
+                    "summary": title,
+                    "source": "portal",
+                })
+
+        # 2. From HA calendar events
+        for evt in getattr(self, "calendar_events", []):
+            if not isinstance(evt, dict):
+                continue
+            start_val = str(evt.get("start", "") or "")
+            if start_val.startswith(target_iso):
+                summary = str(evt.get("summary", "") or evt.get("title", ""))
+                events.append({
+                    "title": summary,
+                    "summary": summary,
+                    "source": "calendar",
+                })
+
+        return events
+
+    def get_active_cell_for_date(
+        self,
+        cell: dict[str, Any] | None,
+        target_date: dt_date,
+        calendar_events: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        """Determine which subject is active for an alternating or regular timetable cell on a given date."""
+        if not cell or not isinstance(cell, dict):
+            return {
+                "subject": "",
+                "room": "",
+                "teacher": "",
+                "is_alternating": False,
+                "other_subject": "",
+                "active_trigger": "none",
+            }
+
+        is_alt = bool(cell.get("is_alternating", False))
+        subj_a = str(cell.get("subject", "") or "").strip()
+        room_a = str(cell.get("room", "") or "").strip()
+        teacher_a = str(cell.get("teacher", "") or "").strip()
+
+        if not is_alt:
+            return {
+                "subject": subj_a,
+                "room": room_a,
+                "teacher": teacher_a,
+                "is_alternating": False,
+                "other_subject": "",
+                "active_trigger": "default",
+            }
+
+        subj_b = str(cell.get("alt_subject", "") or "").strip()
+        room_b = str(cell.get("alt_room", "") or "").strip()
+        teacher_b = str(cell.get("alt_teacher", "") or "").strip()
+        alt_mode = str(cell.get("alt_mode", "calendar") or "calendar").strip().lower()
+        alt_week = str(cell.get("alt_week", "even") or "even").strip().lower()
+
+        # Gather events for target date
+        events = list(calendar_events) if calendar_events is not None else self.get_events_for_date(target_date)
+
+        def _matches_subject(test_subj: str) -> bool:
+            if not test_subj:
+                return False
+            test_l = test_subj.lower()
+            for e in events:
+                summary = str(e.get("summary", "") or e.get("title", "")).strip()
+                if not summary:
+                    continue
+                sum_l = summary.lower()
+                if test_l == sum_l or test_l in sum_l:
+                    return True
+                resolved = self.resolve_subject(summary)
+                if resolved and resolved.lower() == test_l:
+                    return True
+            return False
+
+        has_event_b = _matches_subject(subj_b) if subj_b else False
+        has_event_a = _matches_subject(subj_a) if subj_a else False
+
+        # Priority 1: Concrete calendar match
+        if has_event_b and not has_event_a:
+            return {
+                "subject": subj_b,
+                "room": room_b,
+                "teacher": teacher_b,
+                "is_alternating": True,
+                "other_subject": subj_a,
+                "active_trigger": "calendar",
+            }
+        elif has_event_a and not has_event_b:
+            return {
+                "subject": subj_a,
+                "room": room_a,
+                "teacher": teacher_a,
+                "is_alternating": True,
+                "other_subject": subj_b,
+                "active_trigger": "calendar",
+            }
+
+        # Priority 2: Fallback based on alt_mode
+        if alt_mode in ("even_odd", "calendar_or_kw"):
+            kw = target_date.isocalendar()[1]
+            is_even_kw = (kw % 2 == 0)
+            use_b = is_even_kw if alt_week == "even" else (not is_even_kw)
+
+            if use_b:
+                return {
+                    "subject": subj_b,
+                    "room": room_b,
+                    "teacher": teacher_b,
+                    "is_alternating": True,
+                    "other_subject": subj_a,
+                    "active_trigger": "kw",
+                }
+            else:
+                return {
+                    "subject": subj_a,
+                    "room": room_a,
+                    "teacher": teacher_a,
+                    "is_alternating": True,
+                    "other_subject": subj_b,
+                    "active_trigger": "kw",
+                }
+
+        # alt_mode == "calendar": Default to primary subject A (or empty)
+        return {
+            "subject": subj_a,
+            "room": room_a,
+            "teacher": teacher_a,
+            "is_alternating": True,
+            "other_subject": subj_b,
+            "active_trigger": "default",
+        }
+
     def get_next_school_day_subjects(
         self, ref_date: dt_date | None = None, ref_dt: dt_datetime | None = None
     ) -> list[str]:
@@ -611,7 +761,8 @@ class SchoolGradesData:
 
         for slot_id in slot_ids:
             cell = schedule.get(slot_id, {}).get(day_key, {})
-            subj = str(cell.get("subject", "")).strip()
+            active_cell = self.get_active_cell_for_date(cell, target_date)
+            subj = str(active_cell.get("subject", "")).strip()
             if subj and subj not in needed:
                 needed.append(subj)
 
@@ -776,10 +927,12 @@ class SchoolGradesData:
         earliest_lesson_start: int | None = None
         latest_lesson_end: int | None = None
 
+        today_date = ref_dt.date()
         for s in parsed_slots:
             slot_id = s["id"]
             is_break_type = (s["type"] == "break") or ("pause" in s["label"].lower())
-            cell = schedule.get(slot_id, {}).get(day_key, {}) if isinstance(schedule, dict) else {}
+            raw_cell = schedule.get(slot_id, {}).get(day_key, {}) if isinstance(schedule, dict) else {}
+            cell = self.get_active_cell_for_date(raw_cell, today_date)
             subj = str(cell.get("subject", "")).strip()
             room = str(cell.get("room", "")).strip()
             teacher = str(cell.get("teacher", "")).strip()
@@ -902,7 +1055,18 @@ class SchoolGradesData:
             self.timetable_version = getattr(self, "timetable_version", 1) + 1
 
     def update_timetable_cell(
-        self, slot_id: str, day: str, subject: str, room: str = "", teacher: str = ""
+        self,
+        slot_id: str,
+        day: str,
+        subject: str,
+        room: str = "",
+        teacher: str = "",
+        is_alternating: bool = False,
+        alt_subject: str = "",
+        alt_room: str = "",
+        alt_teacher: str = "",
+        alt_mode: str = "calendar",
+        alt_week: str = "even",
     ) -> None:
         """Update or clear a single cell in the timetable matrix."""
         import copy
@@ -913,6 +1077,9 @@ class SchoolGradesData:
         clean_subj = str(subject or "").strip()
         if clean_subj:
             clean_subj = self.resolve_subject(clean_subj)
+        clean_alt_subj = str(alt_subject or "").strip()
+        if clean_alt_subj:
+            clean_alt_subj = self.resolve_subject(clean_alt_subj)
         clean_day = str(day or "").strip().lower()
 
         slot_str = str(slot_id).strip()
@@ -922,7 +1089,9 @@ class SchoolGradesData:
         else:
             possible_slot_keys.append(f"slot_{slot_str}")
 
-        if not clean_subj:
+        has_any_content = bool(clean_subj or (is_alternating and clean_alt_subj))
+
+        if not has_any_content:
             for sk in possible_slot_keys:
                 if sk in new_timetable["schedule"] and isinstance(new_timetable["schedule"][sk], dict):
                     new_timetable["schedule"][sk].pop(clean_day, None)
@@ -930,16 +1099,27 @@ class SchoolGradesData:
             target_key = next((sk for sk in possible_slot_keys if sk in new_timetable["schedule"]), slot_str)
             if target_key not in new_timetable["schedule"]:
                 new_timetable["schedule"][target_key] = {}
-            new_timetable["schedule"][target_key][clean_day] = {
+            cell_entry: dict[str, Any] = {
                 "subject": clean_subj,
                 "room": str(room or "").strip(),
                 "teacher": str(teacher or "").strip(),
             }
-            # Automatically register new subject in child's subjects list if not yet present
-            if clean_subj not in self._subjects:
-                self._subjects.append(clean_subj)
-                if clean_subj not in self._grades:
-                    self._grades[clean_subj] = []
+            if is_alternating:
+                cell_entry["is_alternating"] = True
+                cell_entry["alt_subject"] = clean_alt_subj
+                cell_entry["alt_room"] = str(alt_room or "").strip()
+                cell_entry["alt_teacher"] = str(alt_teacher or "").strip()
+                cell_entry["alt_mode"] = str(alt_mode or "calendar").strip().lower()
+                cell_entry["alt_week"] = str(alt_week or "even").strip().lower()
+
+            new_timetable["schedule"][target_key][clean_day] = cell_entry
+
+            # Automatically register new subjects in child's subjects list if not yet present
+            for s in (clean_subj, clean_alt_subj):
+                if s and s not in self._subjects:
+                    self._subjects.append(s)
+                    if s not in self._grades:
+                        self._grades[s] = []
 
         self.timetable = new_timetable
         self.timetable_version = getattr(self, "timetable_version", 1) + 1
@@ -973,11 +1153,27 @@ class SchoolGradesData:
                             subj = str(cell.get("subject", "") or "").strip()
                             if subj:
                                 subj = self.resolve_subject(subj)
-                            normalized_schedule.setdefault(str(slot_id), {})[day] = {
+                            cell_dict: dict[str, Any] = {
                                 "subject": subj,
                                 "room": str(cell.get("room", "") or "").strip(),
                                 "teacher": str(cell.get("teacher", "") or "").strip(),
                             }
+                            if cell.get("is_alternating") or cell.get("alt_subject"):
+                                alt_subj = str(cell.get("alt_subject", "") or "").strip()
+                                if alt_subj:
+                                    alt_subj = self.resolve_subject(alt_subj)
+                                cell_dict["is_alternating"] = True
+                                cell_dict["alt_subject"] = alt_subj
+                                cell_dict["alt_room"] = str(cell.get("alt_room", "") or "").strip()
+                                cell_dict["alt_teacher"] = str(cell.get("alt_teacher", "") or "").strip()
+                                cell_dict["alt_mode"] = str(cell.get("alt_mode", "calendar") or "calendar").strip().lower()
+                                cell_dict["alt_week"] = str(cell.get("alt_week", "even") or "even").strip().lower()
+                                if alt_subj and alt_subj not in self._subjects:
+                                    self._subjects.append(alt_subj)
+                                    if alt_subj not in self._grades:
+                                        self._grades[alt_subj] = []
+
+                            normalized_schedule.setdefault(str(slot_id), {})[day] = cell_dict
                             if subj and subj not in self._subjects:
                                 self._subjects.append(subj)
                                 if subj not in self._grades:
@@ -991,11 +1187,27 @@ class SchoolGradesData:
                             subj = str(cell.get("subject", "") or "").strip()
                             if subj:
                                 subj = self.resolve_subject(subj)
-                            normalized_schedule.setdefault(slot_id, {})[day] = {
+                            cell_dict = {
                                 "subject": subj,
                                 "room": str(cell.get("room", "") or "").strip(),
                                 "teacher": str(cell.get("teacher", "") or "").strip(),
                             }
+                            if cell.get("is_alternating") or cell.get("alt_subject"):
+                                alt_subj = str(cell.get("alt_subject", "") or "").strip()
+                                if alt_subj:
+                                    alt_subj = self.resolve_subject(alt_subj)
+                                cell_dict["is_alternating"] = True
+                                cell_dict["alt_subject"] = alt_subj
+                                cell_dict["alt_room"] = str(cell.get("alt_room", "") or "").strip()
+                                cell_dict["alt_teacher"] = str(cell.get("alt_teacher", "") or "").strip()
+                                cell_dict["alt_mode"] = str(cell.get("alt_mode", "calendar") or "calendar").strip().lower()
+                                cell_dict["alt_week"] = str(cell.get("alt_week", "even") or "even").strip().lower()
+                                if alt_subj and alt_subj not in self._subjects:
+                                    self._subjects.append(alt_subj)
+                                    if alt_subj not in self._grades:
+                                        self._grades[alt_subj] = []
+
+                            normalized_schedule.setdefault(slot_id, {})[day] = cell_dict
                             if subj and subj not in self._subjects:
                                 self._subjects.append(subj)
                                 if subj not in self._grades:
@@ -1037,9 +1249,28 @@ class SchoolGradesData:
             for slot_id, days in list(self.timetable["schedule"].items()):
                 if isinstance(days, dict):
                     for day_key, cell in list(days.items()):
-                        if isinstance(cell, dict) and cell.get("subject") == clean_subj:
-                            days.pop(day_key, None)
-                            removed = True
+                        if isinstance(cell, dict):
+                            if cell.get("subject") == clean_subj:
+                                if cell.get("is_alternating") and cell.get("alt_subject"):
+                                    # Demote alt_subject to primary
+                                    cell["subject"] = cell.pop("alt_subject", "")
+                                    cell["room"] = cell.pop("alt_room", "")
+                                    cell["teacher"] = cell.pop("alt_teacher", "")
+                                    cell.pop("is_alternating", None)
+                                    cell.pop("alt_mode", None)
+                                    cell.pop("alt_week", None)
+                                    removed = True
+                                else:
+                                    days.pop(day_key, None)
+                                    removed = True
+                            elif cell.get("alt_subject") == clean_subj:
+                                cell.pop("alt_subject", None)
+                                cell.pop("alt_room", None)
+                                cell.pop("alt_teacher", None)
+                                cell.pop("is_alternating", None)
+                                cell.pop("alt_mode", None)
+                                cell.pop("alt_week", None)
+                                removed = True
 
         if removed:
             self.timetable_version = getattr(self, "timetable_version", 1) + 1

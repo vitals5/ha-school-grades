@@ -177,6 +177,54 @@ update_timetable_cell:
       example: "Fr. Schmidt"
       selector:
         text:
+    is_alternating:
+      name: "Wechselfach aktivieren"
+      description: "Aktiviert den 14-tägigen Wechsel mit einem zweiten Fach oder Freistunde."
+      example: true
+      selector:
+        boolean:
+    alt_subject:
+      name: "Wechselfach (Fach B)"
+      description: "Name des alternierenden Schulfachs (oder leer für Freistunde)."
+      example: "Werken"
+      selector:
+        text:
+    alt_room:
+      name: "Raum (Fach B)"
+      description: "Raum für das Wechselfach."
+      example: "W02"
+      selector:
+        text:
+    alt_teacher:
+      name: "Lehrkraft (Fach B)"
+      description: "Lehrkraft für das Wechselfach."
+      example: "Hr. Müller"
+      selector:
+        text:
+    alt_mode:
+      name: "Wechsel-Modus"
+      description: "Steuerungsmodus: 'calendar' (über Kalender-Termin), 'calendar_or_kw' (KW mit Kalender-Vorrang) oder 'even_odd' (nach Kalenderwoche)."
+      example: "calendar"
+      selector:
+        select:
+          options:
+            - label: "Kalender-gesteuert"
+              value: "calendar"
+            - label: "Kalenderwoche mit Termin-Vorrang"
+              value: "calendar_or_kw"
+            - label: "Gerade / Ungerade Kalenderwoche"
+              value: "even_odd"
+    alt_week:
+      name: "Woche für Fach B (bei KW)"
+      description: "In welcher Kalenderwoche Fach B stattfindet ('even' für gerade, 'odd' für ungerade)."
+      example: "even"
+      selector:
+        select:
+          options:
+            - label: "Gerade Kalenderwoche"
+              value: "even"
+            - label: "Ungerade Kalenderwoche"
+              value: "odd"
 
 import_timetable:
   name: "Stundenplan per YAML importieren"

@@ -129,6 +129,97 @@ class TestSchoolGradesLogic(unittest.TestCase):
         data.update_timetable_cell("slot_2", "thursday", "", "", "")
         self.assertNotIn("thursday", data.timetable["schedule"]["2"])
 
+    def test_alternating_timetable_cell(self):
+        data = SchoolGradesData("Lukas")
+        # Configure alternating cell: Fach A = Chemie, Fach B = Physik
+        data.update_timetable_cell(
+            slot_id="slot_1",
+            day="monday",
+            subject="Chemie",
+            room="CH1",
+            teacher="Hr. Bunsen",
+            is_alternating=True,
+            alt_subject="Physik",
+            alt_room="PH1",
+            alt_teacher="Dr. Newton",
+            alt_mode="even_odd",
+            alt_week="even"  # Fach B (Physik) on even KW, Fach A (Chemie) on odd KW
+        )
+        cell = data.timetable["schedule"]["slot_1"]["monday"]
+        self.assertTrue(cell["is_alternating"])
+        self.assertEqual(cell["subject"], "Chemie")
+        self.assertEqual(cell["alt_subject"], "Physik")
+        self.assertEqual(cell["alt_mode"], "even_odd")
+        self.assertEqual(cell["alt_week"], "even")
+        self.assertIn("Chemie", data.subjects)
+        self.assertIn("Physik", data.subjects)
+
+        # Test resolution for even week vs odd week
+        # 2026-10-05 was Monday in KW 41 (odd week)
+        date_odd = date(2026, 10, 5)
+        # 2026-10-12 is Monday in KW 42 (even week)
+        date_even = date(2026, 10, 12)
+
+        resolved_odd = data.get_active_cell_for_date(cell, date_odd)
+        self.assertEqual(resolved_odd["subject"], "Chemie")
+        self.assertEqual(resolved_odd["room"], "CH1")
+        self.assertEqual(resolved_odd["other_subject"], "Physik")
+
+        resolved_even = data.get_active_cell_for_date(cell, date_even)
+        self.assertEqual(resolved_even["subject"], "Physik")
+        self.assertEqual(resolved_even["room"], "PH1")
+        self.assertEqual(resolved_even["other_subject"], "Chemie")
+
+        # Test calendar mode
+        cell_cal = dict(cell)
+        cell_cal["alt_mode"] = "calendar"
+        # Without matching calendar event, defaults to primary subject
+        resolved_no_evt = data.get_active_cell_for_date(cell_cal, date_even, calendar_events=[])
+        self.assertEqual(resolved_no_evt["subject"], "Chemie")
+
+        # With calendar event for "Physik" on date_even
+        cal_events = [{"summary": "Physik Ex", "start": "2026-10-12T08:00:00"}]
+        resolved_with_evt = data.get_active_cell_for_date(cell_cal, date_even, calendar_events=cal_events)
+        self.assertEqual(resolved_with_evt["subject"], "Physik")
+        self.assertEqual(resolved_with_evt["room"], "PH1")
+        self.assertEqual(resolved_with_evt["active_trigger"], "calendar")
+
+        # Test calendar_or_kw mode:
+        cell_cal_kw = dict(cell)
+        cell_cal_kw["alt_mode"] = "calendar_or_kw"
+        cell_cal_kw["alt_week"] = "even"
+        # On odd week (normally Chemie), but calendar has Physik event -> Physik wins!
+        cal_events_odd = [{"summary": "Physik Unterricht", "start": "2026-10-05T08:00:00"}]
+        resolved_override = data.get_active_cell_for_date(cell_cal_kw, date_odd, calendar_events=cal_events_odd)
+        self.assertEqual(resolved_override["subject"], "Physik")
+
+        # Test YAML import with alternating parameters
+        yaml_data = {
+            "slots": [{"id": "slot_1", "label": "1. Stunde", "start": "08:00", "end": "08:45"}],
+            "schedule": {
+                "slot_1": {
+                    "tuesday": {
+                        "subject": "Kunst",
+                        "room": "K1",
+                        "teacher": "Fr. Picasso",
+                        "is_alternating": True,
+                        "alt_subject": "Musik",
+                        "alt_room": "M1",
+                        "alt_teacher": "Hr. Bach",
+                        "alt_mode": "calendar",
+                        "alt_week": "odd"
+                    }
+                }
+            }
+        }
+        self.assertTrue(data.import_timetable_data(yaml_data))
+        tues_cell = data.timetable["schedule"]["slot_1"]["tuesday"]
+        self.assertTrue(tues_cell["is_alternating"])
+        self.assertEqual(tues_cell["subject"], "Kunst")
+        self.assertEqual(tues_cell["alt_subject"], "Musik")
+        self.assertIn("Kunst", data.subjects)
+        self.assertIn("Musik", data.subjects)
+
     def test_timetable_yaml_import(self):
         data = SchoolGradesData("Richard")
         prev_version = data.timetable_version

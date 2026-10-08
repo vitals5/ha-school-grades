@@ -38,6 +38,12 @@ from .const import (
     CONF_PORTAL_USERNAME,
     CONF_PREPARATION_DONE,
     CONF_ROOM,
+    CONF_IS_ALTERNATING,
+    CONF_ALT_SUBJECT,
+    CONF_ALT_ROOM,
+    CONF_ALT_TEACHER,
+    CONF_ALT_MODE,
+    CONF_ALT_WEEK,
     CONF_SHOW_CALENDAR,
     CONF_SHOW_OVERVIEW,
     CONF_SHOW_PREP,
@@ -139,6 +145,12 @@ SCHEMA_UPDATE_TIMETABLE_CELL = vol.Schema(
         vol.Optional(CONF_SUBJECT, default=""): cv.string,
         vol.Optional(CONF_ROOM, default=""): cv.string,
         vol.Optional(CONF_TEACHER, default=""): cv.string,
+        vol.Optional(CONF_IS_ALTERNATING, default=False): cv.boolean,
+        vol.Optional(CONF_ALT_SUBJECT, default=""): cv.string,
+        vol.Optional(CONF_ALT_ROOM, default=""): cv.string,
+        vol.Optional(CONF_ALT_TEACHER, default=""): cv.string,
+        vol.Optional(CONF_ALT_MODE, default="calendar"): cv.string,
+        vol.Optional(CONF_ALT_WEEK, default="even"): cv.string,
     }
 )
 
@@ -310,7 +322,7 @@ async def _async_setup_frontend(hass: HomeAssistant) -> None:
     else:
         hass.http.register_static_path(URL_BASE, FRONTEND_DIR, cache_headers=False)
 
-    version_str = "1.2.15"
+    version_str = "1.2.16"
     try:
         js_file = os.path.join(FRONTEND_DIR, "school-grades-panel.js")
         if os.path.exists(js_file):
@@ -457,11 +469,27 @@ def _register_services(hass: HomeAssistant) -> None:
         subject = call.data.get(CONF_SUBJECT, "")
         room = call.data.get(CONF_ROOM, "")
         teacher = call.data.get(CONF_TEACHER, "")
+        is_alternating = call.data.get(CONF_IS_ALTERNATING, False)
+        alt_subject = call.data.get(CONF_ALT_SUBJECT, "")
+        alt_room = call.data.get(CONF_ALT_ROOM, "")
+        alt_teacher = call.data.get(CONF_ALT_TEACHER, "")
+        alt_mode = call.data.get(CONF_ALT_MODE, "calendar")
+        alt_week = call.data.get(CONF_ALT_WEEK, "even")
 
         storage = _get_storage(hass, child_name)
         if storage:
             storage.data.update_timetable_cell(
-                slot_id=slot_id, day=day, subject=subject, room=room, teacher=teacher
+                slot_id=slot_id,
+                day=day,
+                subject=subject,
+                room=room,
+                teacher=teacher,
+                is_alternating=is_alternating,
+                alt_subject=alt_subject,
+                alt_room=alt_room,
+                alt_teacher=alt_teacher,
+                alt_mode=alt_mode,
+                alt_week=alt_week,
             )
             await storage.async_save()
             async_dispatcher_send(

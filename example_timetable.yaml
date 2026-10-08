@@ -92,6 +92,13 @@ schedule:
       subject: "Kunst"
       room: "R001"
       teacher: "Fr. Bauer"
+      # Optional: 14-tägiges Wechselfach (jede 2. Woche im Wechsel mit einem 2. Fach oder Freistunde)
+      is_alternating: true
+      alt_subject: "Werken"
+      alt_room: "Werkstatt"
+      alt_teacher: "Hr. Holz"
+      alt_mode: "calendar" # 'calendar', 'calendar_or_kw' oder 'even_odd'
+      alt_week: "even"     # 'even' (gerade KW) oder 'odd' (ungerade KW)
   slot_3:
     monday:
       subject: "Deutsch"

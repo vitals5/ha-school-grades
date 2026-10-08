@@ -455,6 +455,20 @@ const I18N = {
     teacher_placeholder: "z. B. Fr. Schmidt",
     cancel_btn: "Abbrechen",
     save_btn: "💾 Speichern",
+    alt_toggle_label: "🔄 14-tägiges Wechselfach (jede 2. Woche)",
+    alt_primary_header: "Fach A (Standard)",
+    alt_secondary_header: "Fach B (Wechselfach)",
+    alt_mode_label: "Wechsel-Steuerung",
+    alt_mode_calendar: "📅 Kalender-gesteuert (Termin im Kalender bestimmt das Fach)",
+    alt_mode_calendar_kw: "📅/🗓️ Kalenderwoche mit Termin-Vorrang (A/B-Woche)",
+    alt_mode_kw: "🗓️ Feste Kalenderwochen (Ungerade KW = Fach A, Gerade KW = Fach B)",
+    alt_week_label: "Fach B findet statt in:",
+    alt_week_even: "Geraden Kalenderwochen (KW 40, 42, 44...)",
+    alt_week_odd: "Ungeraden Kalenderwochen (KW 41, 43, 45...)",
+    alt_badge_calendar: "Termin",
+    alt_badge_kw: "KW",
+    alt_wechsel_prefix: "Wechsel:",
+    free_period_label: "Freistunde",
     
     yaml_textarea_label: "Stundenplan YAML-Konfiguration ({child})",
     copy_btn: "📋 Kopieren",
@@ -635,6 +649,20 @@ const I18N = {
     teacher_placeholder: "e.g. Mrs. Smith",
     cancel_btn: "Cancel",
     save_btn: "💾 Save",
+    alt_toggle_label: "🔄 Bi-weekly alternating subject (every 2nd week)",
+    alt_primary_header: "Subject A (Standard)",
+    alt_secondary_header: "Subject B (Alternating)",
+    alt_mode_label: "Alternation Mode",
+    alt_mode_calendar: "📅 Calendar-driven (Calendar event decides the subject)",
+    alt_mode_calendar_kw: "📅/🗓️ Calendar week with event override (Week A/B)",
+    alt_mode_kw: "🗓️ Fixed calendar weeks (Odd CW = Subject A, Even CW = Subject B)",
+    alt_week_label: "Subject B takes place in:",
+    alt_week_even: "Even calendar weeks (CW 40, 42, 44...)",
+    alt_week_odd: "Odd calendar weeks (CW 41, 43, 45...)",
+    alt_badge_calendar: "Event",
+    alt_badge_kw: "CW",
+    alt_wechsel_prefix: "Alt:",
+    free_period_label: "Free period",
     
     yaml_textarea_label: "Timetable YAML Configuration ({child})",
     copy_btn: "📋 Copy",
@@ -2287,12 +2315,17 @@ class SchoolGradesPanel extends HTMLElement {
 
     const targetDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + daysToAdd);
     const dateFormatted = targetDate.toLocaleDateString(this._getLocale(), { weekday: 'long', day: '2-digit', month: '2-digit' });
+    const y = targetDate.getFullYear();
+    const m = String(targetDate.getMonth() + 1).padStart(2, '0');
+    const d = String(targetDate.getDate()).padStart(2, '0');
+    const targetDateIso = `${y}-${m}-${d}`;
 
     // Group lesson slots by subject so double periods form a single card
     const subjectMap = new Map();
     for (const slot of slots) {
       if (slot.type === 'break') continue;
-      const cell = schedule[slot.id] && schedule[slot.id][targetDayKey];
+      const rawCell = schedule[slot.id] && schedule[slot.id][targetDayKey];
+      const cell = this._getActiveCellForDate(rawCell, targetDateIso, child);
       if (cell && cell.subject) {
         const cleanSubj = String(cell.subject).trim();
         if (!cleanSubj) continue;
@@ -2368,11 +2401,6 @@ class SchoolGradesPanel extends HTMLElement {
       });
     }
 
-    const y = targetDate.getFullYear();
-    const m = String(targetDate.getMonth() + 1).padStart(2, '0');
-    const d = String(targetDate.getDate()).padStart(2, '0');
-    const targetDateIso = `${y}-${m}-${d}`;
-
     const matchingExams = (calendarEvents || []).filter(evt => {
       if (!evt.start) return false;
       const evtDateIso = new Date(evt.start).toISOString().split('T')[0];
@@ -2405,6 +2433,129 @@ class SchoolGradesPanel extends HTMLElement {
     const m = String(target.getMonth() + 1).padStart(2, '0');
     const d = String(target.getDate()).padStart(2, '0');
     return `${y}-${m}-${d}`;
+  }
+
+  _getISOWeek(dateObj) {
+    const d = new Date(Date.UTC(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  }
+
+  _getActiveCellForDate(cell, dateIsoStr, child) {
+    if (!cell || typeof cell !== 'object') {
+      return {
+        subject: '',
+        room: '',
+        teacher: '',
+        isAlternating: false,
+        otherSubject: '',
+        activeTrigger: 'none',
+      };
+    }
+
+    const isAlt = !!cell.is_alternating;
+    const subjA = (cell.subject || '').trim();
+    const roomA = (cell.room || '').trim();
+    const teacherA = (cell.teacher || '').trim();
+
+    if (!isAlt) {
+      return {
+        subject: subjA,
+        room: roomA,
+        teacher: teacherA,
+        isAlternating: false,
+        otherSubject: '',
+        activeTrigger: 'default',
+      };
+    }
+
+    const subjB = (cell.alt_subject || '').trim();
+    const roomB = (cell.alt_room || '').trim();
+    const teacherB = (cell.alt_teacher || '').trim();
+    const altMode = (cell.alt_mode || 'calendar').trim().toLowerCase();
+    const altWeek = (cell.alt_week || 'even').trim().toLowerCase();
+
+    // Check calendar events for child on dateIsoStr
+    const childName = (child && child.child_name) || this._selectedChild;
+    const events = (this._calendarEvents && this._calendarEvents[childName]) || [];
+
+    const matchesSubject = (testSubj) => {
+      if (!testSubj) return false;
+      const testL = testSubj.toLowerCase();
+      for (const e of events) {
+        const eStart = (typeof e.start === 'string' ? e.start : '').split('T')[0];
+        if (eStart !== dateIsoStr) continue;
+        const summary = (e.summary || '').toLowerCase();
+        if (summary === testL || summary.includes(testL)) return true;
+        const resolved = (this._resolveSubjectName(e.summary, child) || '').toLowerCase();
+        if (resolved && resolved === testL) return true;
+      }
+      return false;
+    };
+
+    const hasEventB = subjB ? matchesSubject(subjB) : false;
+    const hasEventA = subjA ? matchesSubject(subjA) : false;
+
+    if (hasEventB && !hasEventA) {
+      return {
+        subject: subjB,
+        room: roomB,
+        teacher: teacherB,
+        isAlternating: true,
+        otherSubject: subjA,
+        activeTrigger: 'calendar',
+      };
+    } else if (hasEventA && !hasEventB) {
+      return {
+        subject: subjA,
+        room: roomA,
+        teacher: teacherA,
+        isAlternating: true,
+        otherSubject: subjB,
+        activeTrigger: 'calendar',
+      };
+    }
+
+    if (altMode === 'even_odd' || altMode === 'calendar_or_kw') {
+      const parts = (dateIsoStr || '').split('-').map(Number);
+      if (parts.length === 3 && !isNaN(parts[0])) {
+        const dObj = new Date(parts[0], parts[1] - 1, parts[2]);
+        const kw = this._getISOWeek(dObj);
+        const isEven = (kw % 2 === 0);
+        const useB = (altWeek === 'even' ? isEven : !isEven);
+
+        if (useB) {
+          return {
+            subject: subjB,
+            room: roomB,
+            teacher: teacherB,
+            isAlternating: true,
+            otherSubject: subjA,
+            activeTrigger: 'kw',
+          };
+        } else {
+          return {
+            subject: subjA,
+            room: roomA,
+            teacher: teacherA,
+            isAlternating: true,
+            otherSubject: subjB,
+            activeTrigger: 'kw',
+          };
+        }
+      }
+    }
+
+    return {
+      subject: subjA,
+      room: roomA,
+      teacher: teacherA,
+      isAlternating: true,
+      otherSubject: subjB,
+      activeTrigger: 'default',
+    };
   }
 
   _resolveSubjectName(rawSubj, child) {
@@ -3261,25 +3412,33 @@ Natur und Technik:
                           const cellData = (schedule[slot.id] && schedule[slot.id][d.key]) || {};
                           const isNow = this._isNowInSlot(slot.start, slot.end, d.key);
                           const isToday = this._isToday(d.key);
-                          const hasSubject = !!cellData.subject;
                           const colDateIso = this._getDateForDayKey(d.key);
-                          const subst = (currentChild && currentChild.portalSubstitutions) ? this._getSubstitution(currentChild.portalSubstitutions, colDateIso, slot.id, slot.number, cellData.subject, currentChild) : null;
+                          const activeCell = this._getActiveCellForDate(cellData, colDateIso, currentChild);
+                          const isAlternating = !!cellData.is_alternating;
+                          const subst = (currentChild && currentChild.portalSubstitutions) ? this._getSubstitution(currentChild.portalSubstitutions, colDateIso, slot.id, slot.number, activeCell.subject || cellData.subject, currentChild) : null;
                           const isEntfall = subst && subst.kind === 'entfall';
                           const isRaum = subst && subst.kind === 'raum';
                           const isVertretung = subst && subst.kind === 'vertretung';
-                          const displaySubject = subst ? (this._resolveSubjectName(subst.subject_resolved || subst.subject, currentChild) || cellData.subject) : cellData.subject;
-                          const displayRoom = subst && subst.room ? subst.room : cellData.room;
-                          const displayTeacher = subst && subst.substitute ? subst.substitute : (subst && subst.teacher ? subst.teacher : cellData.teacher);
+                          const displaySubject = subst ? (this._resolveSubjectName(subst.subject_resolved || subst.subject, currentChild) || activeCell.subject) : activeCell.subject;
+                          const displayRoom = subst && subst.room ? subst.room : activeCell.room;
+                          const displayTeacher = subst && subst.substitute ? subst.substitute : (subst && subst.teacher ? subst.teacher : activeCell.teacher);
+                          const hasContent = !!displaySubject || subst || isAlternating;
 
                           return `
-                            <td class="timetable-cell ${isToday ? 'today-col' : ''} ${isNow ? 'now-cell' : ''} ${hasSubject || subst ? 'has-subject' : 'empty-cell'} ${subst ? 'has-substitution' : ''}"
+                            <td class="timetable-cell ${isToday ? 'today-col' : ''} ${isNow ? 'now-cell' : ''} ${hasContent ? 'has-subject' : 'empty-cell'} ${subst ? 'has-substitution' : ''} ${isAlternating ? 'is-alternating' : ''}"
                                 data-slot-id="${slot.id}"
                                 data-day="${d.key}"
                                 data-slot-label="${slot.label} (${slot.start}-${slot.end})"
                                 data-day-label="${dayNames[d.key] || d.key}"
                                 data-subject="${cellData.subject || ''}"
                                 data-room="${cellData.room || ''}"
-                                data-teacher="${cellData.teacher || ''}">
+                                data-teacher="${cellData.teacher || ''}"
+                                data-is-alternating="${isAlternating ? 'true' : 'false'}"
+                                data-alt-subject="${cellData.alt_subject || ''}"
+                                data-alt-room="${cellData.alt_room || ''}"
+                                data-alt-teacher="${cellData.alt_teacher || ''}"
+                                data-alt-mode="${cellData.alt_mode || 'calendar'}"
+                                data-alt-week="${cellData.alt_week || 'even'}">
                               ${isNow ? `<div class="now-badge">${this._t('now_badge')}</div>` : ''}
                               ${isEntfall ? `
                                 <div class="subst-badge subst-entfall" style="font-size: 10px; font-weight: 700; background: rgba(239, 68, 68, 0.25); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 4px; padding: 1px 5px; margin-bottom: 3px; display: inline-block;" title="${subst.info || ''}">${this._t('subst_badge_cancelled')}</div>
@@ -3288,8 +3447,19 @@ Natur und Technik:
                               ` : isVertretung ? `
                                 <div class="subst-badge subst-vertretung" style="font-size: 10px; font-weight: 700; background: rgba(59, 130, 246, 0.25); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 4px; padding: 1px 5px; margin-bottom: 3px; display: inline-block;" title="${subst.info || ''}">${this._t('subst_badge_subst')}</div>
                               ` : ''}
-                              ${hasSubject || subst ? `
-                                <div class="cell-subject" style="${isEntfall ? 'text-decoration: line-through; opacity: 0.6;' : ''}">${displaySubject}</div>
+                              ${isAlternating ? `
+                                <div class="alt-badge" style="font-size: 9px; font-weight: 600; background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 4px; padding: 1px 4px; margin-bottom: 2px; display: inline-flex; align-items: center; gap: 2px;" title="${this._t('alt_toggle_label')} (${cellData.alt_mode || 'calendar'})">
+                                  <span>🔄</span>
+                                  <span>${activeCell.activeTrigger === 'calendar' ? this._t('alt_badge_calendar') : (activeCell.activeTrigger === 'kw' ? this._t('alt_badge_kw') : '14t')}</span>
+                                </div>
+                              ` : ''}
+                              ${hasContent ? `
+                                <div class="cell-subject" style="${isEntfall ? 'text-decoration: line-through; opacity: 0.6;' : ''}">${displaySubject || `<span style="font-style: italic; opacity: 0.6;">${this._t('free_period_label')}</span>`}</div>
+                                ${isAlternating && activeCell.otherSubject ? `
+                                  <div style="font-size: 10px; color: rgba(255, 255, 255, 0.45); font-style: italic; margin-top: -1px; margin-bottom: 2px;" title="${this._t('alt_wechsel_prefix')} ${activeCell.otherSubject}">
+                                    ${this._t('alt_wechsel_prefix')} ${activeCell.otherSubject}
+                                  </div>
+                                ` : ''}
                                 <div class="cell-details">
                                   ${displayRoom ? `<span class="cell-room" style="${isRaum ? 'color: #fde047; font-weight: 600;' : ''}">📍 ${displayRoom}</span>` : ''}
                                   ${displayTeacher ? `<span class="cell-teacher" style="${isVertretung ? 'color: #93c5fd; font-weight: 600;' : ''}">👨‍🏫 ${displayTeacher}</span>` : ''}
@@ -3498,7 +3668,7 @@ Natur und Technik:
 
             <form id="timetable-edit-form">
               <div class="form-group">
-                <label>${this._t('subject_label')}</label>
+                <label>${this._editingCell.isAlternating ? this._t('alt_primary_header') : this._t('subject_label')}</label>
                 <select id="modal-subject-select">
                   <option value="">${this._t('no_subject_free')}</option>
                   ${subjectList.map(s => `
@@ -3520,6 +3690,64 @@ Natur und Technik:
                 <div class="form-group half">
                   <label>${this._t('teacher_label')}</label>
                   <input type="text" id="modal-teacher" placeholder="${this._t('teacher_placeholder')}" value="${this._editingCell.teacher || ''}">
+                </div>
+              </div>
+
+              <!-- Alternating Subject Checkbox & Configuration -->
+              <div class="form-group" style="margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--divider-color, rgba(255,255,255,0.1));">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 600; font-size: 13px;">
+                  <input type="checkbox" id="modal-is-alternating" ${this._editingCell.isAlternating ? 'checked' : ''} style="width: 16px; height: 16px; cursor: pointer; accent-color: var(--primary-color, #3b82f6);">
+                  <span>${this._t('alt_toggle_label')}</span>
+                </label>
+              </div>
+
+              <div id="modal-alternating-container" style="${this._editingCell.isAlternating ? 'display: block;' : 'display: none;'} margin-top: 10px; padding: 12px; background: rgba(0,0,0,0.15); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+                <div style="font-size: 12px; font-weight: 700; color: #c084fc; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                  <span>🔄</span> ${this._t('alt_secondary_header')}
+                </div>
+
+                <div class="form-group" style="margin-bottom: 12px;">
+                  <label>${this._t('subject_label')}</label>
+                  <select id="modal-alt-subject-select">
+                    <option value="">${this._t('no_subject_free')}</option>
+                    ${subjectList.map(s => `
+                      <option value="${s}" ${this._editingCell.altSubject === s ? 'selected' : ''}>${s}</option>
+                    `).join('')}
+                    ${this._editingCell.altSubject && !subjectList.includes(this._editingCell.altSubject) ? `
+                      <option value="${this._editingCell.altSubject}" selected>${this._editingCell.altSubject}</option>
+                    ` : ''}
+                    <option value="__custom__">${this._t('custom_subject_opt')}</option>
+                  </select>
+                  <input type="text" id="modal-custom-alt-subject" placeholder="${this._t('custom_subject_placeholder')}" style="display: none; margin-top: 8px;" value="">
+                </div>
+
+                <div class="form-row" style="margin-bottom: 12px;">
+                  <div class="form-group half">
+                    <label>${this._t('room_label')}</label>
+                    <input type="text" id="modal-alt-room" placeholder="${this._t('room_placeholder')}" value="${this._editingCell.altRoom || ''}">
+                  </div>
+                  <div class="form-group half">
+                    <label>${this._t('teacher_label')}</label>
+                    <input type="text" id="modal-alt-teacher" placeholder="${this._t('teacher_placeholder')}" value="${this._editingCell.altTeacher || ''}">
+                  </div>
+                </div>
+
+                <div class="form-row" style="margin-bottom: 6px;">
+                  <div class="form-group ${(!this._editingCell.altMode || this._editingCell.altMode === 'calendar') ? '' : 'half'}">
+                    <label>${this._t('alt_mode_label')}</label>
+                    <select id="modal-alt-mode">
+                      <option value="calendar" ${(!this._editingCell.altMode || this._editingCell.altMode === 'calendar') ? 'selected' : ''}>${this._t('alt_mode_calendar')}</option>
+                      <option value="calendar_or_kw" ${this._editingCell.altMode === 'calendar_or_kw' ? 'selected' : ''}>${this._t('alt_mode_calendar_kw')}</option>
+                      <option value="even_odd" ${this._editingCell.altMode === 'even_odd' ? 'selected' : ''}>${this._t('alt_mode_kw')}</option>
+                    </select>
+                  </div>
+                  <div class="form-group half" id="modal-alt-week-group" style="${(!this._editingCell.altMode || this._editingCell.altMode === 'calendar') ? 'display: none;' : 'display: block;'}">
+                    <label>${this._t('alt_week_label')}</label>
+                    <select id="modal-alt-week">
+                      <option value="even" ${(!this._editingCell.altWeek || this._editingCell.altWeek === 'even') ? 'selected' : ''}>${this._t('alt_week_even')}</option>
+                      <option value="odd" ${this._editingCell.altWeek === 'odd' ? 'selected' : ''}>${this._t('alt_week_odd')}</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -4971,6 +5199,12 @@ Natur und Technik:
           subject: targetCell.dataset.subject,
           room: targetCell.dataset.room,
           teacher: targetCell.dataset.teacher,
+          isAlternating: targetCell.dataset.isAlternating === 'true',
+          altSubject: targetCell.dataset.altSubject || '',
+          altRoom: targetCell.dataset.altRoom || '',
+          altTeacher: targetCell.dataset.altTeacher || '',
+          altMode: targetCell.dataset.altMode || 'calendar',
+          altWeek: targetCell.dataset.altWeek || 'even',
         };
         this.render();
       });
@@ -5000,6 +5234,36 @@ Natur und Technik:
         });
       }
 
+      const isAltCheckbox = root.querySelector('#modal-is-alternating');
+      const altContainer = root.querySelector('#modal-alternating-container');
+      if (isAltCheckbox && altContainer) {
+        isAltCheckbox.addEventListener('change', (e) => {
+          altContainer.style.display = e.target.checked ? 'block' : 'none';
+        });
+      }
+
+      const altSubjectSelect = root.querySelector('#modal-alt-subject-select');
+      const customAltSubjectInput = root.querySelector('#modal-custom-alt-subject');
+      if (altSubjectSelect && customAltSubjectInput) {
+        altSubjectSelect.addEventListener('change', (e) => {
+          if (e.target.value === '__custom__') {
+            customAltSubjectInput.style.display = 'block';
+            customAltSubjectInput.value = '';
+            customAltSubjectInput.focus();
+          } else {
+            customAltSubjectInput.style.display = 'none';
+          }
+        });
+      }
+
+      const altModeSelect = root.querySelector('#modal-alt-mode');
+      const altWeekGroup = root.querySelector('#modal-alt-week-group');
+      if (altModeSelect && altWeekGroup) {
+        altModeSelect.addEventListener('change', (e) => {
+          altWeekGroup.style.display = (e.target.value === 'calendar') ? 'none' : 'block';
+        });
+      }
+
       const cancelBtn = root.querySelector('#modal-cancel-btn');
       if (cancelBtn) {
         cancelBtn.addEventListener('click', () => {
@@ -5024,6 +5288,12 @@ Natur und Technik:
             subject: '',
             room: '',
             teacher: '',
+            is_alternating: false,
+            alt_subject: '',
+            alt_room: '',
+            alt_teacher: '',
+            alt_mode: 'calendar',
+            alt_week: 'even',
           };
 
           // Also remove directly from current child schedule immediately
@@ -5048,6 +5318,12 @@ Natur und Technik:
               subject: '',
               room: '',
               teacher: '',
+              is_alternating: false,
+              alt_subject: '',
+              alt_room: '',
+              alt_teacher: '',
+              alt_mode: 'calendar',
+              alt_week: 'even',
             });
           } catch (err) {
             console.error('Failed to clear timetable cell:', err);
@@ -5071,6 +5347,27 @@ Natur und Technik:
           const roomVal = subjectVal ? (root.querySelector('#modal-room').value || '').trim() : '';
           const teacherVal = subjectVal ? (root.querySelector('#modal-teacher').value || '').trim() : '';
 
+          const isAltChecked = root.querySelector('#modal-is-alternating') ? root.querySelector('#modal-is-alternating').checked : false;
+          let altSubjectVal = '';
+          let altRoomVal = '';
+          let altTeacherVal = '';
+          let altModeVal = 'calendar';
+          let altWeekVal = 'even';
+
+          if (isAltChecked) {
+            const altSelect = root.querySelector('#modal-alt-subject-select');
+            if (altSelect) {
+              altSubjectVal = altSelect.value;
+              if (altSubjectVal === '__custom__') {
+                altSubjectVal = (root.querySelector('#modal-custom-alt-subject').value || '').trim();
+              }
+            }
+            altRoomVal = (root.querySelector('#modal-alt-room')?.value || '').trim();
+            altTeacherVal = (root.querySelector('#modal-alt-teacher')?.value || '').trim();
+            altModeVal = root.querySelector('#modal-alt-mode')?.value || 'calendar';
+            altWeekVal = root.querySelector('#modal-alt-week')?.value || 'even';
+          }
+
           // Optimistically update local timetable schedule
           if (!this._localTimetableSchedule) this._localTimetableSchedule = {};
           if (!this._localTimetableSchedule[childName]) this._localTimetableSchedule[childName] = {};
@@ -5079,10 +5376,16 @@ Natur und Technik:
             subject: subjectVal,
             room: roomVal,
             teacher: teacherVal,
+            is_alternating: isAltChecked,
+            alt_subject: altSubjectVal,
+            alt_room: altRoomVal,
+            alt_teacher: altTeacherVal,
+            alt_mode: altModeVal,
+            alt_week: altWeekVal,
           };
 
           const currentChild = this._data && this._data[childName];
-          if (!subjectVal && currentChild && currentChild.timetable && currentChild.timetable.schedule) {
+          if (!subjectVal && !altSubjectVal && !isAltChecked && currentChild && currentChild.timetable && currentChild.timetable.schedule) {
             const possibleSlots = [slotId, slotId.startsWith('slot_') ? slotId.replace('slot_', '') : `slot_${slotId}`];
             for (const ps of possibleSlots) {
               if (currentChild.timetable.schedule[ps]) {
@@ -5102,6 +5405,12 @@ Natur und Technik:
               subject: subjectVal,
               room: roomVal,
               teacher: teacherVal,
+              is_alternating: isAltChecked,
+              alt_subject: altSubjectVal,
+              alt_room: altRoomVal,
+              alt_teacher: altTeacherVal,
+              alt_mode: altModeVal,
+              alt_week: altWeekVal,
             });
           } catch (err) {
             console.error('Failed to update timetable cell:', err);
@@ -5839,6 +6148,10 @@ Natur und Technik:
 
       .timetable-cell.today-col {
         background: rgba(59, 130, 246, 0.03);
+      }
+
+      .timetable-cell.is-alternating {
+        border-left: 3px solid rgba(168, 85, 247, 0.5) !important;
       }
 
       .timetable-cell.now-cell {

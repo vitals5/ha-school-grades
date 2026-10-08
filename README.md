@@ -46,6 +46,11 @@ Mit dem **integrierten Sidebar-Panel** (`/schulnoten`) verwaltest du Noten, Fäc
   - **Tages-Highlighting**: Heutiger Wochentag wird automatisch im Header und in den Spalten hervorgehoben (`HEUTE`).
   - **Live-Unterrichtsanzeige (`⚡ JETZT`)**: Markiert die aktuell laufende Unterrichtsstunde in Echtzeit.
   - **Visueller Cell-Editor**: Klick auf eine Zelle zum Bearbeiten von Fach, Raumnummer (📍) und Lehrkraft (👨‍🏫). Eigene Fächer können direkt im Dialog erstellt werden.
+  - **14-tägige Wechselfächer (jede 2. Woche)**: Volle Unterstützung für Fächer im zweiwöchigen Turnus (z. B. Fach A im Wechsel mit Fach B oder Fach A im Wechsel mit einer Freistunde).
+    - **Kalender-gesteuert (`calendar`)**: Ein Kalendereintrag (Home Assistant / Google Kalender) an dem Tag bestimmt dynamisch das Fach – ideal bei unregelmäßigen Terminen oder Verschiebungen durch Schulferien/Feiertage.
+    - **Kalenderwoche mit Termin-Vorrang (`calendar_or_kw`)**: Rotation nach A/B-Wochen (gerade/ungerade KW), wobei ein konkreter Kalendereintrag jederzeit Vorrang hat.
+    - **Feste Kalenderwochen (`even_odd`)**: Feste Zuordnung nach geraden/ungeraden ISO-Kalenderwochen.
+    - Voll integriert in die Schultaschen-Packliste für den nächsten Schultag und den Schulzeit-Sensor!
   - **YAML Import & Export**: Stundenpläne bequem im YAML-Format importieren oder exportieren.
 - 📆 **Klausuren- & Termine-Kalender**:
   - Verknüpfung mit jedem beliebigen Home Assistant Kalender (z. B. Google Kalender, CalDAV, lokaler Kalender).
@@ -111,7 +116,7 @@ Die Integration stellt folgende Aktionen (Services) für Automatisierungen oder 
 | `school_grades.add_calendar_event` | Termin/Klausur im Kalender eintragen | `child_name`, `summary`, `start_time`, `end_time`, `description` |
 | `school_grades.update_calendar_event` | Kalendertermin bearbeiten | `child_name`, `event_uid`, `summary`, `start_time`, `end_time`, `description` |
 | `school_grades.remove_calendar_event` | Termin aus Kalender löschen | `child_name`, `event_uid` |
-| `school_grades.update_timetable_cell` | Stundenplan-Zelle bearbeiten | `child_name`, `slot_id`, `day`, `subject`, `room`, `teacher` |
+| `school_grades.update_timetable_cell` | Stundenplan-Zelle bearbeiten | `child_name`, `slot_id`, `day`, `subject`, `room`, `teacher`, `is_alternating`, `alt_subject`, `alt_room`, `alt_teacher`, `alt_mode`, `alt_week` |
 | `school_grades.import_timetable` | Stundenplan per YAML importieren | `child_name`, `yaml_content` |
 | `school_grades.update_settings` | Land, Klasse & Einstellungen aktualisieren | `child_name`, `country`, `grade_level`, `calendar_entity`, `show_prep_card`, ... |
 | `school_grades.sync_elternportal` | Eltern-Portal synchronisieren | `child_name` (optional: leer für alle Kinder) |
@@ -353,6 +358,11 @@ With the **built-in Sidebar Panel** (`/schulnoten`), you can manage grades, subj
   - **Day Highlighting**: Automatically highlights current day in header and columns (`TODAY`).
   - **Live Class Indicator (`⚡ NOW`)**: Marks the currently active lesson period in real time.
   - **Visual Cell Editor**: Click any cell to edit subject, room number (📍), and teacher (👨🏫). Custom subjects can be created directly within the dialog.
+  - **14-Day Alternating Subjects (Bi-weekly)**: Full support for subjects alternating every 2nd week (e.g. Subject A alternating with Subject B, or Subject A alternating with a free period).
+    - **Calendar-driven (`calendar`)**: An event in your linked calendar on that day dynamically chooses the active subject – ideal when school holidays or breaks shift the rotation.
+    - **Calendar week with event override (`calendar_or_kw`)**: Standard A/B week rotation (even/odd CW) with priority given to any specific calendar event.
+    - **Fixed calendar weeks (`even_odd`)**: Alternates based on even/odd ISO calendar weeks.
+    - Fully reflected in the next school day bag preparation checklist and the active school time sensor!
   - **YAML Import & Export**: Import or export timetables conveniently in YAML format.
 - 📆 **Exams & Events Calendar**:
   - Link any Home Assistant calendar (e.g. Google Calendar, CalDAV, Local HA Calendar).
@@ -418,7 +428,7 @@ The integration provides the following actions (services) for automations and sc
 | `school_grades.add_calendar_event` | Add exam/event to calendar | `child_name`, `summary`, `start_time`, `end_time`, `description` |
 | `school_grades.update_calendar_event` | Update calendar event | `child_name`, `event_uid`, `summary`, `start_time`, `end_time`, `description` |
 | `school_grades.remove_calendar_event` | Delete event from calendar | `child_name`, `event_uid` |
-| `school_grades.update_timetable_cell` | Edit timetable slot | `child_name`, `slot_id`, `day`, `subject`, `room`, `teacher` |
+| `school_grades.update_timetable_cell` | Edit timetable slot | `child_name`, `slot_id`, `day`, `subject`, `room`, `teacher`, `is_alternating`, `alt_subject`, `alt_room`, `alt_teacher`, `alt_mode`, `alt_week` |
 | `school_grades.import_timetable` | Import timetable via YAML | `child_name`, `yaml_content` |
 | `school_grades.update_settings` | Update settings & grade level | `child_name`, `country`, `grade_level`, `calendar_entity`, ... |
 | `school_grades.sync_elternportal` | Synchronize Eltern-Portal | `child_name` (optional: empty for all children) |
