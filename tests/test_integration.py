@@ -872,6 +872,83 @@ class TestMultiLanguageSupport(unittest.TestCase):
         for pl in primary_langs:
             self.assertIn(f"{pl}: {{", content, f"Language {pl} block missing in school-grades-panel.js I18N")
 
+    def test_panel_js_runtime_execution(self):
+        """Verify school-grades-panel.js can be evaluated and executed by Node.js without runtime/syntax errors."""
+        import subprocess
+        panel_path = project_root / "custom_components" / "school_grades" / "frontend" / "school-grades-panel.js"
+        node_script = f"""
+let PanelClass;
+global.HTMLElement = class {{
+  attachShadow() {{
+    this.shadowRoot = {{
+      innerHTML: "",
+      querySelector: () => ({{ addEventListener: () => {{}}, value: "", checked: false, style: {{}} }}),
+      querySelectorAll: () => []
+    }};
+    return this.shadowRoot;
+  }}
+}};
+global.customElements = {{
+  define: (tag, cls) => {{ PanelClass = cls; }}
+}};
+
+const fs = require("fs");
+let code = fs.readFileSync({json.dumps(str(panel_path))}, "utf8");
+eval(code);
+
+const panel = new PanelClass();
+const mockHass = {{
+  states: {{
+    "sensor.richard_schulnoten": {{
+      state: "2.1",
+      attributes: {{
+        kind_name: "Richard",
+        country: "DE",
+        grade_level: "5a",
+        homework_done: false,
+        preparation_done: false,
+        prepared_subjects: {{}},
+        timetable: {{
+          slots: [
+            {{ id: "slot_1", label: "1. Stunde", start: "08:00", end: "08:45" }}
+          ],
+          schedule: {{
+            slot_1: {{
+              monday: {{
+                subject: "Mathe",
+                room: "R101",
+                teacher: "Hr. A",
+                is_alternating: true,
+                alt_subject: "Physik",
+                alt_room: "PH1",
+                alt_teacher: "Dr. N",
+                alt_mode: "calendar",
+                alt_week: "even"
+              }}
+            }}
+          }}
+        }},
+        subjects: {{
+          Mathe: {{ grades: [2], weight: 1 }}
+        }}
+      }}
+    }}
+  }},
+  language: "de",
+  callWS: async () => []
+}};
+
+panel.hass = mockHass;
+panel.render();
+if (!panel.shadowRoot.innerHTML || panel.shadowRoot.innerHTML.length < 100) {{
+  throw new Error("Render produced empty HTML");
+}}
+console.log("OK");
+"""
+        proc = subprocess.run(["node", "-e", node_script], capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0, f"Node execution failed:\n{proc.stderr}")
+        self.assertIn("OK", proc.stdout)
+
     def test_school_from_input_parsing(self):
         """Test URL and identifier parsing for Eltern-Portal."""
         sfi = portal_mod.school_from_input

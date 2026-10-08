@@ -2029,7 +2029,7 @@ class SchoolGradesPanel extends HTMLElement {
       // Check if all needed subjects for next school day are prepared
       const timetable = child.timetable;
       if (timetable) {
-        const nextDayInfo = this._getNextSchoolDayInfo(timetable, []);
+        const nextDayInfo = this._getNextSchoolDayInfo(timetable, [], child);
         if (nextDayInfo && nextDayInfo.lessons && nextDayInfo.lessons.length > 0) {
           const allPrepared = nextDayInfo.lessons.every(l => Boolean(child.preparedSubjects && child.preparedSubjects[l.subject]));
           child.preparationDone = allPrepared;
@@ -2232,7 +2232,7 @@ class SchoolGradesPanel extends HTMLElement {
     this.render();
   }
 
-  _getNextSchoolDayInfo(timetable, calendarEvents) {
+  _getNextSchoolDayInfo(timetable, calendarEvents, child = null) {
     const now = new Date();
     const currentDay = now.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
     const currentMins = now.getHours() * 60 + now.getMinutes();
@@ -2478,7 +2478,7 @@ class SchoolGradesPanel extends HTMLElement {
     const altWeek = (cell.alt_week || 'even').trim().toLowerCase();
 
     // Check calendar events for child on dateIsoStr
-    const childName = (child && child.child_name) || this._selectedChild;
+    const childName = (child && (child.child_name || child.name)) || this._selectedChild;
     const events = (this._calendarEvents && this._calendarEvents[childName]) || [];
 
     const matchesSubject = (testSubj) => {
@@ -3179,7 +3179,7 @@ Natur und Technik:
 
         <!-- Preparation Card for Next School Day (Interactive Clickable Subjects) -->
         ${secVis.show_prep_card ? (() => {
-          const nextDay = this._getNextSchoolDayInfo(timetable, upcomingEvents);
+          const nextDay = this._getNextSchoolDayInfo(timetable, upcomingEvents, currentChild);
           if (nextDay.isDuringSchool) return '';
           return `
             <div class="card prep-card" style="margin-bottom: 24px;">
