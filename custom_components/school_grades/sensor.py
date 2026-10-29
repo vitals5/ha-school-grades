@@ -140,6 +140,8 @@ class SchoolGradeTotalSensor(SensorEntity):
     _attr_icon = "mdi:calculator-variant"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_has_entity_name = False
+    # Keep portal account details out of the recorder database
+    _unrecorded_attributes = frozenset({"portal_school", "portal_username"})
 
     def __init__(self, storage: SchoolGradesStorage, entry_id: str) -> None:
         """Initialize total average sensor."""

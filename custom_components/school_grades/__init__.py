@@ -10,6 +10,7 @@ import voluptuous as vol
 from homeassistant.components import frontend, panel_custom, websocket_api
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse, callback
+from homeassistant.exceptions import Unauthorized, UnknownUser
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
@@ -380,6 +381,19 @@ def _get_storage(hass: HomeAssistant, child_name: str | None = None) -> SchoolGr
     return next(iter(entries.values()))
 
 
+async def _async_require_admin(hass: HomeAssistant, call: ServiceCall) -> None:
+    """Reject service calls touching portal credentials unless made by an admin."""
+    user_id = call.context.user_id
+    if not user_id:
+        # Calls from automations/scripts without a user context are allowed
+        return
+    user = await hass.auth.async_get_user(user_id)
+    if user is None:
+        raise UnknownUser(context=call.context, user_id=user_id)
+    if not user.is_admin:
+        raise Unauthorized(context=call.context)
+
+
 def _register_services(hass: HomeAssistant) -> None:
     """Register custom integration services/actions."""
     if hass.services.has_service(DOMAIN, SERVICE_ADD_SUBJECT):
@@ -603,6 +617,7 @@ def _register_services(hass: HomeAssistant) -> None:
 
     async def handle_test_elternportal(call: ServiceCall) -> dict[str, Any]:
         """Test connection to Eltern-Portal and retrieve student list."""
+        await _async_require_admin(hass, call)
         child_name = call.data.get(CONF_CHILD_NAME)
         school = call.data[CONF_PORTAL_SCHOOL]
         username = call.data.get(CONF_PORTAL_USERNAME, "")
@@ -624,6 +639,7 @@ def _register_services(hass: HomeAssistant) -> None:
 
     async def handle_update_portal_settings(call: ServiceCall) -> None:
         """Update Eltern-Portal settings for a specific child."""
+        await _async_require_admin(hass, call)
         child_name = call.data[CONF_CHILD_NAME]
         enabled = call.data[CONF_PORTAL_ENABLED]
         school = call.data.get(CONF_PORTAL_SCHOOL, "")
@@ -681,6 +697,7 @@ def _register_services(hass: HomeAssistant) -> None:
                 except Exception as clean_err:
                     _LOGGER.warning("Could not cleanup calendar on settings update for %s: %s", child_name, clean_err)
 
+    @websocket_api.require_admin
     @websocket_api.websocket_command(
         {
             vol.Required("type"): "school_grades/get_sibling_portal_credentials",
@@ -705,11 +722,12 @@ def _register_services(hass: HomeAssistant) -> None:
                 "success": True,
                 "school": sib_storage.data.portal_school,
                 "username": sib_storage.data.portal_username,
-                "password": sib_storage.data.portal_password,
+                "has_password": bool(sib_storage.data.portal_password),
                 "student_id": sib_storage.data.portal_student_id,
             },
         )
 
+    @websocket_api.require_admin
     @websocket_api.websocket_command(
         {
             vol.Required("type"): "school_grades/test_elternportal",
