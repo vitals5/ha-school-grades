@@ -3139,12 +3139,12 @@ Natur und Technik:
               const gradeLevelStr = cData && cData.gradeLevel ? ` (${cData.gradeLevel})` : '';
               const isSyncing = this._portalHeaderSyncing && name === this._selectedChild;
               const portalBadge = cData && cData.portalEnabled ? `
-                <span class="child-portal-sync-badge ${isSyncing ? 'syncing' : ''}" data-child="${name}" title="Eltern-Portal für ${name} synchronisieren (Klicken zum Abrufen, max. 1x/Min)" style="cursor: pointer; margin-left: 6px; padding: 2px 6px; border-radius: 6px; background: rgba(59,130,246,0.25); border: 1px solid rgba(59,130,246,0.45); font-size: 11px; display: inline-flex; align-items: center; gap: 3px;">
+                <span class="child-portal-sync-badge ${isSyncing ? 'syncing' : ''}" data-child="${this._escapeHtml(name)}" title="Eltern-Portal für ${this._escapeHtml(name)} synchronisieren (Klicken zum Abrufen, max. 1x/Min)" style="cursor: pointer; margin-left: 6px; padding: 2px 6px; border-radius: 6px; background: rgba(59,130,246,0.25); border: 1px solid rgba(59,130,246,0.45); font-size: 11px; display: inline-flex; align-items: center; gap: 3px;">
                   🏫${isSyncing ? '<span class="spin-icon">⏳</span>' : ''}
                 </span>` : '';
               return `
-                <button class="tab-btn ${name === this._selectedChild ? 'active' : ''}" data-child="${name}">
-                  👤 ${name}${gradeLevelStr}${portalBadge}
+                <button class="tab-btn ${name === this._selectedChild ? 'active' : ''}" data-child="${this._escapeHtml(name)}">
+                  👤 ${this._escapeHtml(name)}${this._escapeHtml(gradeLevelStr)}${portalBadge}
                 </button>
               `;
             }).join('')}
@@ -3199,7 +3199,7 @@ Natur und Technik:
                   <div class="exam-alert-content">
                     <strong>${this._t('prep_exam_alert')}</strong>
                     <div class="exam-alert-list">
-                      ${nextDay.exams.map(e => `• <b>${e.summary}</b>${e.subject ? ' <span style="color:#6ee7b7; font-size:11px; font-weight:600;">[' + e.subject + ']</span>' : ''} ${e.location ? ' (📍 ' + e.location + ')' : ''}`).join(' ')}
+                      ${nextDay.exams.map(e => `• <b>${this._escapeHtml(e.summary)}</b>${e.subject ? ' <span style="color:#6ee7b7; font-size:11px; font-weight:600;">[' + this._escapeHtml(e.subject) + ']</span>' : ''} ${e.location ? ' (📍 ' + this._escapeHtml(e.location) + ')' : ''}`).join(' ')}
                     </div>
                   </div>
                 </div>
@@ -3219,11 +3219,11 @@ Natur und Technik:
                       <div style="font-size: 12px; color: var(--primary-text-color, #fff); margin-top: 4px; display: flex; flex-direction: column; gap: 3px;">
                         ${entries.map(s => {
                           const kindText = s.kind === 'entfall' ? this._t('subst_badge_cancelled') : (s.kind === 'raum' ? this._t('subst_badge_room') : this._t('subst_badge_subst'));
-                          const infoDetail = s.info ? ` (${s.info})` : '';
-                          const roomDetail = s.room ? ` in ${s.room}` : '';
-                          const teacherDetail = s.substitute ? ` durch ${s.substitute}` : '';
+                          const infoDetail = s.info ? ` (${this._escapeHtml(s.info)})` : '';
+                          const roomDetail = s.room ? ` in ${this._escapeHtml(s.room)}` : '';
+                          const teacherDetail = s.substitute ? ` durch ${this._escapeHtml(s.substitute)}` : '';
                           const displaySubj = this._resolveSubjectName(s.subject_resolved || s.subject, currentChild) || s.subject;
-                          return `<div>• <b>${s.lesson}. Std:</b> ${displaySubj} — <span style="font-weight:600;">${kindText}</span>${teacherDetail}${roomDetail}${infoDetail}</div>`;
+                          return `<div>• <b>${this._escapeHtml(s.lesson)}. Std:</b> ${this._escapeHtml(displaySubj)} — <span style="font-weight:600;">${kindText}</span>${teacherDetail}${roomDetail}${infoDetail}</div>`;
                         }).join('')}
                       </div>
                     </div>
@@ -3257,22 +3257,22 @@ Natur und Technik:
                       const isPrepared = Boolean(prepSubjectsMap[l.subject]);
                       return `
                         <div class="prep-item prep-item-clickable ${isPrepared ? 'prepared-subject' : ''} ${isExamSubject ? 'has-exam' : ''} ${isCancelled ? 'cancelled-subject' : ''}"
-                             data-subject="${l.subject}"
+                             data-subject="${this._escapeHtml(l.subject)}"
                              style="cursor: pointer; ${isPrepared ? 'border: 2px solid #22c55e !important; background: rgba(34, 197, 94, 0.14) !important;' : ''} ${isCancelled ? 'opacity: 0.65; border: 1px dashed rgba(239,68,68,0.5);' : ''}">
                           <div class="prep-item-top">
-                            <span class="prep-slot-badge">${l.slotLabel}</span>
-                            <span class="prep-slot-time">${l.slotTime}</span>
+                            <span class="prep-slot-badge">${this._escapeHtml(l.slotLabel)}</span>
+                            <span class="prep-slot-time">${this._escapeHtml(l.slotTime)}</span>
                           </div>
                           <div class="prep-subject-name" style="display: flex; align-items: center; justify-content: space-between;">
-                            <span style="${isCancelled ? 'text-decoration: line-through;' : ''}">${l.subject}</span>
+                            <span style="${isCancelled ? 'text-decoration: line-through;' : ''}">${this._escapeHtml(l.subject)}</span>
                             <div style="display: flex; align-items: center; gap: 4px;">
                               ${isCancelled ? `<span style="font-size: 10px; font-weight: 700; background: rgba(239,68,68,0.25); color: #fca5a5; border: 1px solid rgba(239,68,68,0.4); border-radius: 4px; padding: 1px 5px;">${this._t('subst_badge_cancelled')}</span>` : (matchingSubst && matchingSubst.kind === 'vertretung' ? `<span style="font-size: 10px; font-weight: 700; background: rgba(59,130,246,0.25); color: #93c5fd; border: 1px solid rgba(59,130,246,0.4); border-radius: 4px; padding: 1px 5px;">${this._t('subst_badge_subst')}</span>` : (matchingSubst && matchingSubst.kind === 'raum' ? `<span style="font-size: 10px; font-weight: 700; background: rgba(234,179,8,0.25); color: #fde047; border: 1px solid rgba(234,179,8,0.4); border-radius: 4px; padding: 1px 5px;">${this._t('subst_badge_room')}</span>` : ''))}
                               <span class="prep-check-icon" style="color: #22c55e; font-size: 16px; font-weight: bold; ${isPrepared ? 'display: inline;' : 'display: none;'}">✓</span>
                             </div>
                           </div>
                           <div class="prep-meta">
-                            ${matchingSubst && matchingSubst.room ? `<span class="prep-meta-tag" style="color: #fde047;">📍 ${matchingSubst.room}</span>` : (l.room ? `<span class="prep-meta-tag">📍 ${l.room}</span>` : '')}
-                            ${matchingSubst && matchingSubst.substitute ? `<span class="prep-meta-tag" style="color: #93c5fd;">👨‍🏫 ${matchingSubst.substitute}</span>` : (l.teacher ? `<span class="prep-meta-tag">👨‍🏫 ${l.teacher}</span>` : '')}
+                            ${matchingSubst && matchingSubst.room ? `<span class="prep-meta-tag" style="color: #fde047;">📍 ${this._escapeHtml(matchingSubst.room)}</span>` : (l.room ? `<span class="prep-meta-tag">📍 ${this._escapeHtml(l.room)}</span>` : '')}
+                            ${matchingSubst && matchingSubst.substitute ? `<span class="prep-meta-tag" style="color: #93c5fd;">👨‍🏫 ${this._escapeHtml(matchingSubst.substitute)}</span>` : (l.teacher ? `<span class="prep-meta-tag">👨‍🏫 ${this._escapeHtml(l.teacher)}</span>` : '')}
                           </div>
                           ${isExamSubject ? `<div class="prep-exam-badge">${this._t('exam_badge')}</div>` : ''}
                         </div>
@@ -3333,17 +3333,17 @@ Natur und Technik:
                     }
 
                     return `
-                      <div class="event-item clickable-event" data-uid="${evt.uid || ''}" data-summary="${this._escapeHtml(evt.summary || '')}" data-start="${evt.start || ''}" data-desc="${this._escapeHtml(evt.description || '')}" data-subject="${this._escapeHtml(evt.subject || '')}" data-is-portal="${evt.isPortal ? '1' : '0'}" data-is-exam="${evt.isExam ? '1' : '0'}" style="cursor: pointer; ${borderStyle}" title="${this._t('edit_event_title')}">
+                      <div class="event-item clickable-event" data-uid="${this._escapeHtml(evt.uid || '')}" data-summary="${this._escapeHtml(evt.summary || '')}" data-start="${this._escapeHtml(evt.start || '')}" data-desc="${this._escapeHtml(evt.description || '')}" data-subject="${this._escapeHtml(evt.subject || '')}" data-is-portal="${evt.isPortal ? '1' : '0'}" data-is-exam="${evt.isExam ? '1' : '0'}" style="cursor: pointer; ${borderStyle}" title="${this._t('edit_event_title')}">
                         <div class="event-badge-row" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                           <span class="event-countdown ${countdownText.cls}">${countdownText.text}</span>
                           <span class="event-time">${formattedDate} ${!isAllDay ? this._t('time_at', { time: formattedTime }) : this._t('all_day')}</span>
                           ${evt.isExam ? `<span style="background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 4px; padding: 1px 6px; font-size: 11px; font-weight: 600;">📝 ${this._t('portal_exam_badge')}</span>` : ''}
                           ${evt.isPortal ? `<span style="background: rgba(59, 130, 246, 0.2); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 4px; padding: 1px 6px; font-size: 11px; font-weight: 600;">🏫 Portal</span>` : ''}
                         </div>
-                        <h4 class="event-title">${evt.summary}</h4>
-                        ${evt.subject ? `<div class="event-detail" style="color: #6ee7b7; font-weight: 600; font-size: 12px; margin-top: 2px;">📚 ${this._t('subject_label')}: ${evt.subject}</div>` : ''}
-                        ${evt.location ? `<div class="event-detail">📍 ${evt.location}</div>` : ''}
-                        ${evt.description ? `<div class="event-detail desc">📝 ${evt.description}</div>` : ''}
+                        <h4 class="event-title">${this._escapeHtml(evt.summary)}</h4>
+                        ${evt.subject ? `<div class="event-detail" style="color: #6ee7b7; font-weight: 600; font-size: 12px; margin-top: 2px;">📚 ${this._t('subject_label')}: ${this._escapeHtml(evt.subject)}</div>` : ''}
+                        ${evt.location ? `<div class="event-detail">📍 ${this._escapeHtml(evt.location)}</div>` : ''}
+                        ${evt.description ? `<div class="event-detail desc">📝 ${this._escapeHtml(evt.description)}</div>` : ''}
                       </div>
                     `;
                   }).join('')}
@@ -3364,7 +3364,7 @@ Natur und Technik:
               <div class="timetable-header-actions">
                 ${currentChild && currentChild.portalSubstitutions && currentChild.portalSubstitutions.stand ? `
                   <span style="font-size: 11px; color: #93c5fd; background: rgba(59,130,246,0.15); padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(59,130,246,0.3); font-weight: 500;">
-                    ${this._t('portal_subst_stand')} ${currentChild.portalSubstitutions.stand}
+                    ${this._t('portal_subst_stand')} ${this._escapeHtml(currentChild.portalSubstitutions.stand)}
                   </span>
                 ` : ''}
                 <div class="timetable-legend">
@@ -3393,7 +3393,7 @@ Natur und Technik:
                       return `
                         <tr class="break-row">
                           <td class="time-cell break-cell-title">
-                            <span class="break-icon">☕</span> ${slot.label} <span class="slot-time">(${slot.start} - ${slot.end})</span>
+                            <span class="break-icon">☕</span> ${this._escapeHtml(slot.label)} <span class="slot-time">(${this._escapeHtml(slot.start)} - ${this._escapeHtml(slot.end)})</span>
                           </td>
                           <td colspan="5" class="break-cell-content">
                             ${this._t('break_label')}
@@ -3405,8 +3405,8 @@ Natur und Technik:
                     return `
                       <tr>
                         <td class="time-cell">
-                          <div class="slot-num">${slot.label}</div>
-                          <div class="slot-time">${slot.start} - ${slot.end}</div>
+                          <div class="slot-num">${this._escapeHtml(slot.label)}</div>
+                          <div class="slot-time">${this._escapeHtml(slot.start)} - ${this._escapeHtml(slot.end)}</div>
                         </td>
                         ${DAYS.map(d => {
                           const cellData = (schedule[slot.id] && schedule[slot.id][d.key]) || {};
@@ -3428,24 +3428,24 @@ Natur und Technik:
                             <td class="timetable-cell ${isToday ? 'today-col' : ''} ${isNow ? 'now-cell' : ''} ${hasContent ? 'has-subject' : 'empty-cell'} ${subst ? 'has-substitution' : ''} ${isAlternating ? 'is-alternating' : ''}"
                                 data-slot-id="${slot.id}"
                                 data-day="${d.key}"
-                                data-slot-label="${slot.label} (${slot.start}-${slot.end})"
+                                data-slot-label="${this._escapeHtml(slot.label)} (${this._escapeHtml(slot.start)}-${this._escapeHtml(slot.end)})"
                                 data-day-label="${dayNames[d.key] || d.key}"
-                                data-subject="${cellData.subject || ''}"
-                                data-room="${cellData.room || ''}"
-                                data-teacher="${cellData.teacher || ''}"
+                                data-subject="${this._escapeHtml(cellData.subject || '')}"
+                                data-room="${this._escapeHtml(cellData.room || '')}"
+                                data-teacher="${this._escapeHtml(cellData.teacher || '')}"
                                 data-is-alternating="${isAlternating ? 'true' : 'false'}"
-                                data-alt-subject="${cellData.alt_subject || ''}"
-                                data-alt-room="${cellData.alt_room || ''}"
-                                data-alt-teacher="${cellData.alt_teacher || ''}"
-                                data-alt-mode="${cellData.alt_mode || 'calendar'}"
-                                data-alt-week="${cellData.alt_week || 'even'}">
+                                data-alt-subject="${this._escapeHtml(cellData.alt_subject || '')}"
+                                data-alt-room="${this._escapeHtml(cellData.alt_room || '')}"
+                                data-alt-teacher="${this._escapeHtml(cellData.alt_teacher || '')}"
+                                data-alt-mode="${this._escapeHtml(cellData.alt_mode || 'calendar')}"
+                                data-alt-week="${this._escapeHtml(cellData.alt_week || 'even')}">
                               ${isNow ? `<div class="now-badge">${this._t('now_badge')}</div>` : ''}
                               ${isEntfall ? `
-                                <div class="subst-badge subst-entfall" style="font-size: 10px; font-weight: 700; background: rgba(239, 68, 68, 0.25); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 4px; padding: 1px 5px; margin-bottom: 3px; display: inline-block;" title="${subst.info || ''}">${this._t('subst_badge_cancelled')}</div>
+                                <div class="subst-badge subst-entfall" style="font-size: 10px; font-weight: 700; background: rgba(239, 68, 68, 0.25); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 4px; padding: 1px 5px; margin-bottom: 3px; display: inline-block;" title="${this._escapeHtml(subst.info || '')}">${this._t('subst_badge_cancelled')}</div>
                               ` : isRaum ? `
-                                <div class="subst-badge subst-raum" style="font-size: 10px; font-weight: 700; background: rgba(234, 179, 8, 0.25); color: #fde047; border: 1px solid rgba(234, 179, 8, 0.4); border-radius: 4px; padding: 1px 5px; margin-bottom: 3px; display: inline-block;" title="${subst.info || ''}">${this._t('subst_badge_room')}</div>
+                                <div class="subst-badge subst-raum" style="font-size: 10px; font-weight: 700; background: rgba(234, 179, 8, 0.25); color: #fde047; border: 1px solid rgba(234, 179, 8, 0.4); border-radius: 4px; padding: 1px 5px; margin-bottom: 3px; display: inline-block;" title="${this._escapeHtml(subst.info || '')}">${this._t('subst_badge_room')}</div>
                               ` : isVertretung ? `
-                                <div class="subst-badge subst-vertretung" style="font-size: 10px; font-weight: 700; background: rgba(59, 130, 246, 0.25); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 4px; padding: 1px 5px; margin-bottom: 3px; display: inline-block;" title="${subst.info || ''}">${this._t('subst_badge_subst')}</div>
+                                <div class="subst-badge subst-vertretung" style="font-size: 10px; font-weight: 700; background: rgba(59, 130, 246, 0.25); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 4px; padding: 1px 5px; margin-bottom: 3px; display: inline-block;" title="${this._escapeHtml(subst.info || '')}">${this._t('subst_badge_subst')}</div>
                               ` : ''}
                               ${isAlternating ? `
                                 <div class="alt-badge" style="font-size: 9px; font-weight: 600; background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 4px; padding: 1px 4px; margin-bottom: 2px; display: inline-flex; align-items: center; gap: 2px;" title="${this._t('alt_toggle_label')} (${cellData.alt_mode || 'calendar'})">
@@ -3454,15 +3454,15 @@ Natur und Technik:
                                 </div>
                               ` : ''}
                               ${hasContent ? `
-                                <div class="cell-subject" style="${isEntfall ? 'text-decoration: line-through; opacity: 0.6;' : ''}">${displaySubject || `<span style="font-style: italic; opacity: 0.6;">${this._t('free_period_label')}</span>`}</div>
+                                <div class="cell-subject" style="${isEntfall ? 'text-decoration: line-through; opacity: 0.6;' : ''}">${this._escapeHtml(displaySubject) || `<span style="font-style: italic; opacity: 0.6;">${this._t('free_period_label')}</span>`}</div>
                                 ${isAlternating && activeCell.otherSubject ? `
                                   <div style="font-size: 10px; color: var(--secondary-text-color, rgba(255, 255, 255, 0.45)); font-style: italic; margin-top: -1px; margin-bottom: 2px;" title="${this._t('alt_wechsel_prefix')} ${activeCell.otherSubject}">
                                     ${this._t('alt_wechsel_prefix')} ${activeCell.otherSubject}
                                   </div>
                                 ` : ''}
                                 <div class="cell-details">
-                                  ${displayRoom ? `<span class="cell-room" style="${isRaum ? 'color: #fde047; font-weight: 600;' : ''}">📍 ${displayRoom}</span>` : ''}
-                                  ${displayTeacher ? `<span class="cell-teacher" style="${isVertretung ? 'color: #93c5fd; font-weight: 600;' : ''}">👨‍🏫 ${displayTeacher}</span>` : ''}
+                                  ${displayRoom ? `<span class="cell-room" style="${isRaum ? 'color: #fde047; font-weight: 600;' : ''}">📍 ${this._escapeHtml(displayRoom)}</span>` : ''}
+                                  ${displayTeacher ? `<span class="cell-teacher" style="${isVertretung ? 'color: #93c5fd; font-weight: 600;' : ''}">👨‍🏫 ${this._escapeHtml(displayTeacher)}</span>` : ''}
                                 </div>
                                 ${subst && subst.info ? `<div style="font-size: 10px; color: var(--secondary-text-color, rgba(255,255,255,0.65)); margin-top: 2px;">ℹ️ ${subst.info}</div>` : ''}
                               ` : `
@@ -3504,7 +3504,7 @@ Natur und Technik:
                 <div class="form-group">
                   <label>${this._t('subject_label')}</label>
                   <select id="grade-subject" required>
-                    ${subjectList.map(s => `<option value="${s}">${s}</option>`).join('')}
+                    ${subjectList.map(s => `<option value="${this._escapeHtml(s)}">${this._escapeHtml(s)}</option>`).join('')}
                   </select>
                 </div>
 
@@ -3558,7 +3558,7 @@ Natur und Technik:
                 <div class="card subject-card">
                   <div class="subject-header">
                     <div class="subject-title">
-                      <h3>${subjName}</h3>
+                      <h3>${this._escapeHtml(subjName)}</h3>
                     </div>
                     <span class="badge avg-badge ${this._getGradeColorClass(avg, childCountry)}">${this._t('avg_label')}: ${avg}</span>
                   </div>
@@ -3586,10 +3586,10 @@ Natur und Technik:
                                 </span>
                               </td>
                               <td><span class="weight-badge">${this._t('weight_times', { weight: g.weight })}</span></td>
-                              <td class="date-cell">${g.date}</td>
-                              <td class="name-cell">${g.name || '–'}</td>
+                              <td class="date-cell">${this._escapeHtml(g.date)}</td>
+                              <td class="name-cell">${this._escapeHtml(g.name || '–')}</td>
                               <td>
-                                <button class="icon-btn delete-grade-btn" data-subject="${subjName}" data-id="${g.id}" title="${this._t('delete_btn')}">
+                                <button class="icon-btn delete-grade-btn" data-subject="${this._escapeHtml(subjName)}" data-id="${g.id}" title="${this._t('delete_btn')}">
                                   🗑️
                                 </button>
                               </td>
@@ -3663,7 +3663,7 @@ Natur und Technik:
           <div class="modal-card">
             <div class="modal-header">
               <h3>${this._t('modal_cell_title')}</h3>
-              <span class="modal-subtitle">${this._editingCell.slotLabel} • ${this._editingCell.dayLabel}</span>
+              <span class="modal-subtitle">${this._escapeHtml(this._editingCell.slotLabel)} • ${this._escapeHtml(this._editingCell.dayLabel)}</span>
             </div>
 
             <form id="timetable-edit-form">
@@ -3672,10 +3672,10 @@ Natur und Technik:
                 <select id="modal-subject-select">
                   <option value="">${this._t('no_subject_free')}</option>
                   ${subjectList.map(s => `
-                    <option value="${s}" ${this._editingCell.subject === s ? 'selected' : ''}>${s}</option>
+                    <option value="${this._escapeHtml(s)}" ${this._editingCell.subject === s ? 'selected' : ''}>${this._escapeHtml(s)}</option>
                   `).join('')}
                   ${this._editingCell.subject && !subjectList.includes(this._editingCell.subject) ? `
-                    <option value="${this._editingCell.subject}" selected>${this._editingCell.subject}</option>
+                    <option value="${this._escapeHtml(this._editingCell.subject)}" selected>${this._escapeHtml(this._editingCell.subject)}</option>
                   ` : ''}
                   <option value="__custom__">${this._t('custom_subject_opt')}</option>
                 </select>
@@ -3685,11 +3685,11 @@ Natur und Technik:
               <div class="form-row">
                 <div class="form-group half">
                   <label>${this._t('room_label')}</label>
-                  <input type="text" id="modal-room" placeholder="${this._t('room_placeholder')}" value="${this._editingCell.room || ''}">
+                  <input type="text" id="modal-room" placeholder="${this._t('room_placeholder')}" value="${this._escapeHtml(this._editingCell.room || '')}">
                 </div>
                 <div class="form-group half">
                   <label>${this._t('teacher_label')}</label>
-                  <input type="text" id="modal-teacher" placeholder="${this._t('teacher_placeholder')}" value="${this._editingCell.teacher || ''}">
+                  <input type="text" id="modal-teacher" placeholder="${this._t('teacher_placeholder')}" value="${this._escapeHtml(this._editingCell.teacher || '')}">
                 </div>
               </div>
 
@@ -3711,10 +3711,10 @@ Natur und Technik:
                   <select id="modal-alt-subject-select">
                     <option value="">${this._t('no_subject_free')}</option>
                     ${subjectList.map(s => `
-                      <option value="${s}" ${this._editingCell.altSubject === s ? 'selected' : ''}>${s}</option>
+                      <option value="${this._escapeHtml(s)}" ${this._editingCell.altSubject === s ? 'selected' : ''}>${this._escapeHtml(s)}</option>
                     `).join('')}
                     ${this._editingCell.altSubject && !subjectList.includes(this._editingCell.altSubject) ? `
-                      <option value="${this._editingCell.altSubject}" selected>${this._editingCell.altSubject}</option>
+                      <option value="${this._escapeHtml(this._editingCell.altSubject)}" selected>${this._escapeHtml(this._editingCell.altSubject)}</option>
                     ` : ''}
                     <option value="__custom__">${this._t('custom_subject_opt')}</option>
                   </select>
@@ -3724,11 +3724,11 @@ Natur und Technik:
                 <div class="form-row" style="margin-bottom: 12px;">
                   <div class="form-group half">
                     <label>${this._t('room_label')}</label>
-                    <input type="text" id="modal-alt-room" placeholder="${this._t('room_placeholder')}" value="${this._editingCell.altRoom || ''}">
+                    <input type="text" id="modal-alt-room" placeholder="${this._t('room_placeholder')}" value="${this._escapeHtml(this._editingCell.altRoom || '')}">
                   </div>
                   <div class="form-group half">
                     <label>${this._t('teacher_label')}</label>
-                    <input type="text" id="modal-alt-teacher" placeholder="${this._t('teacher_placeholder')}" value="${this._editingCell.altTeacher || ''}">
+                    <input type="text" id="modal-alt-teacher" placeholder="${this._t('teacher_placeholder')}" value="${this._escapeHtml(this._editingCell.altTeacher || '')}">
                   </div>
                 </div>
 
@@ -3816,7 +3816,7 @@ Natur und Technik:
                     <option value="">${this._t('no_calendar_assigned')}</option>
                     ${availableCalendars.map(c => `
                       <option value="${c.entityId}" ${currentChild && currentChild.calendarEntity === c.entityId ? 'selected' : ''}>
-                        📅 ${c.name} (${c.entityId})
+                        📅 ${this._escapeHtml(c.name)} (${c.entityId})
                       </option>
                     `).join('')}
                   </select>
@@ -3945,14 +3945,14 @@ Natur und Technik:
 
                   ${this._portalTestError ? `
                     <div style="background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.4); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; color: #fca5a5; font-size: 13px;">
-                      ❌ ${this._portalTestError}
+                      ❌ ${this._escapeHtml(this._portalTestError)}
                     </div>
                   ` : ''}
 
                   ${this._portalTestResult ? `
                     <div style="background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.4); border-radius: 8px; padding: 12px 14px; margin-bottom: 16px;">
                       <div style="font-weight: 600; color: #86efac; font-size: 13px; margin-bottom: 10px;">
-                        ✅ Verbindung erfolgreich! Schule: <strong>${this._portalTestResult.school_name || this._portalTestResult.school}</strong>
+                        ✅ Verbindung erfolgreich! Schule: <strong>${this._escapeHtml(this._portalTestResult.school_name || this._portalTestResult.school)}</strong>
                       </div>
                       <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 13px; color: var(--primary-text-color, #fff);">
                         👤 ${this._t('portal_child_select')}
@@ -3961,7 +3961,7 @@ Natur und Technik:
                         ${this._portalTestResult.students.length === 0 ? `<option value="">Keine Schüler gefunden</option>` : ''}
                         ${this._portalTestResult.students.map(st => {
                           const isSel = (this._portalSelectedStudentId && this._portalSelectedStudentId === st.student_id) || (!this._portalSelectedStudentId && (currentChild.portalStudentId === st.student_id || st.fullname.toLowerCase().includes((this._selectedChild || '').toLowerCase())));
-                          return `<option value="${st.student_id}" data-name="${st.fullname}" ${isSel ? 'selected' : ''}>${st.fullname} (ID: ${st.student_id})</option>`;
+                          return `<option value="${this._escapeHtml(st.student_id)}" data-name="${this._escapeHtml(st.fullname)}" ${isSel ? 'selected' : ''}>${this._escapeHtml(st.fullname)} (ID: ${this._escapeHtml(st.student_id)})</option>`;
                         }).join('')}
                       </select>
                     </div>
@@ -4020,7 +4020,7 @@ Natur und Technik:
                           })()}</div>
                         ` : ''}
                         ${currentChild && currentChild.portalLastStatus ? `
-                          <div>📊 <b>Status:</b> ${currentChild.portalLastStatus}</div>
+                          <div>📊 <b>Status:</b> ${this._escapeHtml(currentChild.portalLastStatus)}</div>
                         ` : ''}
                       </div>
                       <div style="display: flex; gap: 10px; flex-wrap: wrap;">
@@ -4036,7 +4036,7 @@ Natur und Technik:
                       </div>
                       ${this._portalSyncFeedback ? `
                         <div style="margin-top: 10px; font-size: 12px; padding: 6px 10px; border-radius: 6px; background: rgba(59,130,246,0.2); color: #93c5fd; border: 1px solid rgba(59,130,246,0.4);">
-                          ${this._portalSyncFeedback}
+                          ${this._escapeHtml(this._portalSyncFeedback)}
                         </div>
                       ` : ''}
                     </div>
@@ -4672,27 +4672,19 @@ Natur und Technik:
           this._portalFormUsername = usr;
           this._portalCopySibling = sibChild;
 
-          let pwd = '';
-          if (sibChild) {
-            try {
-              const res = await this._hass.callWS({
-                type: 'school_grades/get_sibling_portal_credentials',
-                sibling_name: sibChild,
-              });
-              if (res && res.success && res.password) {
-                pwd = res.password;
-              }
-            } catch (err) {
-              console.warn('Could not fetch sibling password:', err);
-            }
-          }
+          // The password itself never leaves the backend: test/save resolve it
+          // server-side via copy_sibling_name.
+          const pwd = '';
           this._portalFormPassword = pwd;
           const sInput = root.querySelector('#settings-portal-school');
           const uInput = root.querySelector('#settings-portal-username');
           const pInput = root.querySelector('#settings-portal-password');
           if (sInput) sInput.value = sch;
           if (uInput) uInput.value = usr;
-          if (pInput) pInput.value = pwd;
+          if (pInput) {
+            pInput.value = pwd;
+            pInput.placeholder = this._t('portal_password_stored');
+          }
         });
       });
 
