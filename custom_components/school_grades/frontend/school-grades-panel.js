@@ -3216,7 +3216,7 @@ Natur und Technik:
                     <span style="font-size: 18px;">🔄</span>
                     <div>
                       <strong style="color: #fdba74; font-size: 13px;">${nextDay.isToday ? this._t('prep_subst_alert_today') : this._t('prep_subst_alert')} (${nextDay.dateFormatted}):</strong>
-                      <div style="font-size: 12px; color: #fff; margin-top: 4px; display: flex; flex-direction: column; gap: 3px;">
+                      <div style="font-size: 12px; color: var(--primary-text-color, #fff); margin-top: 4px; display: flex; flex-direction: column; gap: 3px;">
                         ${entries.map(s => {
                           const kindText = s.kind === 'entfall' ? this._t('subst_badge_cancelled') : (s.kind === 'raum' ? this._t('subst_badge_room') : this._t('subst_badge_subst'));
                           const infoDetail = s.info ? ` (${this._escapeHtml(s.info)})` : '';
@@ -3456,15 +3456,15 @@ Natur und Technik:
                               ${hasContent ? `
                                 <div class="cell-subject" style="${isEntfall ? 'text-decoration: line-through; opacity: 0.6;' : ''}">${this._escapeHtml(displaySubject) || `<span style="font-style: italic; opacity: 0.6;">${this._t('free_period_label')}</span>`}</div>
                                 ${isAlternating && activeCell.otherSubject ? `
-                                  <div style="font-size: 10px; color: rgba(255, 255, 255, 0.45); font-style: italic; margin-top: -1px; margin-bottom: 2px;" title="${this._t('alt_wechsel_prefix')} ${this._escapeHtml(activeCell.otherSubject)}">
-                                    ${this._t('alt_wechsel_prefix')} ${this._escapeHtml(activeCell.otherSubject)}
+                                  <div style="font-size: 10px; color: var(--secondary-text-color, rgba(255, 255, 255, 0.45)); font-style: italic; margin-top: -1px; margin-bottom: 2px;" title="${this._t('alt_wechsel_prefix')} ${activeCell.otherSubject}">
+                                    ${this._t('alt_wechsel_prefix')} ${activeCell.otherSubject}
                                   </div>
                                 ` : ''}
                                 <div class="cell-details">
                                   ${displayRoom ? `<span class="cell-room" style="${isRaum ? 'color: #fde047; font-weight: 600;' : ''}">📍 ${this._escapeHtml(displayRoom)}</span>` : ''}
                                   ${displayTeacher ? `<span class="cell-teacher" style="${isVertretung ? 'color: #93c5fd; font-weight: 600;' : ''}">👨‍🏫 ${this._escapeHtml(displayTeacher)}</span>` : ''}
                                 </div>
-                                ${subst && subst.info ? `<div style="font-size: 10px; color: rgba(255,255,255,0.65); margin-top: 2px;">ℹ️ ${this._escapeHtml(subst.info)}</div>` : ''}
+                                ${subst && subst.info ? `<div style="font-size: 10px; color: var(--secondary-text-color, rgba(255,255,255,0.65)); margin-top: 2px;">ℹ️ ${subst.info}</div>` : ''}
                               ` : `
                                 <div class="cell-empty-trigger">
                                   <span class="add-icon">+</span>
@@ -3498,7 +3498,7 @@ Natur und Technik:
             <div class="card form-card">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                 <h3 style="margin: 0;">${this._t('add_grade_title')}</h3>
-                <button type="button" id="close-add-grade-x" style="background: none; border: none; color: rgba(255,255,255,0.6); cursor: pointer; font-size: 18px; padding: 4px;">✖</button>
+                <button type="button" id="close-add-grade-x" style="background: none; border: none; color: var(--secondary-text-color, rgba(255,255,255,0.6)); cursor: pointer; font-size: 18px; padding: 4px;">✖</button>
               </div>
               <form id="add-grade-form">
                 <div class="form-group">
@@ -3619,27 +3619,27 @@ Natur und Technik:
                   ${this._editingEvent && this._editingEvent.subject ? `<span style="background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 600;">📚 ${this._escapeHtml(this._editingEvent.subject)}</span>` : ''}
                 </div>
               </div>
-              <button class="icon-btn" id="close-event-modal-x" style="font-size: 20px; border: none; background: none; color: #fff; cursor: pointer; padding: 4px 8px;">✖</button>
+              <button class="icon-btn" id="close-event-modal-x" style="font-size: 20px; border: none; background: none; color: var(--primary-text-color, #fff); cursor: pointer; padding: 4px 8px;">✖</button>
             </div>
 
             <form id="add-event-form">
               <div class="form-group" style="margin-bottom: 12px;">
-                <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: #fff;">${this._t('event_summary_label')}</label>
-                <input type="text" id="event-summary-input" required value="${this._escapeHtml(this._editingEvent ? this._editingEvent.summary : '')}" placeholder="${this._t('event_summary_placeholder')}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 13px; box-sizing: border-box;">
+                <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: var(--primary-text-color, #fff);">${this._t('event_summary_label')}</label>
+                <input type="text" id="event-summary-input" required value="${this._escapeHtml(this._editingEvent ? this._editingEvent.summary : '')}" placeholder="${this._t('event_summary_placeholder')}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: var(--card-background-color, rgba(0,0,0,0.3)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 13px; box-sizing: border-box;">
               </div>
               <div class="form-row" style="display: flex; gap: 12px; margin-bottom: 12px;">
                 <div class="form-group half" style="flex: 1;">
-                  <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: #fff;">${this._t('event_date_label')}</label>
-                  <input type="date" id="event-date-input" required value="${this._editingEvent ? this._editingEvent.date : new Date().toISOString().split('T')[0]}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 13px; box-sizing: border-box;">
+                  <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: var(--primary-text-color, #fff);">${this._t('event_date_label')}</label>
+                  <input type="date" id="event-date-input" required value="${this._editingEvent ? this._editingEvent.date : new Date().toISOString().split('T')[0]}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: var(--card-background-color, rgba(0,0,0,0.3)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 13px; box-sizing: border-box;">
                 </div>
                 <div class="form-group half" style="flex: 1;">
-                  <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: #fff;">${this._t('event_time_label')}</label>
-                  <input type="time" id="event-time-input" required value="${this._editingEvent ? this._editingEvent.time : '08:00'}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 13px; box-sizing: border-box;">
+                  <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: var(--primary-text-color, #fff);">${this._t('event_time_label')}</label>
+                  <input type="time" id="event-time-input" required value="${this._editingEvent ? this._editingEvent.time : '08:00'}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: var(--card-background-color, rgba(0,0,0,0.3)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 13px; box-sizing: border-box;">
                 </div>
               </div>
               <div class="form-group" style="margin-bottom: 16px;">
-                <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: #fff;">${this._t('event_desc_label')}</label>
-                <input type="text" id="event-desc-input" value="${this._escapeHtml(this._editingEvent ? (this._editingEvent.description || '') : '')}" placeholder="${this._t('event_desc_placeholder')}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 13px; box-sizing: border-box;">
+                <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: var(--primary-text-color, #fff);">${this._t('event_desc_label')}</label>
+                <input type="text" id="event-desc-input" value="${this._escapeHtml(this._editingEvent ? (this._editingEvent.description || '') : '')}" placeholder="${this._t('event_desc_placeholder')}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: var(--card-background-color, rgba(0,0,0,0.3)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 13px; box-sizing: border-box;">
               </div>
               <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 20px;">
                 ${this._editingEvent ? `
@@ -3701,7 +3701,7 @@ Natur und Technik:
                 </label>
               </div>
 
-              <div id="modal-alternating-container" style="${this._editingCell.isAlternating ? 'display: block;' : 'display: none;'} margin-top: 10px; padding: 12px; background: rgba(0,0,0,0.15); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+              <div id="modal-alternating-container" style="${this._editingCell.isAlternating ? 'display: block;' : 'display: none;'} margin-top: 10px; padding: 12px; background: rgba(0,0,0,0.15); border-radius: 8px; border: 1px solid var(--divider-color, rgba(255,255,255,0.08));">
                 <div style="font-size: 12px; font-weight: 700; color: #c084fc; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
                   <span>🔄</span> ${this._t('alt_secondary_header')}
                 </div>
@@ -3771,21 +3771,21 @@ Natur und Technik:
               <div>
                 <h3 style="margin: 0; font-size: 18px;">⚙️ ${this._t('settings_title', { child: this._selectedChild })}</h3>
               </div>
-              <button class="icon-btn" id="settings-close-x" style="font-size: 20px; border: none; background: none; color: #fff; cursor: pointer; padding: 4px 8px;">✖</button>
+              <button class="icon-btn" id="settings-close-x" style="font-size: 20px; border: none; background: none; color: var(--primary-text-color, #fff); cursor: pointer; padding: 4px 8px;">✖</button>
             </div>
 
             <!-- Settings Tabs Header -->
             <div class="settings-tabs-header" style="display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 1px solid var(--divider-color, rgba(255,255,255,0.1)); padding-bottom: 10px; flex-wrap: wrap; flex-shrink: 0;">
-              <button type="button" class="modal-tab-btn ${this._settingsTab === 'general' ? 'active' : ''}" id="settings-tab-btn-general" style="padding: 8px 14px; border-radius: 8px; border: 1px solid ${this._settingsTab === 'general' ? 'var(--primary-color, #3b82f6)' : 'rgba(255,255,255,0.1)'}; background: ${this._settingsTab === 'general' ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.05)'}; color: #fff; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.2s;">
+              <button type="button" class="modal-tab-btn ${this._settingsTab === 'general' ? 'active' : ''}" id="settings-tab-btn-general" style="padding: 8px 14px; border-radius: 8px; border: 1px solid ${this._settingsTab === 'general' ? 'var(--primary-color, #3b82f6)' : 'var(--divider-color, rgba(255,255,255,0.1))'}; background: ${this._settingsTab === 'general' ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.05)'}; color: var(--primary-text-color, #fff); cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.2s;">
                 ${this._t('settings_tab_general')}
               </button>
-              <button type="button" class="modal-tab-btn ${this._settingsTab === 'subjects' ? 'active' : ''}" id="settings-tab-btn-subjects" style="padding: 8px 14px; border-radius: 8px; border: 1px solid ${this._settingsTab === 'subjects' ? 'var(--primary-color, #3b82f6)' : 'rgba(255,255,255,0.1)'}; background: ${this._settingsTab === 'subjects' ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.05)'}; color: #fff; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.2s;">
+              <button type="button" class="modal-tab-btn ${this._settingsTab === 'subjects' ? 'active' : ''}" id="settings-tab-btn-subjects" style="padding: 8px 14px; border-radius: 8px; border: 1px solid ${this._settingsTab === 'subjects' ? 'var(--primary-color, #3b82f6)' : 'var(--divider-color, rgba(255,255,255,0.1))'}; background: ${this._settingsTab === 'subjects' ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.05)'}; color: var(--primary-text-color, #fff); cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.2s;">
                 ${this._t('settings_tab_subjects')}
               </button>
-              <button type="button" class="modal-tab-btn ${this._settingsTab === 'timetable' ? 'active' : ''}" id="settings-tab-btn-timetable" style="padding: 8px 14px; border-radius: 8px; border: 1px solid ${this._settingsTab === 'timetable' ? 'var(--primary-color, #3b82f6)' : 'rgba(255,255,255,0.1)'}; background: ${this._settingsTab === 'timetable' ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.05)'}; color: #fff; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.2s;">
+              <button type="button" class="modal-tab-btn ${this._settingsTab === 'timetable' ? 'active' : ''}" id="settings-tab-btn-timetable" style="padding: 8px 14px; border-radius: 8px; border: 1px solid ${this._settingsTab === 'timetable' ? 'var(--primary-color, #3b82f6)' : 'var(--divider-color, rgba(255,255,255,0.1))'}; background: ${this._settingsTab === 'timetable' ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.05)'}; color: var(--primary-text-color, #fff); cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.2s;">
                 ${this._t('settings_tab_timetable')}
               </button>
-              <button type="button" class="modal-tab-btn ${this._settingsTab === 'portal' ? 'active' : ''}" id="settings-tab-btn-portal" style="padding: 8px 14px; border-radius: 8px; border: 1px solid ${this._settingsTab === 'portal' ? 'var(--primary-color, #3b82f6)' : 'rgba(255,255,255,0.1)'}; background: ${this._settingsTab === 'portal' ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.05)'}; color: #fff; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.2s;">
+              <button type="button" class="modal-tab-btn ${this._settingsTab === 'portal' ? 'active' : ''}" id="settings-tab-btn-portal" style="padding: 8px 14px; border-radius: 8px; border: 1px solid ${this._settingsTab === 'portal' ? 'var(--primary-color, #3b82f6)' : 'var(--divider-color, rgba(255,255,255,0.1))'}; background: ${this._settingsTab === 'portal' ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.05)'}; color: var(--primary-text-color, #fff); cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.2s;">
                 ${this._t('settings_tab_portal')}
               </button>
             </div>
@@ -3807,12 +3807,12 @@ Natur und Technik:
 
                 <div class="form-group" style="margin-bottom: 16px;">
                   <label style="display: block; margin-bottom: 6px; font-weight: 500;">🎒 ${this._t('grade_level_label')}</label>
-                  <input type="text" id="settings-grade-level-input" placeholder="${this._t('grade_level_placeholder')}" value="${this._escapeHtml(currentChild.gradeLevel || '')}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.25); color: #fff; border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 13px; box-sizing: border-box;">
+                  <input type="text" id="settings-grade-level-input" placeholder="${this._t('grade_level_placeholder')}" value="${currentChild.gradeLevel || ''}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: var(--card-background-color, rgba(0,0,0,0.25)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 13px; box-sizing: border-box;">
                 </div>
 
                 <div class="form-group" style="margin-bottom: 16px;">
                   <label style="display: block; margin-bottom: 6px; font-weight: 500;">📅 ${this._t('calendar_select_label', { child: this._selectedChild })}</label>
-                  <select id="settings-calendar-select" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.25); color: #fff; border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 13px; cursor: pointer;">
+                  <select id="settings-calendar-select" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: var(--card-background-color, rgba(0,0,0,0.25)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 13px; cursor: pointer;">
                     <option value="">${this._t('no_calendar_assigned')}</option>
                     ${availableCalendars.map(c => `
                       <option value="${c.entityId}" ${currentChild && currentChild.calendarEntity === c.entityId ? 'selected' : ''}>
@@ -3861,7 +3861,7 @@ Natur und Technik:
                     <label style="display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px;">
                       ➕ ${this._t('new_subject_label')}
                     </label>
-                    <input type="text" id="settings-new-subject-name" placeholder="${this._t('new_subject_placeholder')}" required style="width: 100%; padding: 12px 14px; border-radius: 8px; background: rgba(0,0,0,0.25); color: #fff; border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 14px; box-sizing: border-box;">
+                    <input type="text" id="settings-new-subject-name" placeholder="${this._t('new_subject_placeholder')}" required style="width: 100%; padding: 12px 14px; border-radius: 8px; background: var(--card-background-color, rgba(0,0,0,0.25)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 14px; box-sizing: border-box;">
                   </div>
                   <button type="submit" class="submit-btn secondary" style="width: 100%;">${this._t('submit_add_subject')}</button>
                 </form>
@@ -3873,7 +3873,7 @@ Natur und Technik:
                     🗑️ ${this._t('delete_subject_label')}
                   </label>
                   <div style="display: flex; gap: 10px; align-items: center;">
-                    <select id="settings-delete-subject-select" style="flex: 1; padding: 12px 14px; border-radius: 8px; background: rgba(0,0,0,0.25); color: #fff; border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 14px; cursor: pointer;">
+                    <select id="settings-delete-subject-select" style="flex: 1; padding: 12px 14px; border-radius: 8px; background: var(--card-background-color, rgba(0,0,0,0.25)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 14px; cursor: pointer;">
                       ${subjectList.map(s => `<option value="${s}">${s}</option>`).join('')}
                     </select>
                     <button type="button" id="settings-delete-subject-btn" class="delete-btn" style="padding: 12px 18px; white-space: nowrap;" ${subjectList.length === 0 ? 'disabled style="opacity:0.4;cursor:not-allowed;"' : ''}>
@@ -3890,12 +3890,12 @@ Natur und Technik:
               <!-- Eltern-Portal Tab in Settings -->
               <div class="settings-portal-tab">
                 <form id="settings-portal-form">
-                  <div style="margin-bottom: 14px; color: rgba(255,255,255,0.75); font-size: 13px; line-height: 1.4;">
+                  <div style="margin-bottom: 14px; color: var(--secondary-text-color, rgba(255,255,255,0.75)); font-size: 13px; line-height: 1.4;">
                     ${this._t('portal_desc')}
                   </div>
 
-                  <div style="margin-bottom: 16px; padding: 10px 14px; border-radius: 8px; background: ${currentChild.portalEnabled ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.05)'}; border: 1px solid ${currentChild.portalEnabled ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.1)'}; display: flex; align-items: center; justify-content: space-between;">
-                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600; font-size: 13px; color: #fff;">
+                  <div style="margin-bottom: 16px; padding: 10px 14px; border-radius: 8px; background: ${currentChild.portalEnabled ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.05)'}; border: 1px solid ${currentChild.portalEnabled ? 'rgba(34,197,94,0.3)' : 'var(--divider-color, rgba(255,255,255,0.1))'}; display: flex; align-items: center; justify-content: space-between;">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600; font-size: 13px; color: var(--primary-text-color, #fff);">
                       <input type="checkbox" id="settings-portal-enabled" ${currentChild.portalEnabled ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: #3b82f6; cursor: pointer;">
                       <span>${this._t('portal_enable')}</span>
                     </label>
@@ -3912,8 +3912,8 @@ Natur und Technik:
                         <div style="font-size: 12px; font-weight: 600; color: #93c5fd; margin-bottom: 6px;">👥 ${this._t('portal_copy_from')}</div>
                         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                           ${siblingPortals.map(s => `
-                            <button type="button" class="sibling-portal-copy-btn" data-child="${this._escapeHtml(s.name)}" data-school="${this._escapeHtml(s.portalSchool)}" data-user="${this._escapeHtml(s.portalUsername)}" style="font-size: 12px; padding: 4px 10px; border-radius: 6px; background: rgba(59,130,246,0.25); border: 1px solid #3b82f6; color: #fff; cursor: pointer; transition: background 0.2s;">
-                              📋 ${this._escapeHtml(s.name)} (${this._escapeHtml(s.portalSchool)})
+                            <button type="button" class="sibling-portal-copy-btn" data-child="${s.name}" data-school="${s.portalSchool}" data-user="${s.portalUsername}" style="font-size: 12px; padding: 4px 10px; border-radius: 6px; background: rgba(59,130,246,0.25); border: 1px solid #3b82f6; color: var(--primary-text-color, #fff); cursor: pointer; transition: background 0.2s;">
+                              📋 ${s.name} (${s.portalSchool})
                             </button>
                           `).join('')}
                         </div>
@@ -3923,18 +3923,18 @@ Natur und Technik:
 
                   <div class="form-group" style="margin-bottom: 14px;">
                     <label style="display: block; margin-bottom: 6px; font-weight: 500; font-size: 13px;">🏫 ${this._t('portal_school')}</label>
-                    <input type="text" id="settings-portal-school" placeholder="${this._t('portal_school_placeholder')}" value="${this._escapeHtml(this._portalFormSchool !== undefined ? this._portalFormSchool : (currentChild.portalSchool || ''))}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.25); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 13px; box-sizing: border-box;">
-                    <div style="font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 4px;">${this._t('portal_school_help')}</div>
+                    <input type="text" id="settings-portal-school" placeholder="${this._t('portal_school_placeholder')}" value="${this._portalFormSchool !== undefined ? this._portalFormSchool : (currentChild.portalSchool || '')}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: var(--card-background-color, rgba(0,0,0,0.25)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 13px; box-sizing: border-box;">
+                    <div style="font-size: 11px; color: var(--secondary-text-color, rgba(255,255,255,0.5)); margin-top: 4px;">${this._t('portal_school_help')}</div>
                   </div>
 
                   <div class="form-group" style="margin-bottom: 14px;">
                     <label style="display: block; margin-bottom: 6px; font-weight: 500; font-size: 13px;">👤 ${this._t('portal_username')}</label>
-                    <input type="text" id="settings-portal-username" placeholder="name@beispiel.de" value="${this._escapeHtml(this._portalFormUsername !== undefined ? this._portalFormUsername : (currentChild.portalUsername || ''))}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.25); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 13px; box-sizing: border-box;">
+                    <input type="text" id="settings-portal-username" placeholder="name@beispiel.de" value="${this._portalFormUsername !== undefined ? this._portalFormUsername : (currentChild.portalUsername || '')}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: var(--card-background-color, rgba(0,0,0,0.25)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 13px; box-sizing: border-box;">
                   </div>
 
                   <div class="form-group" style="margin-bottom: 16px;">
                     <label style="display: block; margin-bottom: 6px; font-weight: 500; font-size: 13px;">🔒 ${this._t('portal_password')}</label>
-                    <input type="password" id="settings-portal-password" placeholder="${currentChild.portalHasPassword || this._portalCopySibling ? this._t('portal_password_stored') : '••••••••'}" value="${this._escapeHtml(this._portalFormPassword !== undefined ? this._portalFormPassword : '')}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.25); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 13px; box-sizing: border-box;">
+                    <input type="password" id="settings-portal-password" placeholder="${currentChild.portalHasPassword ? this._t('portal_password_stored') : '••••••••'}" value="${this._portalFormPassword !== undefined ? this._portalFormPassword : ''}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: var(--card-background-color, rgba(0,0,0,0.25)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 13px; box-sizing: border-box;">
                   </div>
 
                   <div style="margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
@@ -3954,10 +3954,10 @@ Natur und Technik:
                       <div style="font-weight: 600; color: #86efac; font-size: 13px; margin-bottom: 10px;">
                         ✅ Verbindung erfolgreich! Schule: <strong>${this._escapeHtml(this._portalTestResult.school_name || this._portalTestResult.school)}</strong>
                       </div>
-                      <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 13px; color: #fff;">
+                      <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 13px; color: var(--primary-text-color, #fff);">
                         👤 ${this._t('portal_child_select')}
                       </label>
-                      <select id="settings-portal-student-select" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.2); font-size: 13px; cursor: pointer;">
+                      <select id="settings-portal-student-select" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: var(--card-background-color, rgba(0,0,0,0.3)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.2)); font-size: 13px; cursor: pointer;">
                         ${this._portalTestResult.students.length === 0 ? `<option value="">Keine Schüler gefunden</option>` : ''}
                         ${this._portalTestResult.students.map(st => {
                           const isSel = (this._portalSelectedStudentId && this._portalSelectedStudentId === st.student_id) || (!this._portalSelectedStudentId && (currentChild.portalStudentId === st.student_id || st.fullname.toLowerCase().includes((this._selectedChild || '').toLowerCase())));
@@ -3966,15 +3966,15 @@ Natur und Technik:
                       </select>
                     </div>
                   ` : currentChild.portalStudentId ? `
-                    <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; font-size: 13px;">
-                      👤 <strong>Verknüpftes Kind im Portal:</strong> <span style="color: #60a5fa;">${this._escapeHtml(currentChild.portalStudentName || currentChild.portalStudentId)}</span>
-                      <input type="hidden" id="settings-portal-student-id-hidden" value="${this._escapeHtml(currentChild.portalStudentId)}">
-                      <input type="hidden" id="settings-portal-student-name-hidden" value="${this._escapeHtml(currentChild.portalStudentName || '')}">
+                    <div style="background: rgba(255,255,255,0.05); border: 1px solid var(--divider-color, rgba(255,255,255,0.12)); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; font-size: 13px;">
+                      👤 <strong>Verknüpftes Kind im Portal:</strong> <span style="color: #60a5fa;">${currentChild.portalStudentName || currentChild.portalStudentId}</span>
+                      <input type="hidden" id="settings-portal-student-id-hidden" value="${currentChild.portalStudentId}">
+                      <input type="hidden" id="settings-portal-student-name-hidden" value="${currentChild.portalStudentName || ''}">
                     </div>
                   ` : ''}
 
-                  <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 14px; margin-bottom: 20px;">
-                    <label style="display: block; margin-bottom: 10px; font-weight: 600; font-size: 13px; color: #fff;">
+                  <div style="border-top: 1px solid var(--divider-color, rgba(255,255,255,0.1)); padding-top: 14px; margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 10px; font-weight: 600; font-size: 13px; color: var(--primary-text-color, #fff);">
                       ⚙️ ${this._t('portal_sync_options')}
                     </label>
                     <div style="display: flex; flex-direction: column; gap: 8px;">
@@ -3982,7 +3982,7 @@ Natur und Technik:
                         <input type="checkbox" id="settings-portal-sync-tt" ${currentChild.portalSyncTimetable ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: #3b82f6; cursor: pointer;">
                         <span>📅 ${this._t('portal_sync_tt')}</span>
                       </label>
-                      <div style="font-size: 11px; color: rgba(255,255,255,0.5); margin-left: 26px; margin-top: -4px; margin-bottom: 4px; line-height: 1.3;">
+                      <div style="font-size: 11px; color: var(--secondary-text-color, rgba(255,255,255,0.5)); margin-left: 26px; margin-top: -4px; margin-bottom: 4px; line-height: 1.3;">
                         ${this._t('portal_sync_tt_help')}
                       </div>
                       <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13px;">
@@ -3997,18 +3997,18 @@ Natur und Technik:
                         <input type="checkbox" id="settings-portal-ignore-info" ${currentChild.portalIgnoreInfoEvents ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: #3b82f6; cursor: pointer;">
                         <span>🚫 ${this._t('portal_ignore_info_label')}</span>
                       </label>
-                      <div style="font-size: 11px; color: rgba(255,255,255,0.5); margin-left: 26px; margin-top: -4px; margin-bottom: 4px; line-height: 1.3;">
+                      <div style="font-size: 11px; color: var(--secondary-text-color, rgba(255,255,255,0.5)); margin-left: 26px; margin-top: -4px; margin-bottom: 4px; line-height: 1.3;">
                         ${this._t('portal_ignore_info_help')}
                       </div>
                     </div>
                   </div>
 
                   ${currentChild.portalEnabled && currentChild.portalStudentId ? `
-                    <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 14px; margin-bottom: 20px;">
-                      <label style="display: block; margin-bottom: 8px; font-weight: 600; font-size: 13px; color: #fff;">
+                    <div style="border-top: 1px solid var(--divider-color, rgba(255,255,255,0.1)); padding-top: 14px; margin-bottom: 20px;">
+                      <label style="display: block; margin-bottom: 8px; font-weight: 600; font-size: 13px; color: var(--primary-text-color, #fff);">
                         🔄 Aktionen & Status
                       </label>
-                      <div style="font-size: 12px; color: rgba(255,255,255,0.7); margin-bottom: 10px;">
+                      <div style="font-size: 12px; color: var(--secondary-text-color, rgba(255,255,255,0.7)); margin-bottom: 10px;">
                         ${currentChild && currentChild.portalLastSync ? `
                           <div>⏱️ <b>${this._t('portal_last_sync_label')}</b> ${(() => {
                             try {
@@ -4043,22 +4043,22 @@ Natur und Technik:
                   ` : ''}
 
                   <!-- Editable Subject Aliases Section (YAML) -->
-                  <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 14px; margin-bottom: 20px;">
+                  <div style="border-top: 1px solid var(--divider-color, rgba(255,255,255,0.1)); padding-top: 14px; margin-bottom: 20px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                      <label style="font-weight: 600; font-size: 13px; color: #fff;">
+                      <label style="font-weight: 600; font-size: 13px; color: var(--primary-text-color, #fff);">
                         ${this._t('portal_aliases_title')}
                       </label>
                       <button type="button" id="settings-portal-aliases-reset-btn" style="background: none; border: none; color: #93c5fd; cursor: pointer; font-size: 11px; text-decoration: underline;">
                         ${this._t('portal_aliases_reset')}
                       </button>
                     </div>
-                    <div style="font-size: 11px; color: rgba(255,255,255,0.6); margin-bottom: 8px; line-height: 1.3;">
+                    <div style="font-size: 11px; color: var(--secondary-text-color, rgba(255,255,255,0.6)); margin-bottom: 8px; line-height: 1.3;">
                       ${this._t('portal_aliases_help')}
                     </div>
                     <div style="font-size: 11px; color: #93c5fd; background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.3); border-radius: 6px; padding: 6px 10px; margin-bottom: 8px; line-height: 1.35;">
                       ${this._t('portal_aliases_slash_tip')}
                     </div>
-                    <textarea id="settings-portal-aliases-textarea" rows="6" style="font-family: monospace; font-size: 12px; line-height: 1.4; resize: vertical; tab-size: 2; width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 10px;">${this._escapeHtml(this._aliasesToYaml((currentChild && currentChild.subjectAliases) || {}))}</textarea>
+                    <textarea id="settings-portal-aliases-textarea" rows="6" style="font-family: monospace; font-size: 12px; line-height: 1.4; resize: vertical; tab-size: 2; width: 100%; box-sizing: border-box; background: var(--card-background-color, rgba(0,0,0,0.3)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); border-radius: 8px; padding: 10px;">${this._aliasesToYaml((currentChild && currentChild.subjectAliases) || {})}</textarea>
                     <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
                       <button type="button" id="settings-portal-aliases-save-btn" class="submit-btn secondary" style="width: auto; padding: 6px 14px; font-size: 12px;">
                         ${this._t('portal_aliases_save_btn')}
@@ -4077,8 +4077,8 @@ Natur und Technik:
               <div class="settings-timetable-tab">
                 <form id="settings-yaml-import-form">
                   <div class="form-group" style="margin-bottom: 16px;">
-                    <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 13px; color: #fff;">${this._t('yaml_textarea_label', { child: this._selectedChild })}</label>
-                    <textarea id="settings-yaml-textarea" rows="10" style="font-family: monospace; font-size: 12px; line-height: 1.4; resize: vertical; tab-size: 2; width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 10px;">${this._escapeHtml(this._timetableToYaml(timetable))}</textarea>
+                    <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 13px; color: var(--primary-text-color, #fff);">${this._t('yaml_textarea_label', { child: this._selectedChild })}</label>
+                    <textarea id="settings-yaml-textarea" rows="10" style="font-family: monospace; font-size: 12px; line-height: 1.4; resize: vertical; tab-size: 2; width: 100%; box-sizing: border-box; background: var(--card-background-color, rgba(0,0,0,0.3)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); border-radius: 8px; padding: 10px;">${this._timetableToYaml(timetable)}</textarea>
                   </div>
 
                   <div class="modal-actions" style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
@@ -5526,7 +5526,7 @@ Natur und Technik:
 
       .menu-btn {
         background: var(--card-background-color, #1f2937);
-        border: 1px solid rgba(255, 255, 255, 0.12);
+        border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.12));
         color: var(--primary-text-color, #f3f4f6);
         width: 44px;
         height: 44px;
@@ -5585,7 +5585,7 @@ Natur und Technik:
 
       .tab-btn {
         background: var(--card-background-color, #1f2937);
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.1));
         color: var(--primary-text-color, #e5e7eb);
         padding: 10px 20px;
         border-radius: 12px;
@@ -5609,7 +5609,7 @@ Natur und Technik:
 
       .settings-badge-btn {
         background: var(--card-background-color, #1f2937);
-        border: 1px solid rgba(255, 255, 255, 0.12);
+        border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.12));
         color: var(--secondary-text-color, #9ca3af);
         width: 40px;
         height: 40px;
@@ -5673,7 +5673,7 @@ Natur und Technik:
 
       .stat-card {
         background: var(--card-background-color, #1f2937);
-        border: 1px solid rgba(255, 255, 255, 0.08);
+        border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.08));
         border-radius: 16px;
         padding: 20px;
         display: flex;
@@ -5716,7 +5716,7 @@ Natur und Technik:
         flex-wrap: wrap;
         gap: 12px;
         padding-bottom: 16px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        border-bottom: 1px solid var(--divider-color, rgba(255, 255, 255, 0.08));
         margin-bottom: 16px;
       }
 
@@ -5785,7 +5785,7 @@ Natur und Technik:
       .exam-alert-list {
         margin-top: 4px;
         font-size: 14px;
-        color: #ffffff;
+        color: var(--primary-text-color, #ffffff);
       }
 
       .prep-grid {
@@ -5796,7 +5796,7 @@ Natur und Technik:
 
       .prep-item {
         background: rgba(255, 255, 255, 0.04);
-        border: 1px solid rgba(255, 255, 255, 0.08);
+        border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.08));
         border-radius: 12px;
         padding: 12px;
         transition: all 0.2s ease;
@@ -5848,7 +5848,7 @@ Natur und Technik:
       .prep-subject-name {
         font-size: 16px;
         font-weight: 800;
-        color: #ffffff;
+        color: var(--primary-text-color, #ffffff);
         margin-bottom: 6px;
       }
 
@@ -5885,7 +5885,7 @@ Natur und Technik:
         flex-wrap: wrap;
         gap: 12px;
         padding-bottom: 16px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        border-bottom: 1px solid var(--divider-color, rgba(255, 255, 255, 0.08));
         margin-bottom: 16px;
       }
 
@@ -5929,7 +5929,7 @@ Natur und Technik:
 
       .event-item {
         background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.08);
+        border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.08));
         border-radius: 12px;
         padding: 14px;
         transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
@@ -6040,7 +6040,7 @@ Natur und Technik:
       .timetable-table-container {
         overflow-x: auto;
         border-radius: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
+        border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.08));
       }
 
       .timetable-table {
@@ -6055,7 +6055,7 @@ Natur und Technik:
         padding: 12px 10px;
         text-align: center;
         font-weight: 700;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        border-bottom: 1px solid var(--divider-color, rgba(255, 255, 255, 0.1));
         position: relative;
       }
 
@@ -6084,8 +6084,8 @@ Natur und Technik:
 
       .timetable-table td {
         padding: 10px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        border-right: 1px solid rgba(255, 255, 255, 0.05);
+        border-bottom: 1px solid var(--divider-color, rgba(255, 255, 255, 0.05));
+        border-right: 1px solid var(--divider-color, rgba(255, 255, 255, 0.05));
         vertical-align: top;
         position: relative;
       }
@@ -6167,7 +6167,7 @@ Natur und Technik:
       .cell-subject {
         font-weight: 700;
         font-size: 14px;
-        color: #ffffff;
+        color: var(--primary-text-color, #ffffff);
         margin-bottom: 4px;
       }
 
@@ -6219,7 +6219,7 @@ Natur und Technik:
       .modal-card {
         background: var(--card-background-color, #1f2937);
         border-radius: 16px;
-        border: 1px solid rgba(255, 255, 255, 0.15);
+        border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.15));
         padding: 24px;
         width: 90%;
         max-width: 460px;
@@ -6330,7 +6330,7 @@ Natur und Technik:
 
       .card {
         background: var(--card-background-color, #1f2937);
-        border: 1px solid rgba(255, 255, 255, 0.08);
+        border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.08));
         border-radius: 16px;
         padding: 24px;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
@@ -6362,7 +6362,7 @@ Natur und Technik:
         width: 100%;
         padding: 10px 14px;
         border-radius: 10px;
-        border: 1px solid rgba(255, 255, 255, 0.15);
+        border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.15));
         background: var(--primary-background-color, #111827);
         color: var(--primary-text-color, #ffffff);
         font-size: 14px;
@@ -6392,7 +6392,7 @@ Natur und Technik:
 
       .pill-btn {
         background: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.1));
         color: var(--primary-text-color, #d1d5db);
         padding: 6px 12px;
         border-radius: 8px;
@@ -6478,7 +6478,7 @@ Natur und Technik:
         justify-content: space-between;
         align-items: center;
         padding-bottom: 14px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        border-bottom: 1px solid var(--divider-color, rgba(255, 255, 255, 0.08));
         margin-bottom: 14px;
       }
 
@@ -6520,7 +6520,7 @@ Natur und Technik:
 
       .grades-table td {
         padding: 10px 6px;
-        border-top: 1px solid rgba(255, 255, 255, 0.05);
+        border-top: 1px solid var(--divider-color, rgba(255, 255, 255, 0.05));
       }
 
       .grade-pill {
