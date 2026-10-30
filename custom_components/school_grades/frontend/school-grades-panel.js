@@ -387,6 +387,24 @@ const I18N = {
     settings_tab_subjects: "📘 Fächer verwalten",
     settings_tab_timetable: "📅 Stundenplan",
     settings_tab_portal: "🏫 Eltern-Portal",
+    settings_tab_notifications: "🔔 Benachrichtigungen",
+    notify_title: "Benachrichtigungen bei Stundenplan-Änderungen",
+    notify_desc: "Erhalte Push-Nachrichten auf dein Smartphone oder andere Geräte bei Unterrichtsausfall, Vertretungen und Raumänderungen für dieses Kind.",
+    notify_entities_label: "Empfänger / Notify-Entitäten:",
+    notify_entities_help: "Wähle eine oder mehrere Home Assistant Benachrichtigungs-Entitäten (z. B. mobile_app_papa, mobile_app_mama).",
+    notify_select_placeholder: "Notify-Dienst / Entität auswählen...",
+    notify_add_btn: "Hinzufügen",
+    notify_custom_placeholder: "Oder Entität manuell eingeben (z. B. notify.mobile_app_phone)",
+    notify_no_entities: "Noch keine Empfänger hinterlegt.",
+    notify_triggers_label: "Ereignisse für Benachrichtigungen:",
+    notify_on_entfall_label: "🚫 Bei Unterrichtsausfall ('Entfällt') benachrichtigen",
+    notify_on_entfall_help: "Sendet eine Benachrichtigung, wenn eine oder mehrere Schulstunden ersatzlos ausfallen.",
+    notify_on_vertretung_label: "🔄 Bei Vertretung & Raumänderung benachrichtigen",
+    notify_on_vertretung_help: "Sendet eine Benachrichtigung bei Vertretungslehrern oder geänderten Unterrichtsräumen.",
+    notify_test_btn: "🔔 Test-Benachrichtigung senden",
+    notify_test_sending: "Sende Test-Nachricht...",
+    notify_test_success: "✅ Test-Benachrichtigung an {count} Empfänger gesendet!",
+    notify_test_failed: "❌ Fehler beim Senden: {error}",
     portal_title: "Eltern-Portal (eltern-portal.org)",
     portal_desc: "Verknüpfe dieses Profil mit dem Eltern-Portal, um Stundenplan, Vertretungsplan, Termine und Klausuren automatisch abzugleichen.",
     portal_enable: "Eltern-Portal Synchronisierung aktivieren",
@@ -581,6 +599,24 @@ const I18N = {
     settings_tab_subjects: "📘 Manage Subjects",
     settings_tab_timetable: "📅 Timetable",
     settings_tab_portal: "🏫 Parents Portal",
+    settings_tab_notifications: "🔔 Notifications",
+    notify_title: "Timetable Change Notifications",
+    notify_desc: "Receive push notifications for cancellations, substitutions, and room changes for this child.",
+    notify_entities_label: "Recipients / Notify entities:",
+    notify_entities_help: "Select one or more Home Assistant notification entities (e.g. mobile_app_dad, mobile_app_mom).",
+    notify_select_placeholder: "Select notify service / entity...",
+    notify_add_btn: "Add",
+    notify_custom_placeholder: "Or enter entity manually (e.g. notify.mobile_app_phone)",
+    notify_no_entities: "No recipients added yet.",
+    notify_triggers_label: "Notification triggers:",
+    notify_on_entfall_label: "🚫 Notify on cancelled lessons ('Entfällt')",
+    notify_on_entfall_help: "Sends a notification when one or more lessons are cancelled without replacement.",
+    notify_on_vertretung_label: "🔄 Notify on substitutions & room changes",
+    notify_on_vertretung_help: "Sends a notification when lessons have a substitute teacher or moved room.",
+    notify_test_btn: "🔔 Send test notification",
+    notify_test_sending: "Sending test notification...",
+    notify_test_success: "✅ Test notification sent to {count} recipient(s)!",
+    notify_test_failed: "❌ Failed to send: {error}",
     portal_title: "Parents Portal (eltern-portal.org)",
     portal_desc: "Link this child profile with Eltern-Portal (eltern-portal.org) to sync timetable, substitutions, and exams.",
     portal_enable: "Enable Eltern-Portal sync",
@@ -1781,6 +1817,9 @@ class SchoolGradesPanel extends HTMLElement {
           subjectAliases: {},
           portalSubstitutions: { days: [], available: false },
           portalAppointments: [],
+          notifyEntities: [],
+          notifyOnEntfall: true,
+          notifyOnVertretung: true,
         };
       }
 
@@ -1828,6 +1867,15 @@ class SchoolGradesPanel extends HTMLElement {
       }
       if (attrs.portal_appointments !== undefined) {
         children[kindName].portalAppointments = Array.isArray(attrs.portal_appointments) ? attrs.portal_appointments : [];
+      }
+      if (attrs.notify_entities !== undefined) {
+        children[kindName].notifyEntities = Array.isArray(attrs.notify_entities) ? attrs.notify_entities : [];
+      }
+      if (attrs.notify_on_entfall !== undefined) {
+        children[kindName].notifyOnEntfall = Boolean(attrs.notify_on_entfall);
+      }
+      if (attrs.notify_on_vertretung !== undefined) {
+        children[kindName].notifyOnVertretung = Boolean(attrs.notify_on_vertretung);
       }
 
       if (attrs.country) {
@@ -2044,6 +2092,17 @@ class SchoolGradesPanel extends HTMLElement {
     if (!this._hass) return [];
     return Object.keys(this._hass.states)
       .filter(id => id.startsWith('calendar.'))
+      .map(id => ({
+        entityId: id,
+        name: this._hass.states[id].attributes.friendly_name || id,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  _getAvailableNotifyEntities() {
+    if (!this._hass) return [];
+    return Object.keys(this._hass.states)
+      .filter(id => id.startsWith('notify.'))
       .map(id => ({
         entityId: id,
         name: this._hass.states[id].attributes.friendly_name || id,
@@ -3038,6 +3097,7 @@ Natur und Technik:
     const children = data;
     const childNames = Object.keys(data);
     const availableCalendars = this._getAvailableCalendars();
+    const availableNotify = this._getAvailableNotifyEntities();
 
     if (childNames.length === 0) {
       this.shadowRoot.innerHTML = `
@@ -3763,8 +3823,17 @@ Natur und Technik:
         </div>
       ` : ''}
 
-      <!-- 3-Tab Settings Modal -->
-      ${this._showSettingsModal ? `
+      <!-- 5-Tab Settings Modal -->
+      ${this._showSettingsModal ? (() => {
+          if (!this._localNotifyEntities) this._localNotifyEntities = {};
+          if (!this._localNotifyEntities[this._selectedChild]) {
+            this._localNotifyEntities[this._selectedChild] = Array.isArray(currentChild.notifyEntities) ? [...currentChild.notifyEntities] : [];
+          }
+          const currentEntities = this._localNotifyEntities[this._selectedChild];
+          const notifyEntfall = currentChild && currentChild.notifyOnEntfall !== undefined ? currentChild.notifyOnEntfall : true;
+          const notifyVertretung = currentChild && currentChild.notifyOnVertretung !== undefined ? currentChild.notifyOnVertretung : true;
+
+          return `
         <div class="modal-backdrop" id="settings-modal-backdrop">
           <div class="modal-card settings-modal-card" style="max-width: 580px; width: 100%;">
             <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-shrink: 0;">
@@ -3787,6 +3856,9 @@ Natur und Technik:
               </button>
               <button type="button" class="modal-tab-btn ${this._settingsTab === 'portal' ? 'active' : ''}" id="settings-tab-btn-portal" style="padding: 8px 14px; border-radius: 8px; border: 1px solid ${this._settingsTab === 'portal' ? 'var(--primary-color, #3b82f6)' : 'var(--divider-color, rgba(255,255,255,0.1))'}; background: ${this._settingsTab === 'portal' ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.05)'}; color: var(--primary-text-color, #fff); cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.2s;">
                 ${this._t('settings_tab_portal')}
+              </button>
+              <button type="button" class="modal-tab-btn ${this._settingsTab === 'notifications' ? 'active' : ''}" id="settings-tab-btn-notifications" style="padding: 8px 14px; border-radius: 8px; border: 1px solid ${this._settingsTab === 'notifications' ? 'var(--primary-color, #3b82f6)' : 'var(--divider-color, rgba(255,255,255,0.1))'}; background: ${this._settingsTab === 'notifications' ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.05)'}; color: var(--primary-text-color, #fff); cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.2s;">
+                ${this._t('settings_tab_notifications')}
               </button>
             </div>
 
@@ -4000,6 +4072,12 @@ Natur und Technik:
                       <div style="font-size: 11px; color: var(--secondary-text-color, rgba(255,255,255,0.5)); margin-left: 26px; margin-top: -4px; margin-bottom: 4px; line-height: 1.3;">
                         ${this._t('portal_ignore_info_help')}
                       </div>
+                      <div style="margin-top: 8px; font-size: 11px; color: #93c5fd; background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.3); border-radius: 6px; padding: 6px 10px; line-height: 1.35; display: flex; align-items: center; justify-content: space-between;">
+                        <span>🔔 Benachrichtigungen bei Ausfällen & Vertretungen einrichten?</span>
+                        <button type="button" id="portal-goto-notifications-btn" style="background: none; border: none; color: #60a5fa; cursor: pointer; font-size: 11px; font-weight: 600; text-decoration: underline; white-space: nowrap; padding-left: 8px;">
+                          Zu Benachrichtigungen ➔
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -4072,6 +4150,116 @@ Natur und Technik:
                   </div>
                 </form>
               </div>
+            ` : this._settingsTab === 'notifications' ? `
+              <!-- Notifications Tab in Settings -->
+              <div class="settings-notifications-tab">
+                <form id="settings-notifications-form">
+                  <div style="margin-bottom: 14px; color: var(--secondary-text-color, rgba(255,255,255,0.75)); font-size: 13px; line-height: 1.4;">
+                    ${this._t('notify_desc')}
+                  </div>
+
+                  <!-- Notification Triggers (Checkboxes) -->
+                  <div class="form-group" style="margin-bottom: 20px; background: rgba(255,255,255,0.03); border: 1px solid var(--divider-color, rgba(255,255,255,0.1)); border-radius: 8px; padding: 12px 14px;">
+                    <label style="display: block; margin-bottom: 10px; font-weight: 600; font-size: 13px; color: var(--primary-text-color, #fff);">
+                      ⚡ ${this._t('notify_triggers_label')}
+                    </label>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                      <div>
+                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13px; font-weight: 500;">
+                          <input type="checkbox" id="settings-notify-entfall" ${notifyEntfall ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: #ef4444; cursor: pointer;">
+                          <span>${this._t('notify_on_entfall_label')}</span>
+                        </label>
+                        <div style="font-size: 11px; color: var(--secondary-text-color, rgba(255,255,255,0.5)); margin-left: 26px; margin-top: 2px;">
+                          ${this._t('notify_on_entfall_help')}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13px; font-weight: 500;">
+                          <input type="checkbox" id="settings-notify-vertretung" ${notifyVertretung ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: #3b82f6; cursor: pointer;">
+                          <span>${this._t('notify_on_vertretung_label')}</span>
+                        </label>
+                        <div style="font-size: 11px; color: var(--secondary-text-color, rgba(255,255,255,0.5)); margin-left: 26px; margin-top: 2px;">
+                          ${this._t('notify_on_vertretung_help')}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Notify Entities Selector & Chips -->
+                  <div class="form-group" style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 13px; color: var(--primary-text-color, #fff);">
+                      📱 ${this._t('notify_entities_label')}
+                    </label>
+                    <div style="font-size: 11px; color: var(--secondary-text-color, rgba(255,255,255,0.6)); margin-bottom: 10px; line-height: 1.3;">
+                      ${this._t('notify_entities_help')}
+                    </div>
+
+                    <!-- Dropdown + Add button -->
+                    <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                      <select id="settings-notify-entity-select" style="flex: 1; padding: 10px 12px; border-radius: 8px; background: var(--card-background-color, rgba(0,0,0,0.25)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 13px; cursor: pointer;">
+                        <option value="">-- ${this._t('notify_select_placeholder')} --</option>
+                        ${availableNotify.map(n => `
+                          <option value="${n.entityId}">📱 ${this._escapeHtml(n.name)} (${n.entityId})</option>
+                        `).join('')}
+                      </select>
+                      <button type="button" id="settings-notify-add-select-btn" class="submit-btn secondary" style="width: auto; padding: 8px 16px; font-size: 13px; white-space: nowrap;">
+                        ➕ ${this._t('notify_add_btn')}
+                      </button>
+                    </div>
+
+                    <!-- Custom text input for manual entity entry -->
+                    <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                      <input type="text" id="settings-notify-custom-input" placeholder="${this._t('notify_custom_placeholder')}" style="flex: 1; padding: 8px 12px; border-radius: 8px; background: var(--card-background-color, rgba(0,0,0,0.25)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 12px; box-sizing: border-box;">
+                      <button type="button" id="settings-notify-add-custom-btn" class="submit-btn secondary" style="width: auto; padding: 8px 14px; font-size: 12px; white-space: nowrap;">
+                        ➕
+                      </button>
+                    </div>
+
+                    <!-- Selected Entities Chips List -->
+                    <div style="background: var(--card-background-color, rgba(0,0,0,0.2)); border: 1px solid var(--divider-color, rgba(255,255,255,0.1)); border-radius: 8px; padding: 10px; min-height: 48px;">
+                      <div style="font-size: 11px; font-weight: 600; color: var(--secondary-text-color, rgba(255,255,255,0.5)); margin-bottom: 6px; text-transform: uppercase;">
+                        Ausgewählte Empfänger (${currentEntities.length}):
+                      </div>
+                      ${currentEntities.length === 0 ? `
+                        <div style="font-size: 12px; color: var(--secondary-text-color, rgba(255,255,255,0.4)); font-style: italic; padding: 4px 0;">
+                          ${this._t('notify_no_entities')}
+                        </div>
+                      ` : `
+                        <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                          ${currentEntities.map((ent, idx) => `
+                            <div class="notify-entity-chip" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 16px; background: rgba(59,130,246,0.2); border: 1px solid rgba(59,130,246,0.4); color: var(--primary-text-color, #fff); font-size: 12px;">
+                              <span>📱 ${this._escapeHtml(ent)}</span>
+                              <button type="button" class="notify-chip-remove-btn" data-index="${idx}" style="background: none; border: none; color: #ef4444; cursor: pointer; padding: 0 2px; font-size: 13px; font-weight: bold; line-height: 1;" title="Entfernen">✖</button>
+                            </div>
+                          `).join('')}
+                        </div>
+                      `}
+                    </div>
+                  </div>
+
+                  <!-- Test Notification Section -->
+                  <div style="border-top: 1px solid var(--divider-color, rgba(255,255,255,0.1)); padding-top: 14px; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                      <div>
+                        <button type="button" id="settings-notify-test-btn" class="submit-btn secondary" style="width: auto; padding: 8px 16px; font-size: 13px;" ${this._notifyTesting ? 'disabled style="opacity:0.6;cursor:wait;"' : ''} ${currentEntities.length === 0 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>
+                          ${this._notifyTesting ? `⏳ ${this._t('notify_test_sending')}` : this._t('notify_test_btn')}
+                        </button>
+                      </div>
+                    </div>
+                    ${this._notifyTestFeedback ? `
+                      <div style="margin-top: 10px; font-size: 12px; padding: 6px 10px; border-radius: 6px; background: ${this._notifyTestFeedback.includes('❌') ? 'rgba(239,68,68,0.2)' : 'rgba(34,197,94,0.2)'}; color: ${this._notifyTestFeedback.includes('❌') ? '#fca5a5' : '#86efac'}; border: 1px solid ${this._notifyTestFeedback.includes('❌') ? 'rgba(239,68,68,0.4)' : 'rgba(34,197,94,0.4)'};">
+                        ${this._escapeHtml(this._notifyTestFeedback)}
+                      </div>
+                    ` : ''}
+                  </div>
+
+                  <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+                    <button type="button" class="submit-btn secondary" id="settings-cancel-btn">${this._t('cancel_btn')}</button>
+                    <button type="submit" class="submit-btn">${this._t('save_btn')}</button>
+                  </div>
+                </form>
+              </div>
             ` : `
               <!-- Timetable Tab in Settings -->
               <div class="settings-timetable-tab">
@@ -4094,7 +4282,8 @@ Natur und Technik:
             </div>
           </div>
         </div>
-      ` : ''}
+      `;
+    })() : ''}
     `;
 
     this._attachEventListeners();
@@ -4442,6 +4631,13 @@ Natur und Technik:
         this._portalFormUsername = undefined;
         this._portalFormPassword = undefined;
         this._portalCopySibling = undefined;
+        this._notifyTesting = false;
+        this._notifyTestFeedback = null;
+        if (!this._localNotifyEntities) this._localNotifyEntities = {};
+        const curData = this._getSchoolGradesData()[this._selectedChild];
+        if (curData && curData.notifyEntities) {
+          this._localNotifyEntities[this._selectedChild] = [...curData.notifyEntities];
+        }
         this.render();
       });
     });
@@ -4504,6 +4700,15 @@ Natur und Technik:
         tabBtnPortal.addEventListener('click', (e) => {
           e.preventDefault();
           this._settingsTab = 'portal';
+          this.render();
+        });
+      }
+
+      const tabBtnNotifications = root.querySelector('#settings-tab-btn-notifications');
+      if (tabBtnNotifications) {
+        tabBtnNotifications.addEventListener('click', (e) => {
+          e.preventDefault();
+          this._settingsTab = 'notifications';
           this.render();
         });
       }
@@ -5008,6 +5213,127 @@ Natur und Technik:
           if (ta) {
             ta.value = this._getDefaultAliasesYaml();
           }
+        });
+      }
+
+      // Notifications Tab Event Listeners
+      const portalGotoNotifBtn = root.querySelector('#portal-goto-notifications-btn');
+      if (portalGotoNotifBtn) {
+        portalGotoNotifBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          this._settingsTab = 'notifications';
+          this.render();
+        });
+      }
+
+      const notifyAddSelectBtn = root.querySelector('#settings-notify-add-select-btn');
+      if (notifyAddSelectBtn) {
+        notifyAddSelectBtn.addEventListener('click', () => {
+          const sel = root.querySelector('#settings-notify-entity-select');
+          const val = sel ? sel.value.trim() : '';
+          if (val) {
+            if (!this._localNotifyEntities) this._localNotifyEntities = {};
+            if (!this._localNotifyEntities[this._selectedChild]) {
+              this._localNotifyEntities[this._selectedChild] = [];
+            }
+            if (!this._localNotifyEntities[this._selectedChild].includes(val)) {
+              this._localNotifyEntities[this._selectedChild].push(val);
+              this.render();
+            }
+          }
+        });
+      }
+
+      const notifyAddCustomBtn = root.querySelector('#settings-notify-add-custom-btn');
+      if (notifyAddCustomBtn) {
+        notifyAddCustomBtn.addEventListener('click', () => {
+          const input = root.querySelector('#settings-notify-custom-input');
+          let val = input ? input.value.trim() : '';
+          if (val) {
+            if (!val.startsWith('notify.')) {
+              val = 'notify.' + val;
+            }
+            if (!this._localNotifyEntities) this._localNotifyEntities = {};
+            if (!this._localNotifyEntities[this._selectedChild]) {
+              this._localNotifyEntities[this._selectedChild] = [];
+            }
+            if (!this._localNotifyEntities[this._selectedChild].includes(val)) {
+              this._localNotifyEntities[this._selectedChild].push(val);
+              this.render();
+            }
+          }
+        });
+      }
+
+      root.querySelectorAll('.notify-chip-remove-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const idx = parseInt(btn.dataset.index, 10);
+          if (this._localNotifyEntities && this._localNotifyEntities[this._selectedChild] && !isNaN(idx)) {
+            this._localNotifyEntities[this._selectedChild].splice(idx, 1);
+            this.render();
+          }
+        });
+      });
+
+      const notifyTestBtn = root.querySelector('#settings-notify-test-btn');
+      if (notifyTestBtn) {
+        notifyTestBtn.addEventListener('click', async () => {
+          const entities = (this._localNotifyEntities && this._localNotifyEntities[this._selectedChild]) || [];
+          if (entities.length === 0) {
+            this._notifyTestFeedback = '❌ Keine Empfänger ausgewählt.';
+            this.render();
+            return;
+          }
+          this._notifyTesting = true;
+          this._notifyTestFeedback = null;
+          this.render();
+          try {
+            const res = await this._hass.callWS({
+              type: 'school_grades/send_test_notification',
+              child_name: this._selectedChild,
+              notify_entities: entities,
+            });
+            this._notifyTesting = false;
+            if (res && res.success) {
+              this._notifyTestFeedback = this._t('notify_test_success', { count: res.sent_count || entities.length });
+            } else {
+              this._notifyTestFeedback = this._t('notify_test_failed', { error: (res && (res.message || res.error)) || 'Unbekannter Fehler' });
+            }
+          } catch (err) {
+            this._notifyTesting = false;
+            this._notifyTestFeedback = this._t('notify_test_failed', { error: (err && (err.message || err.error)) || String(err) });
+          }
+          this.render();
+        });
+      }
+
+      const notificationsForm = root.querySelector('#settings-notifications-form');
+      if (notificationsForm) {
+        notificationsForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const entfall = Boolean(root.querySelector('#settings-notify-entfall')?.checked);
+          const vertretung = Boolean(root.querySelector('#settings-notify-vertretung')?.checked);
+          const entities = (this._localNotifyEntities && this._localNotifyEntities[this._selectedChild]) || [];
+
+          try {
+            await this._hass.callService('school_grades', 'update_settings', {
+              child_name: this._selectedChild,
+              notify_entities: entities,
+              notify_on_entfall: entfall,
+              notify_on_vertretung: vertretung,
+            });
+            const currentChild = this._getSchoolGradesData()[this._selectedChild];
+            if (currentChild) {
+              currentChild.notifyEntities = entities;
+              currentChild.notifyOnEntfall = entfall;
+              currentChild.notifyOnVertretung = vertretung;
+            }
+          } catch (err) {
+            console.error('Failed to update notification settings:', err);
+          }
+          this._showSettingsModal = false;
+          this.render();
         });
       }
     }

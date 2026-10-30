@@ -77,6 +77,10 @@
     "import_portal_exams": {
       "name": "Importa esami e appuntamenti da Eltern-Portal",
       "description": "Importa esami e appuntamenti da Eltern-Portal nel calendario."
+    },
+    "send_test_notification": {
+      "name": "Invia notifica di prova",
+      "description": "Invia una notifica di prova alle entità di notifica configurate."
     }
   }
 }

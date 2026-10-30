@@ -61,11 +61,17 @@ Mit dem **integrierten Sidebar-Panel** (`/schulnoten`) verwaltest du Noten, Fäc
   - Eintragen von Noten (1.0 bis 6.0) mit frei wählbarer Gewichtung (1-fach, 2-fach, 3-fach, 4-fach).
   - Automatische Errechnung des gewichteten Fachdurchschnitts sowie des Gesamtdurchschnitts.
   - Notenhistorie mit Datum, Bezeichnung (z. B. *1. Schulaufgabe*) und Löschoption.
-- ⚙️ **4-Tab Einstellungen-Modal (`⚙️ Allgemein`, `📘 Fächer verwalten`, `📅 Stundenplan YAML` & `🏫 Eltern-Portal`)**:
+- ⚙️ **5-Tab Einstellungen-Modal (`⚙️ Allgemein`, `📘 Fächer verwalten`, `📅 Stundenplan YAML`, `🏫 Eltern-Portal` & `🔔 Benachrichtigungen`)**:
   - **Allgemein**: Notenskala (🇩🇪, 🇦🇹, 🇨🇭, 🇫🇷, 🇮🇹, 🇪🇸, 🇳🇱, 🇵🇱, 🇬🇧, 🇺🇸, 🇷🇺, 🇨🇳), Eingabe der Klasse (z. B. `5a`), Kalender-Auswahl sowie Bereichs-Sichtbarkeiten.
   - **Fächer verwalten**: Bequemes Anlegen neuer Schulfächer sowie Löschen bestehender Fächer.
   - **Stundenplan YAML**: Direkter YAML-Import/Export des Wochenstundenplans.
   - **Eltern-Portal**: Zugangsdaten (Schulkennung, Benutzername, Passwort), Kind-Verknüpfung, Synchronisations-Optionen (Klausuren, Vertretungen, Stundenplan, Info-Termine filtern), Fächer-Aliase bearbeiten, Geschwister-Zugangsdaten kopieren und Verbindungstest.
+  - **Benachrichtigungen (Push Notifications)**:
+    - Hinterlege pro Kind beliebig viele Home Assistant `notify`-Empfänger (z. B. Papa, Mama, Familien-Gruppe).
+    - Wähle gezielt aus, worüber benachrichtigt werden soll: **Unterrichtsausfall (`Entfällt`)** und/oder **Vertretungen & Raumänderungen**.
+    - Die Push-Nachricht listet Datum, Kind, Schulstunde, Fach, Vertretungslehrkraft, Raum und Anmerkungen übersichtlich auf.
+    - **Intelligente Duplikatsvermeidung**: Benachrichtigungen werden nur für neue oder geänderte Einträge verschickt.
+    - **Test-Benachrichtigung**: Sofortiger Funktionstest aller hinterlegten Empfänger direkt per Klick im Modal.
 - 🌐 **Mehrsprachigkeit (Multi-Language i18n)**:
   - Vollständige Lokalisierung für alle unterstützten Ländernormen: **Deutsch 🇩🇪**, **Englisch 🇬🇧/🇺🇸**, **Französisch 🇫🇷**, **Italienisch 🇮🇹**, **Spanisch 🇪🇸**, **Niederländisch 🇳🇱**, **Polnisch 🇵🇱**, **Russisch 🇷🇺** und **Chinesisch 🇨🇳**.
   - Passt sich automatisch der eingestellten Home Assistant Sprache des Benutzers an (inkl. UI-Panel, Sensoren-Statusansagen und Dienste-Beschreibungen).
@@ -124,6 +130,7 @@ Die Integration stellt folgende Aktionen (Services) für Automatisierungen oder 
 | `school_grades.import_portal_timetable` | Stundenplan aus Eltern-Portal importieren | `child_name` |
 | `school_grades.update_portal_settings` | Eltern-Portal Zugangsdaten & Optionen speichern | `child_name`, `portal_enabled`, `portal_school`, `portal_username`, `portal_password`, `portal_student_id`, `portal_student_name`, `portal_sync_timetable`, `portal_sync_substitutions`, `portal_sync_exams`, `portal_ignore_info_events` |
 | `school_grades.update_subject_aliases` | Fächer-Kürzel/Aliase per YAML aktualisieren | `child_name`, `aliases_yaml` |
+| `school_grades.send_test_notification` | Test-Benachrichtigung an Empfänger senden | `child_name` |
 
 ### 🤖 Automatischer Stundenplan-Import per KI (Prompt-Vorlage)
 
@@ -373,11 +380,17 @@ With the **built-in Sidebar Panel** (`/schulnoten`), you can manage grades, subj
   - Record grades (1.0 to 6.0) with configurable weights (1x, 2x, 3x, 4x).
   - Automatic calculation of weighted subject average and overall GPA.
   - Grade history with date, label (e.g., *1st Exam*), and deletion option.
-- ⚙️ **4-Tab Settings Modal (`⚙️ General`, `📘 Manage Subjects`, `📅 Timetable YAML` & `🏫 Eltern-Portal`)**:
+- ⚙️ **5-Tab Settings Modal (`⚙️ General`, `📘 Manage Subjects`, `📅 Timetable YAML`, `🏫 Eltern-Portal` & `🔔 Notifications`)**:
   - **General**: Customize country-specific grading systems (🇩🇪, 🇦🇹, 🇨🇭, 🇫🇷, 🇮🇹, 🇪🇸, 🇳🇱, 🇵🇱, 🇬🇧, 🇺🇸, 🇷🇺, 🇨🇳), class level (e.g. `5a`), calendar selection, and section visibilities.
   - **Manage Subjects**: Easily add new subjects or delete existing ones.
   - **Timetable YAML**: Direct YAML import/export of weekly timetables.
   - **Eltern-Portal**: Credentials (school ID, username, password), student linking, sync toggles (exams, substitutions, timetable, exclude info events), subject aliases editor, copy sibling credentials, and connection test.
+  - **Notifications (Push Notifications)**:
+    - Configure multiple Home Assistant `notify` entities per child (e.g., Mom, Dad, family group).
+    - Choose notification triggers: **Lesson cancellations (`Entfällt`)** and/or **Substitutions & Room changes**.
+    - Notification messages clearly display date, child name, affected lesson/period, subject, substitute teacher, room, and info notes.
+    - **Smart Deduplication**: Only sends push alerts for new or modified substitution changes.
+    - **Test Notification**: Send a test push notification to all configured recipients directly from the modal.
 - 🌐 **Multi-Language Support (i18n)**:
   - Complete native localization for all supported country standards: **German 🇩🇪**, **English 🇬🇧/🇺🇸**, **French 🇫🇷**, **Italian 🇮🇹**, **Spanish 🇪🇸**, **Dutch 🇳🇱**, **Polish 🇵🇱**, **Russian 🇷🇺**, and **Chinese 🇨🇳**.
   - Automatically adapts to the active Home Assistant user language (including UI panel, sensor TTS announcements, and service descriptions).
@@ -436,6 +449,7 @@ The integration provides the following actions (services) for automations and sc
 | `school_grades.import_portal_timetable` | Import timetable from Eltern-Portal | `child_name` |
 | `school_grades.update_portal_settings` | Save Eltern-Portal credentials & options | `child_name`, `portal_enabled`, `portal_school`, `portal_username`, `portal_password`, `portal_student_id`, `portal_student_name`, `portal_sync_timetable`, `portal_sync_substitutions`, `portal_sync_exams`, `portal_ignore_info_events` |
 | `school_grades.update_subject_aliases` | Update subject aliases via YAML | `child_name`, `aliases_yaml` |
+| `school_grades.send_test_notification` | Send test notification to configured recipients | `child_name` |
 
 ### 🤖 Automatic Timetable Import via AI (Prompt Template)
 

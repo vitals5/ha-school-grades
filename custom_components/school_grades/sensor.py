@@ -246,6 +246,9 @@ class SchoolGradeTotalSensor(SensorEntity):
             "portal_substitutions": copy.deepcopy(self.storage.data.portal_substitutions),
             "portal_appointments": copy.deepcopy(self.storage.data.portal_appointments),
             "portal_exams": copy.deepcopy(self.storage.data.get_portal_appointments(only_exams=True)),
+            "notify_entities": list(getattr(self.storage.data, "notify_entities", [])),
+            "notify_on_entfall": bool(getattr(self.storage.data, "notify_on_entfall", True)),
+            "notify_on_vertretung": bool(getattr(self.storage.data, "notify_on_vertretung", True)),
         }
 
 

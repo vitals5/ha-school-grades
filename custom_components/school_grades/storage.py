@@ -94,6 +94,11 @@ class SchoolGradesData:
             self.portal_substitutions: dict[str, Any] = {"days": [], "stand": None, "available": False}
             self.portal_appointments: list[dict[str, Any]] = []
             self.calendar_events: list[dict[str, Any]] = []
+            # Notification settings
+            self.notify_entities: list[str] = []
+            self.notify_on_entfall: bool = True
+            self.notify_on_vertretung: bool = True
+            self.notified_substitutions: list[str] = []
         else:
             self.child_name = data.get("child_name", child_name)
             self.country = str(data.get("country", DEFAULT_COUNTRY)).upper()
@@ -148,6 +153,21 @@ class SchoolGradesData:
             else:
                 self.portal_appointments = []
             self.calendar_events = [dict(e) for e in data.get("calendar_events", []) if isinstance(e, dict)]
+            # Notification settings
+            raw_notify = data.get("notify_entities", [])
+            if isinstance(raw_notify, list):
+                self.notify_entities = [str(x).strip() for x in raw_notify if str(x).strip()]
+            elif isinstance(raw_notify, str) and raw_notify.strip():
+                self.notify_entities = [raw_notify.strip()]
+            else:
+                self.notify_entities = []
+            self.notify_on_entfall = bool(data.get("notify_on_entfall", True))
+            self.notify_on_vertretung = bool(data.get("notify_on_vertretung", True))
+            raw_notified = data.get("notified_substitutions", [])
+            if isinstance(raw_notified, list):
+                self.notified_substitutions = [str(x).strip() for x in raw_notified if str(x).strip()]
+            else:
+                self.notified_substitutions = []
             # Ensure all subjects have an entry in grades dict
             for subj in self._subjects:
                 if subj not in self._grades:
@@ -186,6 +206,10 @@ class SchoolGradesData:
             "portal_substitutions": self.portal_substitutions,
             "portal_appointments": self.portal_appointments,
             "calendar_events": getattr(self, "calendar_events", []),
+            "notify_entities": self.notify_entities,
+            "notify_on_entfall": self.notify_on_entfall,
+            "notify_on_vertretung": self.notify_on_vertretung,
+            "notified_substitutions": self.notified_substitutions,
         }
 
     def set_subject_aliases(self, aliases_dict_or_yaml: dict[str, list[str]] | str) -> None:
@@ -417,6 +441,119 @@ class SchoolGradesData:
                 return e
 
         return None
+
+    def set_notification_settings(
+        self,
+        notify_entities: list[str] | None = None,
+        notify_on_entfall: bool | None = None,
+        notify_on_vertretung: bool | None = None,
+    ) -> bool:
+        """Update notification settings and return True if anything changed."""
+        changed = False
+        if notify_entities is not None:
+            clean = [str(x).strip() for x in notify_entities if str(x).strip()]
+            if clean != self.notify_entities:
+                self.notify_entities = clean
+                changed = True
+        if notify_on_entfall is not None:
+            val = bool(notify_on_entfall)
+            if val != self.notify_on_entfall:
+                self.notify_on_entfall = val
+                changed = True
+        if notify_on_vertretung is not None:
+            val = bool(notify_on_vertretung)
+            if val != self.notify_on_vertretung:
+                self.notify_on_vertretung = val
+                changed = True
+        return changed
+
+    @staticmethod
+    def compute_substitution_signature(date_str: str, entry: dict[str, Any]) -> str:
+        """Compute unique signature for a substitution entry to avoid duplicate notifications."""
+        date_clean = str(date_str).strip().split("T")[0]
+        lesson = str(entry.get("lesson", "")).strip()
+        subj = str(entry.get("subject_resolved") or entry.get("subject") or "").strip().lower()
+        kind = str(entry.get("kind", "")).strip().lower()
+        subst = str(entry.get("substitute", "")).strip().lower()
+        room = str(entry.get("room", "")).strip().lower()
+        info = str(entry.get("info", "")).strip().lower()
+        return f"{date_clean}|{lesson}|{subj}|{kind}|{subst}|{room}|{info}"
+
+    def get_new_substitutions_to_notify(self) -> dict[str, list[dict[str, Any]]]:
+        """Return new relevant substitutions grouped by date that have not been notified yet."""
+        if not self.notify_entities:
+            return {}
+        if not self.notify_on_entfall and not self.notify_on_vertretung:
+            return {}
+        if not self.portal_substitutions or not isinstance(self.portal_substitutions, dict):
+            return {}
+
+        today_iso = dt_date.today().isoformat()
+        notified_set = set(self.notified_substitutions)
+        grouped: dict[str, list[dict[str, Any]]] = {}
+
+        for day in self.portal_substitutions.get("days", []):
+            if not isinstance(day, dict):
+                continue
+            day_date = str(day.get("date", "")).strip().split("T")[0]
+            if not day_date:
+                continue
+            # Only notify for today or future dates
+            if day_date < today_iso:
+                continue
+
+            for entry in day.get("entries", []):
+                if not isinstance(entry, dict):
+                    continue
+                # Only entries applying to this child
+                if not entry.get("applies_to_child", True):
+                    continue
+
+                kind = str(entry.get("kind", "")).strip().lower()
+                if kind == "entfall":
+                    if not self.notify_on_entfall:
+                        continue
+                elif kind in ("vertretung", "raum"):
+                    if not self.notify_on_vertretung:
+                        continue
+                else:
+                    if not self.notify_on_vertretung:
+                        continue
+
+                sig = self.compute_substitution_signature(day_date, entry)
+                if sig in notified_set:
+                    continue
+
+                if day_date not in grouped:
+                    grouped[day_date] = []
+                entry_copy = dict(entry)
+                entry_copy["_signature"] = sig
+                grouped[day_date].append(entry_copy)
+
+        return grouped
+
+    def mark_substitutions_notified(self, signatures: list[str]) -> None:
+        """Mark substitutions signatures as notified and prune signatures older than 14 days."""
+        if not signatures:
+            return
+        notified_set = set(self.notified_substitutions)
+        for s in signatures:
+            clean = str(s).strip()
+            if clean:
+                notified_set.add(clean)
+
+        cutoff = (dt_date.today() - timedelta(days=14)).isoformat()
+        pruned = []
+        for sig in notified_set:
+            parts = sig.split("|")
+            if len(parts) > 0 and len(parts[0]) == 10 and parts[0] < cutoff:
+                continue
+            pruned.append(sig)
+
+        if len(pruned) > 300:
+            pruned = pruned[-300:]
+
+        self.notified_substitutions = sorted(pruned)
 
     def set_portal_appointments(
         self,

@@ -781,6 +781,7 @@ class TestMultiLanguageSupport(unittest.TestCase):
         "set_preparation_done",
         "toggle_prepared_subject",
         "import_portal_exams",
+        "send_test_notification",
     ]
     EXPECTED_DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 
@@ -1790,6 +1791,285 @@ Deutsch:
         self.assertNotIn("Vokabeltest Englisch", upcoming_titles)
         self.assertIn("Wichtiger Elternabend", upcoming_titles)
         self.assertIn("Hitzefrei Warnung", upcoming_titles)
+
+
+class TestNotificationServicesAndFormatting(unittest.TestCase):
+    """Test suite for notification settings, deduplication, filtering, and message formatting."""
+
+    def test_notification_settings_storage_and_serialization(self):
+        """Test storing, serializing and deserializing notification settings."""
+        data = SchoolGradesData("Max")
+        self.assertEqual(data.notify_entities, [])
+        self.assertTrue(data.notify_on_entfall)
+        self.assertTrue(data.notify_on_vertretung)
+        self.assertEqual(data.notified_substitutions, [])
+
+        # Update settings
+        changed = data.set_notification_settings(
+            notify_entities=["notify.mobile_app_papa", "notify.mobile_app_mama"],
+            notify_on_entfall=True,
+            notify_on_vertretung=False,
+        )
+        self.assertTrue(changed)
+        self.assertEqual(data.notify_entities, ["notify.mobile_app_papa", "notify.mobile_app_mama"])
+        self.assertTrue(data.notify_on_entfall)
+        self.assertFalse(data.notify_on_vertretung)
+
+        # Calling again with identical settings should return False
+        self.assertFalse(data.set_notification_settings(
+            notify_entities=["notify.mobile_app_papa", "notify.mobile_app_mama"],
+            notify_on_entfall=True,
+            notify_on_vertretung=False,
+        ))
+
+        # Test to_dict and restoration
+        d = data.to_dict()
+        self.assertEqual(d["notify_entities"], ["notify.mobile_app_papa", "notify.mobile_app_mama"])
+        self.assertTrue(d["notify_on_entfall"])
+        self.assertFalse(d["notify_on_vertretung"])
+
+        data2 = SchoolGradesData("Max", d)
+        self.assertEqual(data2.notify_entities, ["notify.mobile_app_papa", "notify.mobile_app_mama"])
+        self.assertTrue(data2.notify_on_entfall)
+        self.assertFalse(data2.notify_on_vertretung)
+
+    def test_substitution_signature_and_pruning(self):
+        """Test signature generation, deduplication tracking, and 14-day pruning."""
+        data = SchoolGradesData("Max")
+        entry = {
+            "lesson": "2",
+            "subject": "Mathematik",
+            "subject_resolved": "Mathematik",
+            "kind": "entfall",
+            "substitute": "",
+            "room": "",
+            "info": "Krankheit",
+        }
+        sig = data.compute_substitution_signature("2026-11-05", entry)
+        self.assertEqual(sig, "2026-11-05|2|mathematik|entfall|||krankheit")
+
+        data.mark_substitutions_notified([sig])
+        self.assertIn(sig, data.notified_substitutions)
+
+        # Test pruning: add signature older than 14 days
+        from datetime import date as dt_date, timedelta
+        old_date = (dt_date.today() - timedelta(days=20)).isoformat()
+        old_sig = f"{old_date}|1|deutsch|entfall|||"
+        data.notified_substitutions.append(old_sig)
+
+        recent_date = (dt_date.today() - timedelta(days=2)).isoformat()
+        recent_sig = f"{recent_date}|3|englisch|vertretung|schmidt|r101|"
+        data.mark_substitutions_notified([recent_sig])
+
+        # old_sig should have been pruned, recent_sig and sig should remain
+        self.assertNotIn(old_sig, data.notified_substitutions)
+        self.assertIn(recent_sig, data.notified_substitutions)
+
+    def test_get_new_substitutions_to_notify_filtering(self):
+        """Test filtering substitutions by child relevance, trigger checkboxes, and deduplication."""
+        from datetime import date as dt_date, timedelta
+        today_iso = dt_date.today().isoformat()
+        tomorrow_iso = (dt_date.today() + timedelta(days=1)).isoformat()
+        past_iso = (dt_date.today() - timedelta(days=2)).isoformat()
+
+        data = SchoolGradesData("Max")
+        subst_data = {
+            "available": True,
+            "stand": "Heute 07:30",
+            "days": [
+                {
+                    "date": today_iso,
+                    "entries": [
+                        {
+                            "lesson": "1",
+                            "subject": "Mathematik",
+                            "kind": "entfall",
+                            "applies_to_child": True,
+                            "info": "Krank",
+                        },
+                        {
+                            "lesson": "2",
+                            "subject": "Latein",
+                            "kind": "entfall",
+                            "applies_to_child": False,  # Not child's course
+                            "info": "Entfällt",
+                        },
+                        {
+                            "lesson": "3",
+                            "subject": "Deutsch",
+                            "kind": "vertretung",
+                            "substitute": "Hr. Weber",
+                            "room": "R102",
+                            "applies_to_child": True,
+                            "info": "Stillarbeit",
+                        },
+                    ],
+                },
+                {
+                    "date": tomorrow_iso,
+                    "entries": [
+                        {
+                            "lesson": "4",
+                            "subject": "Englisch",
+                            "kind": "raum",
+                            "room": "R205",
+                            "applies_to_child": True,
+                            "info": "Raumtausch",
+                        },
+                    ],
+                },
+                {
+                    "date": past_iso,
+                    "entries": [
+                        {
+                            "lesson": "1",
+                            "subject": "Physik",
+                            "kind": "entfall",
+                            "applies_to_child": True,
+                        },
+                    ],
+                },
+            ],
+        }
+        data.portal_substitutions = subst_data
+
+        # 1. Without notify entities configured -> nothing returned
+        data.notify_entities = []
+        self.assertEqual(data.get_new_substitutions_to_notify(), {})
+
+        # 2. With notify entities configured and both triggers enabled
+        data.notify_entities = ["notify.mobile_app_papa"]
+        data.notify_on_entfall = True
+        data.notify_on_vertretung = True
+
+        to_notify = data.get_new_substitutions_to_notify()
+        self.assertIn(today_iso, to_notify)
+        self.assertIn(tomorrow_iso, to_notify)
+        self.assertNotIn(past_iso, to_notify)  # Past dates must be skipped
+
+        today_entries = to_notify[today_iso]
+        # Only relevant entries: lesson 1 (Math) and lesson 3 (German), but NOT lesson 2 (Latin)
+        self.assertEqual(len(today_entries), 2)
+        subjects = [e["subject"] for e in today_entries]
+        self.assertIn("Mathematik", subjects)
+        self.assertIn("Deutsch", subjects)
+        self.assertNotIn("Latein", subjects)
+
+        # 3. Only notify_on_entfall enabled -> no vertretung or raum
+        data.notify_on_entfall = True
+        data.notify_on_vertretung = False
+        to_notify_entfall = data.get_new_substitutions_to_notify()
+        self.assertIn(today_iso, to_notify_entfall)
+        self.assertNotIn(tomorrow_iso, to_notify_entfall)  # Tomorrow only has raum
+        self.assertEqual(len(to_notify_entfall[today_iso]), 1)
+        self.assertEqual(to_notify_entfall[today_iso][0]["subject"], "Mathematik")
+
+        # 4. Only notify_on_vertretung enabled -> no entfall
+        data.notify_on_entfall = False
+        data.notify_on_vertretung = True
+        to_notify_vert = data.get_new_substitutions_to_notify()
+        self.assertIn(today_iso, to_notify_vert)
+        self.assertIn(tomorrow_iso, to_notify_vert)
+        self.assertEqual(len(to_notify_vert[today_iso]), 1)
+        self.assertEqual(to_notify_vert[today_iso][0]["subject"], "Deutsch")
+        self.assertEqual(len(to_notify_vert[tomorrow_iso]), 1)
+        self.assertEqual(to_notify_vert[tomorrow_iso][0]["subject"], "Englisch")
+
+        # 5. Deduplication: mark notified
+        data.notify_on_entfall = True
+        data.notify_on_vertretung = True
+        all_new = data.get_new_substitutions_to_notify()
+        signatures = [e["_signature"] for day in all_new.values() for e in day]
+        data.mark_substitutions_notified(signatures)
+
+        # Next check should be empty!
+        self.assertEqual(data.get_new_substitutions_to_notify(), {})
+
+    def test_format_substitution_notification_message(self):
+        """Test message text and title formatting for cancellation and substitution notifications."""
+        format_msg = portal_mod.format_substitution_notification_message
+        from datetime import date as dt_date, timedelta
+        today_iso = dt_date.today().isoformat()
+        tomorrow_iso = (dt_date.today() + timedelta(days=1)).isoformat()
+
+        # Case 1: Empty input
+        title, msg = format_msg("Max", {})
+        self.assertEqual(title, "")
+        self.assertEqual(msg, "")
+
+        # Case 2: Only cancellations (Unterrichtsausfall)
+        grouped_entfall = {
+            today_iso: [
+                {
+                    "lesson": "1",
+                    "subject": "Mathematik",
+                    "kind": "entfall",
+                    "info": "Krankheit",
+                },
+                {
+                    "lesson": "2",
+                    "subject": "Mathematik",
+                    "kind": "entfall",
+                    "info": "",
+                },
+            ]
+        }
+        title, body = format_msg("Max", grouped_entfall)
+        self.assertIn("🎓 Unterrichtsausfall (Max)", title)
+        self.assertIn("Heute", body)
+        self.assertIn("1. Std: Mathematik — Entfällt (Krankheit)", body)
+        self.assertIn("2. Std: Mathematik — Entfällt", body)
+
+        # Case 3: Only substitutions (Vertretungsplan)
+        grouped_vert = {
+            tomorrow_iso: [
+                {
+                    "lesson": "3",
+                    "subject": "Deutsch",
+                    "kind": "vertretung",
+                    "substitute": "Fr. Schmidt",
+                    "room": "R102",
+                    "info": "Stillarbeit",
+                },
+                {
+                    "lesson": "4",
+                    "subject": "Englisch",
+                    "kind": "raum",
+                    "room": "R205",
+                    "info": "",
+                },
+            ]
+        }
+        title, body = format_msg("Emma", grouped_vert)
+        self.assertIn("🔄 Vertretungsplan (Emma)", title)
+        self.assertIn("Morgen", body)
+        self.assertIn("3. Std: Deutsch — Vertretung (durch Fr. Schmidt, in R102, Stillarbeit)", body)
+        self.assertIn("4. Std: Englisch — Raumänderung → R205", body)
+
+        # Case 4: Both cancellations and substitutions (Stundenplan-Änderung)
+        grouped_both = {
+            today_iso: [
+                {
+                    "lesson": "1",
+                    "subject": "Mathematik",
+                    "kind": "entfall",
+                    "info": "Lehrkraft abwesend",
+                },
+                {
+                    "lesson": "2",
+                    "subject": "Physik",
+                    "kind": "vertretung",
+                    "substitute": "Hr. Meyer",
+                    "room": "Phy-Saal",
+                    "info": "",
+                },
+            ]
+        }
+        title, body = format_msg("Max", grouped_both)
+        self.assertIn("📢 Stundenplan-Änderung (Max)", title)
+        self.assertIn("1. Std: Mathematik — Entfällt (Lehrkraft abwesend)", body)
+        self.assertIn("2. Std: Physik — Vertretung (durch Hr. Meyer, in Phy-Saal)", body)
+
 
 def validate_json_yaml_files():
     json_files = list(project_root.glob("**/*.json"))

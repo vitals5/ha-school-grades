@@ -77,6 +77,10 @@
     "import_portal_exams": {
       "name": "Examens en afspraken importeren uit Ouderportaal",
       "description": "Importeert examens en afspraken uit het Ouderportaal naar de agenda."
+    },
+    "send_test_notification": {
+      "name": "Testmelding verzenden",
+      "description": "Verzendt een testmelding naar de geconfigureerde meldingsentiteiten."
     }
   }
 }

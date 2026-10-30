@@ -77,6 +77,10 @@
     "import_portal_exams": {
       "name": "Importuj sprawdziany i terminy z Portalu Rodzica",
       "description": "Importuje sprawdziany i terminy z Portalu Rodzica do kalendarza."
+    },
+    "send_test_notification": {
+      "name": "Wyślij powiadomienie testowe",
+      "description": "Wysyła powiadomienie testowe do skonfigurowanych encji powiadomień."
     }
   }
 }

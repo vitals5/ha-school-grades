@@ -27,6 +27,9 @@ from .const import (
     CONF_GRADE_LEVEL,
     CONF_HOMEWORK_DONE,
     CONF_NAME,
+    CONF_NOTIFY_ENTITIES,
+    CONF_NOTIFY_ON_ENTFALL,
+    CONF_NOTIFY_ON_VERTRETUNG,
     CONF_PORTAL_ENABLED,
     CONF_PORTAL_PASSWORD,
     CONF_PORTAL_SCHOOL,
@@ -68,6 +71,7 @@ from .const import (
     SERVICE_REMOVE_CALENDAR_EVENT,
     SERVICE_REMOVE_GRADE,
     SERVICE_REMOVE_SUBJECT,
+    SERVICE_SEND_TEST_NOTIFICATION,
     SERVICE_SET_CALENDAR,
     SERVICE_SET_HOMEWORK_DONE,
     SERVICE_SET_PREPARATION_DONE,
@@ -85,6 +89,7 @@ from .portal import (
     async_fetch_child_portal_data,
     async_validate_and_get_students,
     convert_portal_lessons_to_timetable,
+    format_substitution_notification_message,
     parse_appointments,
     parse_subject_aliases_yaml,
 )
@@ -173,6 +178,17 @@ SCHEMA_UPDATE_SETTINGS = vol.Schema(
         vol.Optional(CONF_SHOW_CALENDAR): cv.boolean,
         vol.Optional(CONF_SHOW_TIMETABLE): cv.boolean,
         vol.Optional(CONF_SHOW_OVERVIEW): cv.boolean,
+        vol.Optional(CONF_NOTIFY_ENTITIES): vol.All(cv.ensure_list, [cv.string]),
+        vol.Optional(CONF_NOTIFY_ON_ENTFALL): cv.boolean,
+        vol.Optional(CONF_NOTIFY_ON_VERTRETUNG): cv.boolean,
+    }
+)
+
+SCHEMA_SEND_TEST_NOTIFICATION = vol.Schema(
+    {
+        vol.Optional(CONF_CHILD_NAME): cv.string,
+        vol.Optional(CONF_NOTIFY_ENTITIES): vol.All(cv.ensure_list, [cv.string]),
+        vol.Optional("message"): cv.string,
     }
 )
 
@@ -323,7 +339,7 @@ async def _async_setup_frontend(hass: HomeAssistant) -> None:
     else:
         hass.http.register_static_path(URL_BASE, FRONTEND_DIR, cache_headers=False)
 
-    version_str = "1.2.18"
+    version_str = "1.2.19"
     try:
         js_file = os.path.join(FRONTEND_DIR, "school-grades-panel.js")
         if os.path.exists(js_file):
@@ -571,6 +587,18 @@ def _register_services(hass: HomeAssistant) -> None:
                 storage.data.set_section_visibility(vis_updates)
                 updated = True
 
+            if (
+                CONF_NOTIFY_ENTITIES in call.data
+                or CONF_NOTIFY_ON_ENTFALL in call.data
+                or CONF_NOTIFY_ON_VERTRETUNG in call.data
+            ):
+                if storage.data.set_notification_settings(
+                    notify_entities=call.data.get(CONF_NOTIFY_ENTITIES),
+                    notify_on_entfall=call.data.get(CONF_NOTIFY_ON_ENTFALL),
+                    notify_on_vertretung=call.data.get(CONF_NOTIFY_ON_VERTRETUNG),
+                ):
+                    updated = True
+
             if updated:
                 await storage.async_save()
                 async_dispatcher_send(
@@ -770,6 +798,95 @@ def _register_services(hass: HomeAssistant) -> None:
         result = await async_validate_and_get_students(session, school, username, password)
         connection.send_result(msg["id"], result)
 
+    async def _async_send_notifications(
+        notify_entities: list[str],
+        title: str,
+        message: str,
+        data: dict[str, Any] | None = None,
+    ) -> int:
+        """Send notification to all configured notify entities/services."""
+        sent = 0
+        payload: dict[str, Any] = {"title": title, "message": message}
+        if data:
+            payload["data"] = data
+
+        for entity in notify_entities:
+            target = str(entity).strip()
+            if not target:
+                continue
+            delivered = False
+            # Modern Home Assistant: notify.send_message
+            if hass.services.has_service("notify", "send_message") and target.startswith("notify."):
+                try:
+                    await hass.services.async_call(
+                        "notify",
+                        "send_message",
+                        {"entity_id": target, "title": title, "message": message},
+                        blocking=False,
+                    )
+                    delivered = True
+                    sent += 1
+                except Exception as err:
+                    _LOGGER.debug("notify.send_message failed for %s, trying direct service: %s", target, err)
+
+            if not delivered:
+                # Legacy / direct notify service: notify.<service_name>
+                svc_name = target.replace("notify.", "") if target.startswith("notify.") else target
+                if hass.services.has_service("notify", svc_name):
+                    try:
+                        await hass.services.async_call(
+                            "notify",
+                            svc_name,
+                            payload,
+                            blocking=False,
+                        )
+                        sent += 1
+                    except Exception as err:
+                        _LOGGER.error("Failed to send notification via notify.%s: %s", svc_name, err)
+                else:
+                    _LOGGER.warning("Notify entity/service '%s' not found in Home Assistant", target)
+
+        return sent
+
+    async def _async_notify_substitutions(storage: SchoolGradesStorage) -> int:
+        """Check for new substitutions and dispatch notifications if configured."""
+        data = storage.data
+        if not data.notify_entities:
+            return 0
+        if not data.notify_on_entfall and not data.notify_on_vertretung:
+            return 0
+
+        grouped = data.get_new_substitutions_to_notify()
+        if not grouped:
+            return 0
+
+        title, message = format_substitution_notification_message(data.child_name, grouped)
+        if not message:
+            return 0
+
+        sent = await _async_send_notifications(
+            notify_entities=data.notify_entities,
+            title=title,
+            message=message,
+            data={"child_name": data.child_name, "tag": f"school_grades_{data.child_name}"},
+        )
+
+        signatures = []
+        for entries in grouped.values():
+            for e in entries:
+                if "_signature" in e:
+                    signatures.append(e["_signature"])
+
+        data.mark_substitutions_notified(signatures)
+        await storage.async_save()
+        _LOGGER.info(
+            "Sent substitution notification for %s (%d entries) to %d recipients",
+            data.child_name,
+            len(signatures),
+            sent,
+        )
+        return len(signatures)
+
     async def _async_sync_child_portal(
         storage: SchoolGradesStorage,
         force_timetable: bool = False,
@@ -836,8 +953,13 @@ def _register_services(hass: HomeAssistant) -> None:
         cooldowns[data.child_name] = now_ts
 
         # Update substitutions if fetched
+        notified_subst_count = 0
         if sync_subst and "substitutions" in res:
             data.set_portal_substitutions(res["substitutions"])
+            try:
+                notified_subst_count = await _async_notify_substitutions(storage)
+            except Exception as notify_err:
+                _LOGGER.error("Error sending substitution notifications for %s: %s", data.child_name, notify_err)
 
         # Update timetable if requested
         if sync_tt and "timetable" in res and res["timetable"]:
@@ -893,6 +1015,7 @@ def _register_services(hass: HomeAssistant) -> None:
             "synced_to_calendar": bool(data.calendar_entity and sync_exams),
             "created_count": synced_count,
             "deleted_info_count": deleted_info,
+            "notified_count": notified_subst_count,
         }
 
     async def handle_sync_elternportal(call: ServiceCall) -> dict[str, Any]:
@@ -1066,6 +1189,80 @@ def _register_services(hass: HomeAssistant) -> None:
                 "aliases": storage.data.subject_aliases,
                 "yaml": storage.data.get_subject_aliases_yaml(),
             },
+        )
+
+    async def handle_send_test_notification(call: ServiceCall) -> dict[str, Any]:
+        """Send a test notification to configured or given notify entities."""
+        child_name = call.data.get(CONF_CHILD_NAME)
+        override_entities = call.data.get(CONF_NOTIFY_ENTITIES)
+        custom_message = call.data.get("message")
+
+        storage = _get_storage(hass, child_name)
+        c_name = storage.child_name if storage else (child_name or "Schulkind")
+        entities = override_entities or (storage.data.notify_entities if storage else [])
+
+        if not entities:
+            return {"success": False, "error": "no_entities", "message": "Keine Notify-Entitäten hinterlegt."}
+
+        title = f"🔔 Test-Benachrichtigung ({c_name})"
+        body = (
+            custom_message
+            or f"Dies ist eine Test-Benachrichtigung für {c_name} aus Schulnoten. Benachrichtigungen für Unterrichtsausfall und Vertretung sind erfolgreich eingerichtet!"
+        )
+
+        sent = await _async_send_notifications(
+            notify_entities=entities,
+            title=title,
+            message=body,
+            data={"child_name": c_name, "tag": f"school_grades_test_{c_name}"},
+        )
+        return {"success": sent > 0, "sent_count": sent, "recipients": entities}
+
+    @websocket_api.websocket_command(
+        {
+            vol.Required("type"): "school_grades/send_test_notification",
+            vol.Optional("child_name"): str,
+            vol.Optional("notify_entities"): vol.All(cv.ensure_list, [str]),
+            vol.Optional("message"): str,
+        }
+    )
+    @websocket_api.async_response
+    async def ws_send_test_notification(
+        hass_inner: HomeAssistant,
+        connection: websocket_api.ActiveConnection,
+        msg: dict[str, Any],
+    ) -> None:
+        """Handle websocket request to send test notification."""
+        child_name = msg.get("child_name")
+        override_entities = msg.get("notify_entities")
+        custom_message = msg.get("message")
+
+        storage = _get_storage(hass, child_name)
+        c_name = storage.child_name if storage else (child_name or "Schulkind")
+        entities = override_entities or (storage.data.notify_entities if storage else [])
+
+        if not entities:
+            connection.send_result(
+                msg["id"],
+                {"success": False, "error": "no_entities", "message": "Keine Notify-Entitäten hinterlegt."},
+            )
+            return
+
+        title = f"🔔 Test-Benachrichtigung ({c_name})"
+        body = (
+            custom_message
+            or f"Dies ist eine Test-Benachrichtigung für {c_name} aus Schulnoten. Benachrichtigungen für Unterrichtsausfall und Vertretung sind erfolgreich eingerichtet!"
+        )
+
+        sent = await _async_send_notifications(
+            notify_entities=entities,
+            title=title,
+            message=body,
+            data={"child_name": c_name, "tag": f"school_grades_test_{c_name}"},
+        )
+        connection.send_result(
+            msg["id"],
+            {"success": True, "sent_count": sent, "recipients": entities},
         )
 
     def _parse_event_datetime(d_str: str, t_str: str) -> tuple[str, str]:
@@ -1725,12 +1922,20 @@ def _register_services(hass: HomeAssistant) -> None:
         handle_update_subject_aliases,
         schema=SCHEMA_UPDATE_SUBJECT_ALIASES,
     )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SEND_TEST_NOTIFICATION,
+        handle_send_test_notification,
+        schema=SCHEMA_SEND_TEST_NOTIFICATION,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
     websocket_api.async_register_command(hass, ws_test_elternportal)
     websocket_api.async_register_command(hass, ws_sync_elternportal)
     websocket_api.async_register_command(hass, ws_import_portal_timetable)
     websocket_api.async_register_command(hass, ws_import_portal_exams)
     websocket_api.async_register_command(hass, ws_update_subject_aliases)
     websocket_api.async_register_command(hass, ws_get_sibling_portal_credentials)
+    websocket_api.async_register_command(hass, ws_send_test_notification)
 
 
 def _unregister_services(hass: HomeAssistant) -> None:
@@ -1755,5 +1960,6 @@ def _unregister_services(hass: HomeAssistant) -> None:
     hass.services.async_remove(DOMAIN, SERVICE_IMPORT_PORTAL_TIMETABLE)
     hass.services.async_remove(DOMAIN, SERVICE_IMPORT_PORTAL_EXAMS)
     hass.services.async_remove(DOMAIN, SERVICE_UPDATE_SUBJECT_ALIASES)
+    hass.services.async_remove(DOMAIN, SERVICE_SEND_TEST_NOTIFICATION)
 
 

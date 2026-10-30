@@ -97,6 +97,10 @@
     "import_portal_exams": {
       "name": "Termine & Klausuren aus Eltern-Portal importieren",
       "description": "Importiert anstehende Schulaufgaben und Termine aus dem Eltern-Portal in den Kalender."
+    },
+    "send_test_notification": {
+      "name": "Test-Benachrichtigung senden",
+      "description": "Sendet eine Test-Benachrichtigung an die hinterlegten Notify-Entitäten."
     }
   }
 }

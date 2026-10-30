@@ -77,6 +77,10 @@
     "import_portal_exams": {
       "name": "从家长门户导入考试与日程",
       "description": "从家长门户导入即将到来的考试与日程至日历。"
+    },
+    "send_test_notification": {
+      "name": "发送测试通知",
+      "description": "向已配置的通知实体发送测试通知。"
     }
   }
 }

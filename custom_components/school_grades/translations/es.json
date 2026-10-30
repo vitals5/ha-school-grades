@@ -77,6 +77,10 @@
     "import_portal_exams": {
       "name": "Importar exámenes y citas de Eltern-Portal",
       "description": "Importa los exámenes y citas de Eltern-Portal al calendario."
+    },
+    "send_test_notification": {
+      "name": "Enviar notificación de prueba",
+      "description": "Envía una notificación de prueba a las entidades configuradas."
     }
   }
 }

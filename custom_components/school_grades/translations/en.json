@@ -97,6 +97,10 @@
     "import_portal_exams": {
       "name": "Import exams & appointments from Eltern-Portal",
       "description": "Imports upcoming exams and appointments from Eltern-Portal into the calendar."
+    },
+    "send_test_notification": {
+      "name": "Send test notification",
+      "description": "Sends a test notification to configured notify entities."
     }
   }
 }

@@ -405,6 +405,85 @@ def substitution_kind(entry: dict[str, Any]) -> str:
     return "vertretung"
 
 
+def format_substitution_notification_message(
+    child_name: str,
+    grouped_by_date: dict[str, list[dict[str, Any]]],
+) -> tuple[str, str]:
+    """Format notification title and body text for substitution changes."""
+    from datetime import date as dt_date, timedelta
+    weekdays_de = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
+    today = dt_date.today()
+
+    all_kinds: set[str] = set()
+    day_blocks: list[str] = []
+
+    for date_str in sorted(grouped_by_date.keys()):
+        entries = grouped_by_date[date_str]
+        if not entries:
+            continue
+
+        try:
+            d_obj = dt_date.fromisoformat(date_str)
+            wd = weekdays_de[d_obj.weekday()]
+            if d_obj == today:
+                header = f"📅 Heute ({wd}, {d_obj.strftime('%d.%m.')}):"
+            elif d_obj == today + timedelta(days=1):
+                header = f"📅 Morgen ({wd}, {d_obj.strftime('%d.%m.')}):"
+            else:
+                header = f"📅 {wd}, {d_obj.strftime('%d.%m.%Y')}:"
+        except Exception:
+            header = f"📅 {date_str}:"
+
+        lines = [header]
+        for e in entries:
+            kind = str(e.get("kind", "vertretung")).strip().lower()
+            all_kinds.add(kind)
+            lesson = str(e.get("lesson", "")).strip() or "?"
+            lesson_label = f"{lesson}. Std" if not lesson.endswith(".") else f"{lesson} Std"
+            subj = str(e.get("subject_resolved") or e.get("subject") or "Unterricht").strip()
+            subst = str(e.get("substitute", "")).strip()
+            room = str(e.get("room", "")).strip()
+            info = str(e.get("info", "")).strip()
+
+            if kind == "entfall":
+                detail = "Entfällt"
+                if info:
+                    detail += f" ({info})"
+            elif kind == "raum":
+                detail = f"Raumänderung → {room}" if room else "Raumänderung"
+                if info:
+                    detail += f" ({info})"
+            else:
+                parts = []
+                if subst and subst not in ("---", "-", "–"):
+                    parts.append(f"durch {subst}")
+                if room:
+                    parts.append(f"in {room}")
+                if info:
+                    parts.append(info)
+                detail = f"Vertretung ({', '.join(parts)})" if parts else "Vertretung"
+
+            lines.append(f"• {lesson_label}: {subj} — {detail}")
+
+        day_blocks.append("\n".join(lines))
+
+    if not day_blocks:
+        return "", ""
+
+    has_entfall = "entfall" in all_kinds
+    has_vertretung = ("vertretung" in all_kinds) or ("raum" in all_kinds)
+
+    if has_entfall and not has_vertretung:
+        title = f"🎓 Unterrichtsausfall ({child_name})"
+    elif has_vertretung and not has_entfall:
+        title = f"🔄 Vertretungsplan ({child_name})"
+    else:
+        title = f"📢 Stundenplan-Änderung ({child_name})"
+
+    message = "\n\n".join(day_blocks)
+    return title, message
+
+
 def parse_timetable(html: str) -> list[dict[str, Any]]:
     """Parse timetable HTML into structured lesson list."""
     out: list[dict[str, Any]] = []

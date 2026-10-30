@@ -332,6 +332,24 @@ update_settings:
       example: true
       selector:
         boolean:
+    notify_entities:
+      name: "Benachrichtigungs-Entitäten"
+      description: "Liste von notify-Entitäten oder Diensten für Benachrichtigungen (z. B. notify.mobile_app_phone)."
+      example: ["notify.mobile_app_phone"]
+      selector:
+        object:
+    notify_on_entfall:
+      name: "Bei Unterrichtsausfall benachrichtigen"
+      description: "Sendet eine Benachrichtigung, wenn Stunden ersatzlos ausfallen."
+      example: true
+      selector:
+        boolean:
+    notify_on_vertretung:
+      name: "Bei Vertretung & Raumänderung benachrichtigen"
+      description: "Sendet eine Benachrichtigung bei Vertretungslehrern oder geänderten Räumen."
+      example: true
+      selector:
+        boolean:
 
 add_calendar_event:
   name: "Klausur / Termin im Kalender erstellen"
@@ -673,6 +691,29 @@ update_subject_aliases:
       selector:
         text:
           multiline: true
+
+send_test_notification:
+  name: "Test-Benachrichtigung senden"
+  description: "Sendet eine Test-Benachrichtigung an die hinterlegten Notify-Entitäten eines Kindes."
+  fields:
+    child_name:
+      name: "Name des Kindes"
+      description: "Name des Kindes (optional, falls nur ein Kind vorhanden)."
+      example: "Max"
+      selector:
+        text:
+    notify_entities:
+      name: "Empfänger / Notify-Entitäten"
+      description: "Optionale Liste von Ziel-Entitäten (überschreibt temporär die gespeicherten Einstellungen)."
+      example: ["notify.mobile_app_phone"]
+      selector:
+        object:
+    message:
+      name: "Benachrichtigungstext"
+      description: "Optionaler individueller Nachrichtentext."
+      example: "Testnachricht aus Schulnoten"
+      selector:
+        text:
 
 
 

@@ -77,6 +77,10 @@
     "import_portal_exams": {
       "name": "Importer les examens et rendez-vous du Portail Parents",
       "description": "Importe les examens et rendez-vous du Portail Parents dans le calendrier."
+    },
+    "send_test_notification": {
+      "name": "Envoyer une notification de test",
+      "description": "Envoie une notification de test aux entités de notification configurées."
     }
   }
 }
