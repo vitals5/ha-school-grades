@@ -1262,6 +1262,39 @@ def _register_services(hass: HomeAssistant) -> None:
             },
         )
 
+    @websocket_api.websocket_command(
+        {
+            vol.Required("type"): "school_grades/reset_notified_substitutions",
+            vol.Optional("child_name"): str,
+        }
+    )
+    @websocket_api.async_response
+    async def ws_reset_notified_substitutions(
+        hass_inner: HomeAssistant,
+        connection: websocket_api.ActiveConnection,
+        msg: dict[str, Any],
+    ) -> None:
+        """Clear the notified-substitutions memory (e.g. after fixing notify entities).
+
+        Entries are then treated as new again on the next sync and notified once more.
+        """
+        child_name = msg.get("child_name")
+        if child_name:
+            st = _get_storage(hass, child_name)
+            targets = [st] if st else []
+        else:
+            targets = [
+                s for s in hass.data.get(DOMAIN, {}).values() if isinstance(s, SchoolGradesStorage)
+            ]
+        cleared = 0
+        for st in targets:
+            cleared += len(st.data.notified_substitutions)
+            st.data.notified_substitutions = []
+            await st.async_save()
+            async_dispatcher_send(hass, SIGNAL_UPDATE_GRADES.format(entry_id=st.entry_id))
+        _LOGGER.info("Cleared %d notified substitution signatures (%d children)", cleared, len(targets))
+        connection.send_result(msg["id"], {"success": True, "cleared": cleared, "children": len(targets)})
+
     async def handle_send_test_notification(call: ServiceCall) -> dict[str, Any]:
         """Send a test notification to configured or given notify entities."""
         child_name = call.data.get(CONF_CHILD_NAME)
@@ -2005,6 +2038,7 @@ def _register_services(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_import_portal_timetable)
     websocket_api.async_register_command(hass, ws_import_portal_exams)
     websocket_api.async_register_command(hass, ws_update_subject_aliases)
+    websocket_api.async_register_command(hass, ws_reset_notified_substitutions)
     websocket_api.async_register_command(hass, ws_get_sibling_portal_credentials)
     websocket_api.async_register_command(hass, ws_send_test_notification)
 
