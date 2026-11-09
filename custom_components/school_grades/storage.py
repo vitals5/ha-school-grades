@@ -483,8 +483,6 @@ class SchoolGradesData:
         """Return new relevant substitutions grouped by date that have not been notified yet."""
         if not self.notify_entities:
             return {}
-        if not self.notify_on_entfall and not self.notify_on_vertretung:
-            return {}
         if not self.portal_substitutions or not isinstance(self.portal_substitutions, dict):
             return {}
 
@@ -513,7 +511,10 @@ class SchoolGradesData:
                     continue
 
                 kind = str(entry.get("kind", "")).strip().lower()
-                if kind == "entfall":
+                if kind == "info":
+                    # day-level hints (e.g. "Allg. Schulschluss") are always included
+                    pass
+                elif kind == "entfall":
                     if not self.notify_on_entfall:
                         stats["kind_filtered"] += 1
                         continue

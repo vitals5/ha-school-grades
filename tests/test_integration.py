@@ -2188,6 +2188,88 @@ class TestSubstitutionPlanParsingLayouts(unittest.TestCase):
         self.assertEqual(len(grouped[today_iso]), 1)
 
 
+class TestDayLevelSubstitutionComments(unittest.TestCase):
+    """Day-level comments like 'Allg. Schulschluss' / 'Unterrichtsende' must be captured as kind='info'."""
+
+    HTML_DAY_COMMENTS = """
+    <div id="asam_content"><div class="main_center">
+      <div class="list bold full_width text_center">Mo., 09.11.2026 - KW 46, Allg. Schulschluss 12:00 Uhr</div>
+      <div class="info">Unterrichtsende nach der 6. Stunde</div>
+      <table class="table">
+        <tr class="vp_plan_head"><td class="table_header">Std.</td><td class="table_header">Betrifft.</td><td class="table_header">Vertretung</td><td class="table_header">Fach</td><td class="table_header">Raum</td><td class="table_header">Info</td></tr>
+        <tr><td colspan="6" class="text_center">Elternsprechstunde entfällt heute</td></tr>
+        <tr class="liste_grau"><td>1.</td><td>abc</td><td>xyz</td><td>D</td><td>R102</td><td>Stillarbeit</td></tr>
+      </table>
+    </div></div>
+    """
+
+    def test_day_comments_captured_as_info(self):
+        for use_bs4 in (True, False):
+            old_bs4 = portal_mod.bs4
+            portal_mod.bs4 = __import__("bs4") if use_bs4 else None
+            try:
+                r = portal_mod.parse_substitutions(self.HTML_DAY_COMMENTS)
+            finally:
+                portal_mod.bs4 = old_bs4
+            self.assertTrue(r["available"])
+            entries = r["days"][0]["entries"]
+            infos = [e for e in entries if e.get("kind") == "info"]
+            infos_text = " | ".join(e.get("info", "") for e in infos)
+            self.assertIn("Allg. Schulschluss 12:00 Uhr", infos_text)
+            self.assertIn("Unterrichtsende nach der 6. Stunde", infos_text)
+            self.assertIn("Elternsprechstunde entfällt heute", infos_text)
+            for e in infos:
+                self.assertEqual(e["lesson"], "")
+            # the real substitution row is still parsed
+            rows = [e for e in entries if e.get("kind") != "info"]
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["lesson"], "1")
+            self.assertEqual(rows[0]["subject"], "D")
+
+    def test_info_included_even_when_both_switches_off(self):
+        from datetime import date as dt_date
+        today_iso = dt_date.today().isoformat()
+        html = self.HTML_DAY_COMMENTS.replace("Mo., 09.11.2026", "X., " + dt_date.today().strftime("%d.%m.%Y"))
+        r = portal_mod.parse_substitutions(html)
+        data = SchoolGradesData("Emma")
+        data._subjects = ["Deutsch"]
+        data.subject_aliases = {"Deutsch": ["D"]}
+        data.notify_entities = ["notify.mobile_app_mama"]
+        data.notify_on_entfall = False
+        data.notify_on_vertretung = False  # both off: only info entries should remain
+        data.set_portal_substitutions(r)
+        grouped = data.get_new_substitutions_to_notify()
+        self.assertIn(today_iso, grouped)
+        kinds = [e["kind"] for e in grouped[today_iso]]
+        self.assertTrue(kinds)
+        self.assertTrue(all(k == "info" for k in kinds))
+
+    def test_info_in_notification_message(self):
+        from datetime import date as dt_date
+        today_iso = dt_date.today().isoformat()
+        grouped = {
+            today_iso: [
+                {"lesson": "", "kind": "info", "info": "Allg. Schulschluss 12:00 Uhr"},
+            ]
+        }
+        title, body = portal_mod.format_substitution_notification_message("Max", grouped)
+        self.assertIn("Hinweis (Max)", title)
+        self.assertIn("ℹ️ Allg. Schulschluss 12:00 Uhr", body)
+        self.assertNotIn("Std:", body)
+
+        # mixed: info + entfall -> combined title, info line without lesson
+        grouped2 = {
+            today_iso: [
+                {"lesson": "", "kind": "info", "info": "Unterrichtsende nach der 6. Stunde"},
+                {"lesson": "2", "subject": "Mathematik", "kind": "entfall", "info": "Krank"},
+            ]
+        }
+        title2, body2 = portal_mod.format_substitution_notification_message("Max", grouped2)
+        self.assertIn("Stundenplan-Änderung (Max)", title2)
+        self.assertIn("ℹ️ Unterrichtsende nach der 6. Stunde", body2)
+        self.assertIn("2. Std: Mathematik — Entfällt (Krank)", body2)
+
+
 def validate_json_yaml_files():
     json_files = list(project_root.glob("**/*.json"))
     for jf in json_files:

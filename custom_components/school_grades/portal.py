@@ -443,6 +443,11 @@ def format_substitution_notification_message(
         for e in entries:
             kind = str(e.get("kind", "vertretung")).strip().lower()
             all_kinds.add(kind)
+            if kind == "info":
+                info_text = str(e.get("info", "")).strip()
+                if info_text:
+                    lines.append(f"ℹ️ {info_text}")
+                continue
             lesson = str(e.get("lesson", "")).strip() or "?"
             lesson_label = f"{lesson}. Std" if not lesson.endswith(".") else f"{lesson} Std"
             subj = str(e.get("subject_resolved") or e.get("subject") or "Unterricht").strip()
@@ -477,11 +482,14 @@ def format_substitution_notification_message(
 
     has_entfall = "entfall" in all_kinds
     has_vertretung = ("vertretung" in all_kinds) or ("raum" in all_kinds)
+    has_info = "info" in all_kinds
 
-    if has_entfall and not has_vertretung:
+    if has_entfall and not has_vertretung and not has_info:
         title = f"🎓 Unterrichtsausfall ({child_name})"
-    elif has_vertretung and not has_entfall:
+    elif has_vertretung and not has_entfall and not has_info:
         title = f"🔄 Vertretungsplan ({child_name})"
+    elif has_info and not has_entfall and not has_vertretung:
+        title = f"📢 Hinweis ({child_name})"
     else:
         title = f"📢 Stundenplan-Änderung ({child_name})"
 
@@ -664,6 +672,26 @@ def substitution_entry_from_cells(
     return entry
 
 
+def _day_info_entry(text: str) -> dict[str, Any]:
+    """Day-level comment entry (e.g. 'Allg. Schulschluss 12:00', 'Unterrichtsende nach der 6. Stunde')."""
+    return {
+        "lesson": "",
+        "teacher": "",
+        "substitute": "",
+        "subject": "",
+        "room": "",
+        "info": str(text).strip(),
+        "kind": "info",
+    }
+
+
+def _strip_date_kw(text: str, date_match: re.Match) -> str:
+    """Remove the date and calendar-week part from a day header, keep any trailing comment."""
+    rest = text[date_match.end():]
+    rest = re.sub(r"-?\s*KW\s*\d+", "", rest, flags=re.IGNORECASE)
+    return rest.strip(" ,;:-–—")
+
+
 def _table_column_map(table: Any) -> dict[str, int]:
     """Extract the column mapping of a substitution table from its header row (tr.vp_plan_head)."""
     head_row = table.select_one("tr.vp_plan_head")
@@ -692,12 +720,23 @@ def parse_substitutions(html: str) -> dict[str, Any]:
         day: dict[str, Any] | None = None
         for tag in center.find_all(["div", "table"], recursive=False):
             if tag.name == "div" and "list" in (tag.get("class") or []):
-                if m := re.search(r"(\d{2})\.(\d{2})\.(\d{4})", tag.get_text()):
+                text = tag.get_text(" ", strip=True)
+                if m := re.search(r"(\d{2})\.(\d{2})\.(\d{4})", text):
                     iso = f"{m[3]}-{m[2]}-{m[1]}"
                     day = next((d for d in result["days"] if d["date"] == iso), None)
                     if day is None:
                         day = {"date": iso, "entries": []}
                         result["days"].append(day)
+                    # day-level comment in the same header (e.g. "Allg. Schulschluss 12:00")
+                    rest = _strip_date_kw(text, m)
+                    if rest:
+                        day["entries"].append(_day_info_entry(rest))
+                continue
+            if tag.name == "div" and day is not None:
+                # day-level comment block between date header and table
+                text = tag.get_text(" ", strip=True)
+                if text:
+                    day["entries"].append(_day_info_entry(text))
                 continue
             if tag.name != "table" or day is None:
                 continue
@@ -707,6 +746,10 @@ def parse_substitutions(html: str) -> dict[str, Any]:
                     continue
                 cells = row.find_all(["td", "th"], recursive=False)
                 if len(cells) < 4:
+                    # day-level comment row (often a single colspan cell)
+                    row_text = row.get_text(" ", strip=True)
+                    if row_text:
+                        day["entries"].append(_day_info_entry(row_text))
                     continue
                 texts: list[str] = []
                 struck: list[str] = []
@@ -722,13 +765,32 @@ def parse_substitutions(html: str) -> dict[str, Any]:
     else:
         # Fallback regex parser
         result["available"] = ("#asam_content" in html) or ("main_center" in html)
+        # day headers (div.list): date plus optional day-level comment in the same div
+        header_map: dict[str, dict[str, Any]] = {}
+        for h_m in re.finditer(r'<div[^>]*class="[^"]*list[^"]*"[^>]*>(.*?)</div>', html, re.DOTALL | re.IGNORECASE):
+            h_text = _html_unescape(re.sub(r"<[^>]+>", " ", h_m.group(1))).replace(" ", " ").strip()
+            dm = re.search(r"(\d{2})\.(\d{2})\.(\d{4})", h_text)
+            if not dm:
+                continue
+            h_iso = f"{dm[3]}-{dm[2]}-{dm[1]}"
+            day_entry = header_map.setdefault(h_iso, {"date": h_iso, "entries": []})
+            rest = _strip_date_kw(h_text, dm)
+            if rest:
+                day_entry["entries"].append(_day_info_entry(rest))
         date_sections = re.split(r'<div[^>]*class="[^"]*list[^"]*"[^>]*>', html, flags=re.IGNORECASE)
         for section in date_sections[1:]:
             m = re.search(r"(\d{2})\.(\d{2})\.(\d{4})", section)
             if not m:
                 continue
             iso = f"{m[3]}-{m[2]}-{m[1]}"
-            day_entry: dict[str, Any] = {"date": iso, "entries": []}
+            day_entry: dict[str, Any] = header_map.pop(iso, None) or {"date": iso, "entries": []}
+            # day-level comment blocks before the first table of this section
+            first_table = re.search(r"<table[^>]*>", section, re.IGNORECASE)
+            pre = section[: first_table.start()] if first_table else section
+            for div_m in re.finditer(r"<div[^>]*>(.*?)</div>", pre, re.DOTALL | re.IGNORECASE):
+                div_text = _html_unescape(re.sub(r"<[^>]+>", " ", div_m.group(1))).replace(" ", " ").strip()
+                if div_text and not re.search(r"\d{2}\.\d{2}\.\d{4}", div_text):
+                    day_entry["entries"].append(_day_info_entry(div_text))
             rows = re.findall(r"(<tr[^>]*>.*?</tr>)", section, re.DOTALL | re.IGNORECASE)
             col_map: dict[str, int] = {}
             for row in rows:
@@ -740,6 +802,9 @@ def parse_substitutions(html: str) -> dict[str, Any]:
                     continue
                 tds = re.findall(r"<td[^>]*>(.*?)</td>", row, re.DOTALL | re.IGNORECASE)
                 if len(tds) < 4:
+                    row_text = _html_unescape(re.sub(r"<[^>]+>", " ", row)).replace(" ", " ").strip()
+                    if row_text:
+                        day_entry["entries"].append(_day_info_entry(row_text))
                     continue
                 texts: list[str] = []
                 struck: list[str] = []
@@ -751,6 +816,9 @@ def parse_substitutions(html: str) -> dict[str, Any]:
                 e = substitution_entry_from_cells(texts, col_map or None, struck)
                 if e is not None:
                     day_entry["entries"].append(e)
+            result["days"].append(day_entry)
+        # days that only had a header (no table) still get appended
+        for day_entry in header_map.values():
             result["days"].append(day_entry)
 
     return result

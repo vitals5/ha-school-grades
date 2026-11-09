@@ -875,8 +875,8 @@ def _register_services(hass: HomeAssistant) -> None:
         data = storage.data
         if not data.notify_entities:
             return 0
-        if not data.notify_on_entfall and not data.notify_on_vertretung:
-            return 0
+        # kind filtering (entfall/vertretung) happens in get_new_substitutions_to_notify;
+        # day-level hints (kind="info") are always included when entities are configured.
 
         grouped = data.get_new_substitutions_to_notify()
         if not grouped:
