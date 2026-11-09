@@ -491,6 +491,7 @@ class SchoolGradesData:
         today_iso = dt_date.today().isoformat()
         notified_set = set(self.notified_substitutions)
         grouped: dict[str, list[dict[str, Any]]] = {}
+        stats = {"past": 0, "not_relevant": 0, "kind_filtered": 0, "already_notified": 0, "new": 0}
 
         for day in self.portal_substitutions.get("days", []):
             if not isinstance(day, dict):
@@ -500,6 +501,7 @@ class SchoolGradesData:
                 continue
             # Only notify for today or future dates
             if day_date < today_iso:
+                stats["past"] += len(day.get("entries", []) or [])
                 continue
 
             for entry in day.get("entries", []):
@@ -507,28 +509,46 @@ class SchoolGradesData:
                     continue
                 # Only entries applying to this child
                 if not entry.get("applies_to_child", True):
+                    stats["not_relevant"] += 1
                     continue
 
                 kind = str(entry.get("kind", "")).strip().lower()
                 if kind == "entfall":
                     if not self.notify_on_entfall:
+                        stats["kind_filtered"] += 1
                         continue
                 elif kind in ("vertretung", "raum"):
                     if not self.notify_on_vertretung:
+                        stats["kind_filtered"] += 1
                         continue
                 else:
                     if not self.notify_on_vertretung:
+                        stats["kind_filtered"] += 1
                         continue
 
                 sig = self.compute_substitution_signature(day_date, entry)
                 if sig in notified_set:
+                    stats["already_notified"] += 1
                     continue
 
+                stats["new"] += 1
                 if day_date not in grouped:
                     grouped[day_date] = []
                 entry_copy = dict(entry)
                 entry_copy["_signature"] = sig
                 grouped[day_date].append(entry_copy)
+
+        if stats["new"] or any(v for k, v in stats.items() if k != "new"):
+            _LOGGER.debug(
+                "get_new_substitutions_to_notify(%s): new=%d already_notified=%d kind_filtered=%d "
+                "not_relevant=%d past=%d",
+                self.child_name,
+                stats["new"],
+                stats["already_notified"],
+                stats["kind_filtered"],
+                stats["not_relevant"],
+                stats["past"],
+            )
 
         return grouped
 

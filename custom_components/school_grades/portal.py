@@ -7,6 +7,11 @@ import logging
 import re
 from typing import Any
 from urllib import parse
+import html as _html_mod
+
+
+def _html_unescape(text: str) -> str:
+    return _html_mod.unescape(text)
 
 try:
     from zoneinfo import ZoneInfo
@@ -564,6 +569,110 @@ def parse_timetable(html: str) -> list[dict[str, Any]]:
     return out
 
 
+_SUBSTITUTION_HEADER_FIELDS = (
+    ("lesson", ("std", "stunde", "zeit")),
+    ("teacher", ("betrifft", "lehrer", "bisher", "orig", "von")),
+    ("substitute", ("vertretung", "vertreter", "statt", "neu", "nach")),
+    ("subject", ("fach", "kurs", "unterricht")),
+    ("room", ("raum",)),
+    ("info", ("info", "bemerkung", "hinweis", "text", "grund")),
+    ("class", ("klasse", "kl")),
+)
+
+
+def map_substitution_columns(header_texts: list[str]) -> dict[str, int]:
+    """Map substitution table columns by header row text (layout differs between schools).
+
+    Returns a dict field -> column index. Empty if no recognizable header was found.
+    """
+    mapping: dict[str, int] = {}
+    for idx, raw in enumerate(header_texts):
+        h = re.sub(r"[^\w\s]", " ", str(raw).lower()).strip()
+        if not h:
+            continue
+        for field, needles in _SUBSTITUTION_HEADER_FIELDS:
+            if field in mapping:
+                continue
+            if any(h.startswith(n) or f" {n}" in f" {h}" for n in needles):
+                mapping[field] = idx
+                break
+    return mapping
+
+
+def _clean_lesson(raw: Any) -> str:
+    text = raw.get_text(strip=True) if hasattr(raw, "get_text") else str(raw)
+    return re.sub(r"\.(?=\s*[-–])", "", text).removesuffix(".").strip()
+
+
+def substitution_entry_from_cells(
+    texts: list[str],
+    col_map: dict[str, int] | None,
+    struck_subjects: list[str] | None = None,
+) -> dict[str, Any] | None:
+    """Build a substitution entry from raw cell texts using a column map (or legacy positions)."""
+    if len(texts) < 4:
+        return None
+
+    def cell(field: str, default_idx: int) -> str:
+        idx = col_map.get(field, default_idx) if col_map else default_idx
+        if 0 <= idx < len(texts):
+            return texts[idx].strip()
+        return ""
+
+    lesson = _clean_lesson(cell("lesson", 0))
+    teacher = cell("teacher", 1)
+    substitute = cell("substitute", 2)
+    if col_map and "subject" in col_map:
+        subject = cell("subject", 3)
+        room = cell("room", 4)
+        info = cell("info", 5)
+    elif col_map:
+        # Layout without a dedicated "Fach" column (e.g. Std. | Betrifft. | Vertretung | Raum | Info):
+        # the subject is folded into the "Betrifft." cell together with class/teacher.
+        subject = teacher
+        room = cell("room", 3)
+        info = cell("info", 4)
+    elif len(texts) >= 6:
+        subject = cell("subject", 3)
+        room = cell("room", 4)
+        info = cell("info", 5)
+    else:
+        subject = ""
+        room = cell("room", 3)
+        info = cell("info", 4)
+
+    old_subject = " ".join(s for s in (struck_subjects or []) if s).strip()
+
+    subj_pieces = [x for x in re.split(r"\s+", subject) if x]
+    if subj_pieces and len({x.lower() for x in subj_pieces}) == 1:
+        subject = subj_pieces[0]
+
+    if not lesson:
+        return None
+
+    entry: dict[str, Any] = {
+        "lesson": lesson,
+        "teacher": teacher,
+        "substitute": substitute,
+        "subject": subject,
+        "room": room,
+        "info": info,
+    }
+    if old_subject:
+        entry["old_subject"] = old_subject
+    entry["kind"] = substitution_kind(entry)
+    return entry
+
+
+def _table_column_map(table: Any) -> dict[str, int]:
+    """Extract the column mapping of a substitution table from its header row (tr.vp_plan_head)."""
+    head_row = table.select_one("tr.vp_plan_head")
+    if head_row is None:
+        return {}
+    headers = [c.get_text(" ", strip=True) for c in head_row.find_all(["td", "th"], recursive=False)]
+    return map_substitution_columns(headers)
+
+
 def parse_substitutions(html: str) -> dict[str, Any]:
     """Parse substitutions HTML into structured dictionary."""
     result: dict[str, Any] = {"available": False, "stand": None, "days": []}
@@ -592,36 +701,23 @@ def parse_substitutions(html: str) -> dict[str, Any]:
                 continue
             if tag.name != "table" or day is None:
                 continue
+            col_map = _table_column_map(tag)
             for row in tag.select("tr"):
                 if "vp_plan_head" in (row.get("class") or []):
                     continue
-                cells = row.find_all("td", recursive=False)
-                if len(cells) < 5:
+                cells = row.find_all(["td", "th"], recursive=False)
+                if len(cells) < 4:
                     continue
-                lesson = re.sub(r"\.(?=\s*[-–])", "", cells[0].get_text(strip=True)).removesuffix(".")
-                teacher = cells[1].get_text(strip=True)
-                substitute = cells[2].get_text(strip=True)
-                if len(cells) >= 6:
-                    pieces = [t.strip() for t in cells[3].stripped_strings if t.strip()]
-                    if pieces and len(list(dict.fromkeys(pieces))) == 1:
-                        subject = pieces[0]
-                    else:
-                        subject = cells[3].get_text(" ", strip=True)
-                    room = cells[4].get_text(strip=True)
-                    info = cells[5].get_text(" ", strip=True)
-                else:
-                    subject = ""
-                    room = cells[3].get_text(strip=True)
-                    info = cells[4].get_text(" ", strip=True)
-                entry = {
-                    "lesson": lesson,
-                    "teacher": teacher,
-                    "substitute": substitute,
-                    "subject": subject,
-                    "room": room,
-                    "info": info,
-                }
-                entry["kind"] = substitution_kind(entry)
+                texts: list[str] = []
+                struck: list[str] = []
+                for c in cells:
+                    for st in c.find_all(["s", "del", "strike"]):
+                        struck.append(st.get_text(" ", strip=True))
+                        st.decompose()
+                    texts.append(c.get_text(" ", strip=True))
+                entry = substitution_entry_from_cells(texts, col_map or None, struck)
+                if entry is None:
+                    continue
                 day["entries"].append(entry)
     else:
         # Fallback regex parser
@@ -633,40 +729,28 @@ def parse_substitutions(html: str) -> dict[str, Any]:
                 continue
             iso = f"{m[3]}-{m[2]}-{m[1]}"
             day_entry: dict[str, Any] = {"date": iso, "entries": []}
-            rows = re.findall(r"<tr[^>]*>(.*?)</tr>", section, re.DOTALL | re.IGNORECASE)
+            rows = re.findall(r"(<tr[^>]*>.*?</tr>)", section, re.DOTALL | re.IGNORECASE)
+            col_map: dict[str, int] = {}
             for row in rows:
                 if "vp_plan_head" in row.lower():
+                    head_tds = re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", row, re.DOTALL | re.IGNORECASE)
+                    col_map = map_substitution_columns(
+                        [_html_unescape(re.sub(r"<[^>]+>", " ", t)).strip() for t in head_tds]
+                    )
                     continue
                 tds = re.findall(r"<td[^>]*>(.*?)</td>", row, re.DOTALL | re.IGNORECASE)
-                if len(tds) < 5:
+                if len(tds) < 4:
                     continue
-                texts = [re.sub(r"<[^>]+>", "", t).strip() for t in tds]
-                lesson = re.sub(r"\.(?=\s*[-–])", "", texts[0]).removesuffix(".")
-                teacher = texts[1]
-                substitute = texts[2]
-                if len(tds) >= 6:
-                    raw_subj = texts[3]
-                    pieces = [t.strip() for t in re.split(r"[\s\n\r]+", raw_subj) if t.strip()]
-                    if pieces and len(list(dict.fromkeys(pieces))) == 1:
-                        subject = pieces[0]
-                    else:
-                        subject = raw_subj
-                    room = texts[4]
-                    info = texts[5]
-                else:
-                    subject = ""
-                    room = texts[3]
-                    info = texts[4]
-                e = {
-                    "lesson": lesson,
-                    "teacher": teacher,
-                    "substitute": substitute,
-                    "subject": subject,
-                    "room": room,
-                    "info": info,
-                }
-                e["kind"] = substitution_kind(e)
-                day_entry["entries"].append(e)
+                texts: list[str] = []
+                struck: list[str] = []
+                struck_re = re.compile(r"<(?:s|del|strike)[^>]*>(.*?)</(?:s|del|strike)>", re.DOTALL | re.IGNORECASE)
+                for t in tds:
+                    struck += [re.sub(r"<[^>]+>", " ", s).strip() for s in struck_re.findall(t)]
+                    t = struck_re.sub(" ", t)
+                    texts.append(_html_unescape(re.sub(r"<[^>]+>", " ", t)).replace(" ", " ").strip())
+                e = substitution_entry_from_cells(texts, col_map or None, struck)
+                if e is not None:
+                    day_entry["entries"].append(e)
             result["days"].append(day_entry)
 
     return result

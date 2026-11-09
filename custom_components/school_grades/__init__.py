@@ -97,6 +97,9 @@ from .storage import SchoolGradesStorage
 
 _LOGGER = logging.getLogger(__name__)
 
+# Interval for the automatic Eltern-Portal sync (substitution notifications rely on it)
+PORTAL_AUTO_SYNC_INTERVAL_MINUTES = 15
+
 PLATFORMS = ["sensor", "binary_sensor"]
 
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "frontend")
@@ -326,6 +329,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Register services once if first entry
     _register_services(hass)
 
+    # Automatic periodic Eltern-Portal sync so that new substitutions/cancellations
+    # are detected (and notified) without a manual sync. Manual sync stays possible.
+    auto_sync_action = hass.data.get(f"{DOMAIN}_auto_sync_action")
+    if auto_sync_action and not hass.data.get(f"{DOMAIN}_auto_sync_registered"):
+        hass.data[f"{DOMAIN}_auto_sync_registered"] = True
+        from datetime import timedelta
+
+        from homeassistant.helpers.event import async_track_time_interval
+
+        hass.data[f"{DOMAIN}_auto_sync_unsub"] = async_track_time_interval(
+            hass,
+            auto_sync_action,
+            timedelta(minutes=PORTAL_AUTO_SYNC_INTERVAL_MINUTES),
+        )
+
     return True
 
 
@@ -339,7 +357,7 @@ async def _async_setup_frontend(hass: HomeAssistant) -> None:
     else:
         hass.http.register_static_path(URL_BASE, FRONTEND_DIR, cache_headers=False)
 
-    version_str = "1.2.19"
+    version_str = "1.2.20"
     try:
         js_file = os.path.join(FRONTEND_DIR, "school-grades-panel.js")
         if os.path.exists(js_file):
@@ -372,6 +390,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data[DOMAIN].pop(entry.entry_id, None)
         if not hass.data[DOMAIN]:
             _unregister_services(hass)
+            unsub = hass.data.pop(f"{DOMAIN}_auto_sync_unsub", None)
+            if unsub:
+                unsub()
+            hass.data.pop(f"{DOMAIN}_auto_sync_registered", None)
             if hass.data.get(f"{DOMAIN}_panel_registered"):
                 try:
                     frontend.async_remove_panel(hass, "schulnoten")
@@ -877,6 +899,19 @@ def _register_services(hass: HomeAssistant) -> None:
                 if "_signature" in e:
                     signatures.append(e["_signature"])
 
+        if sent <= 0:
+            # Do NOT mark as notified: none of the configured notify entities could be
+            # reached (typo, missing integration, ...). Otherwise these substitutions
+            # would never be notified at all. Retry on next sync instead.
+            _LOGGER.warning(
+                "Substitution notification for %s could not be delivered to any of %d configured "
+                "notify entities (%d entries) - keeping them pending, will retry on next sync",
+                data.child_name,
+                len(data.notify_entities),
+                len(signatures),
+            )
+            return 0
+
         data.mark_substitutions_notified(signatures)
         await storage.async_save()
         _LOGGER.info(
@@ -886,6 +921,22 @@ def _register_services(hass: HomeAssistant) -> None:
             sent,
         )
         return len(signatures)
+
+    async def _async_auto_portal_sync(now: Any = None) -> None:
+        """Periodically sync all children with an enabled Eltern-Portal connection."""
+        for storage in list(hass.data.get(DOMAIN, {}).values()):
+            if not isinstance(storage, SchoolGradesStorage):
+                continue
+            if not storage.data.portal_enabled:
+                continue
+            try:
+                await _async_sync_child_portal(storage)
+            except Exception as err:
+                _LOGGER.warning(
+                    "Auto-Sync Eltern-Portal für %s fehlgeschlagen: %s", storage.data.child_name, err
+                )
+
+    hass.data[f"{DOMAIN}_auto_sync_action"] = _async_auto_portal_sync
 
     async def _async_sync_child_portal(
         storage: SchoolGradesStorage,
@@ -955,11 +1006,31 @@ def _register_services(hass: HomeAssistant) -> None:
         # Update substitutions if fetched
         notified_subst_count = 0
         if sync_subst and "substitutions" in res:
-            data.set_portal_substitutions(res["substitutions"])
-            try:
-                notified_subst_count = await _async_notify_substitutions(storage)
-            except Exception as notify_err:
-                _LOGGER.error("Error sending substitution notifications for %s: %s", data.child_name, notify_err)
+            subst_res = res["substitutions"]
+            if isinstance(subst_res, dict) and not subst_res.get("available", True):
+                # Parsing failed or page unreachable: keep previous data instead of wiping it
+                _LOGGER.warning(
+                    "Vertretungsplan für %s nicht auswertbar (available=False) - behalte bisherige Daten",
+                    data.child_name,
+                )
+            else:
+                entry_count = sum(
+                    len(d.get("entries", []))
+                    for d in (subst_res.get("days", []) if isinstance(subst_res, dict) else [])
+                    if isinstance(d, dict)
+                )
+                _LOGGER.debug(
+                    "Vertretungsplan für %s: %d Tag(e), %d Eintrag(e) geparst (Stand: %s)",
+                    data.child_name,
+                    len(subst_res.get("days", [])) if isinstance(subst_res, dict) else 0,
+                    entry_count,
+                    subst_res.get("stand") if isinstance(subst_res, dict) else None,
+                )
+                data.set_portal_substitutions(subst_res)
+                try:
+                    notified_subst_count = await _async_notify_substitutions(storage)
+                except Exception as notify_err:
+                    _LOGGER.error("Error sending substitution notifications for %s: %s", data.child_name, notify_err)
 
         # Update timetable if requested
         if sync_tt and "timetable" in res and res["timetable"]:

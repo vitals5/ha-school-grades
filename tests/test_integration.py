@@ -2071,6 +2071,123 @@ class TestNotificationServicesAndFormatting(unittest.TestCase):
         self.assertIn("2. Std: Physik — Vertretung (durch Hr. Meyer, in Phy-Saal)", body)
 
 
+class TestSubstitutionPlanParsingLayouts(unittest.TestCase):
+    """Tests for header-based column mapping of the substitution plan (layout differs per school)."""
+
+    HTML_6COL = """
+    <div id="asam_content"><div class="main_center">
+      <div class="list bold full_width text_center">Mo., 09.11.2026 - KW 46</div>
+      <table class="table">
+        <tr class="vp_plan_head"><td class="table_header">Std.</td><td class="table_header">Betrifft.</td><td class="table_header">Vertretung</td><td class="table_header">Fach</td><td class="table_header">Raum</td><td class="table_header">Info</td></tr>
+        <tr class="liste_grau"><td>1.</td><td>abc</td><td>xyz</td><td><s>M</s> D</td><td>R102</td><td>Stillarbeit</td></tr>
+        <tr class="liste_weiss"><td>2.</td><td>def</td><td>&nbsp;</td><td>Geo</td><td>1</td><td>entfällt</td></tr>
+      </table>
+    </div></div>
+    """
+
+    HTML_5COL = """
+    <div id="asam_content"><div class="main_center">
+      <div class="list bold full_width text_center">Di., 10.11.2026 - KW 46</div>
+      <table class="table">
+        <tr class="vp_plan_head"><td class="table_header">Std.</td><td class="table_header">Betrifft.</td><td class="table_header">Vertretung</td><td class="table_header">Raum</td><td class="table_header">Info</td></tr>
+        <tr><td>3.</td><td>5a M</td><td>Fr. Schmidt</td><td>R205</td><td>Aufgaben</td></tr>
+      </table>
+    </div></div>
+    """
+
+    HTML_LEGACY_NOHEAD = """
+    <div id="asam_content"><div class="main_center">
+      <div class="list">Mi, 11.11.2026</div>
+      <table class="table-striped">
+        <tr><td>5</td><td>LehrerA</td><td>VertretungB</td><td><span>Sm</span> <span>Sm</span></td><td>TH1</td><td>Vertretung</td></tr>
+      </table>
+    </div></div>
+    """
+
+    def test_map_substitution_columns(self):
+        m = portal_mod.map_substitution_columns(["Std.", "Betrifft.", "Vertretung", "Fach", "Raum", "Info"])
+        self.assertEqual(m.get("lesson"), 0)
+        self.assertEqual(m.get("teacher"), 1)
+        self.assertEqual(m.get("substitute"), 2)
+        self.assertEqual(m.get("subject"), 3)
+        self.assertEqual(m.get("room"), 4)
+        self.assertEqual(m.get("info"), 5)
+
+        m5 = portal_mod.map_substitution_columns(["Std.", "Betrifft.", "Vertretung", "Raum", "Info"])
+        self.assertNotIn("subject", m5)
+        self.assertEqual(m5.get("room"), 3)
+        self.assertEqual(m5.get("info"), 4)
+
+    def test_parse_6col_layout_with_struck_subject(self):
+        for use_bs4 in (True, False):
+            old_bs4 = portal_mod.bs4
+            portal_mod.bs4 = __import__("bs4") if use_bs4 else None
+            try:
+                r = portal_mod.parse_substitutions(self.HTML_6COL)
+            finally:
+                portal_mod.bs4 = old_bs4
+            self.assertTrue(r["available"])
+            entries = r["days"][0]["entries"]
+            self.assertEqual(len(entries), 2)  # header row must be skipped
+            e1, e2 = entries
+            self.assertEqual(e1["lesson"], "1")
+            self.assertEqual(e1["subject"], "D")  # struck-through old subject removed
+            self.assertEqual(e1.get("old_subject"), "M")
+            self.assertEqual(e1["kind"], "vertretung")
+            self.assertEqual(e2["kind"], "entfall")  # "entfällt" in info
+            self.assertEqual(e2["substitute"], "")  # &nbsp; normalized to empty
+
+    def test_parse_5col_layout_subject_from_betrifft(self):
+        r = portal_mod.parse_substitutions(self.HTML_5COL)
+        self.assertTrue(r["available"])
+        entries = r["days"][0]["entries"]
+        self.assertEqual(len(entries), 1)
+        e = entries[0]
+        self.assertEqual(e["lesson"], "3")
+        # No dedicated Fach column: subject folded into Betrifft cell
+        self.assertEqual(e["subject"], "5a M")
+        self.assertEqual(e["room"], "R205")
+        self.assertEqual(e["info"], "Aufgaben")
+
+    def test_parse_legacy_layout_without_header(self):
+        r = portal_mod.parse_substitutions(self.HTML_LEGACY_NOHEAD)
+        self.assertTrue(r["available"])
+        entries = r["days"][0]["entries"]
+        self.assertEqual(len(entries), 1)
+        e = entries[0]
+        self.assertEqual(e["lesson"], "5")
+        self.assertEqual(e["subject"], "Sm")  # duplicate spans deduped
+        self.assertEqual(e["room"], "TH1")
+
+    def test_relevance_with_subject_from_betrifft(self):
+        child = SchoolGradesData("Felix")
+        child._subjects = ["Mathematik", "Deutsch", "Sport"]
+        child.subject_aliases = {"Mathematik": ["M", "Ma"]}
+        # subject "5a M" comes from a Betrifft cell: token "M" must match the alias
+        self.assertTrue(child.is_substitution_relevant_for_child({"subject": "5a M", "lesson": "3"}))
+        self.assertFalse(child.is_substitution_relevant_for_child({"subject": "5a F", "lesson": "3"}))
+
+    def test_notification_flow_with_parsed_5col(self):
+        """End-to-end: parse 5-col HTML, store, and expect a pending notification."""
+        from datetime import date as dt_date, timedelta
+        today_iso = dt_date.today().isoformat()
+        html = self.HTML_5COL.replace("Di., 10.11.2026", "X., " + dt_date.today().strftime("%d.%m.%Y"))
+        r = portal_mod.parse_substitutions(html)
+        data = SchoolGradesData("Emma")
+        data._subjects = ["Mathematik"]
+        data.subject_aliases = {"Mathematik": ["M"]}
+        data.notify_entities = ["notify.mobile_app_mama"]
+        data.notify_on_entfall = True
+        data.notify_on_vertretung = True
+        data.set_portal_substitutions(r)
+        entries = data.get_substitutions_for_date(today_iso)
+        self.assertEqual(len(entries), 1)
+        self.assertTrue(entries[0]["applies_to_child"])
+        grouped = data.get_new_substitutions_to_notify()
+        self.assertIn(today_iso, grouped)
+        self.assertEqual(len(grouped[today_iso]), 1)
+
+
 def validate_json_yaml_files():
     json_files = list(project_root.glob("**/*.json"))
     for jf in json_files:
