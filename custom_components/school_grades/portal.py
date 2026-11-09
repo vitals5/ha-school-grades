@@ -707,9 +707,13 @@ def parse_substitutions(html: str) -> dict[str, Any]:
     if not html:
         return result
 
-    stand_match = re.search(r"Stand:?\s*([\d.]+\s*[\d:]*)", html)
+    stand_match = re.search(
+        r"Stand:?(?:&nbsp;|\s)*((?:\d{2}\.){2}\d{4}(?:(?:&nbsp;|\s)+\d{1,2}:\d{2}(?::\d{2})?)?)",
+        html,
+        re.IGNORECASE,
+    )
     if stand_match:
-        result["stand"] = stand_match.group(1).strip()
+        result["stand"] = _html_unescape(stand_match.group(1)).strip()
 
     if bs4 is not None:
         soup = bs4.BeautifulSoup(html, "html.parser")
@@ -720,7 +724,12 @@ def parse_substitutions(html: str) -> dict[str, Any]:
         day: dict[str, Any] | None = None
         for tag in center.find_all(["div", "table"], recursive=False):
             if tag.name == "div" and "list" in (tag.get("class") or []):
-                text = tag.get_text(" ", strip=True)
+                text = _html_unescape(tag.get_text(" ", strip=True)).replace("\xa0", " ").strip()
+                if re.match(r"stand\s*:", text, re.IGNORECASE):
+                    sm = re.search(r"stand\s*:\s*(.+)$", text, re.IGNORECASE)
+                    if sm:
+                        result["stand"] = sm.group(1).strip()
+                    continue
                 if m := re.search(r"(\d{2})\.(\d{2})\.(\d{4})", text):
                     iso = f"{m[3]}-{m[2]}-{m[1]}"
                     day = next((d for d in result["days"] if d["date"] == iso), None)
@@ -733,10 +742,11 @@ def parse_substitutions(html: str) -> dict[str, Any]:
                         day["entries"].append(_day_info_entry(rest))
                 continue
             if tag.name == "div" and day is not None:
-                # day-level comment block between date header and table
-                text = tag.get_text(" ", strip=True)
-                if text:
-                    day["entries"].append(_day_info_entry(text))
+                # day-level comment block between date header and table (split per <br> line)
+                for line in tag.get_text("\n", strip=True).split("\n"):
+                    line = line.strip()
+                    if line:
+                        day["entries"].append(_day_info_entry(line))
                 continue
             if tag.name != "table" or day is None:
                 continue
@@ -746,10 +756,11 @@ def parse_substitutions(html: str) -> dict[str, Any]:
                     continue
                 cells = row.find_all(["td", "th"], recursive=False)
                 if len(cells) < 4:
-                    # day-level comment row (often a single colspan cell)
-                    row_text = row.get_text(" ", strip=True)
-                    if row_text:
-                        day["entries"].append(_day_info_entry(row_text))
+                    # day-level comment row (often a single colspan cell), split per <br> line
+                    for line in row.get_text("\n", strip=True).split("\n"):
+                        line = line.strip()
+                        if line:
+                            day["entries"].append(_day_info_entry(line))
                     continue
                 texts: list[str] = []
                 struck: list[str] = []
@@ -768,7 +779,12 @@ def parse_substitutions(html: str) -> dict[str, Any]:
         # day headers (div.list): date plus optional day-level comment in the same div
         header_map: dict[str, dict[str, Any]] = {}
         for h_m in re.finditer(r'<div[^>]*class="[^"]*list[^"]*"[^>]*>(.*?)</div>', html, re.DOTALL | re.IGNORECASE):
-            h_text = _html_unescape(re.sub(r"<[^>]+>", " ", h_m.group(1))).replace(" ", " ").strip()
+            h_text = _html_unescape(re.sub(r"<[^>]+>", " ", h_m.group(1))).replace("\xa0", " ").strip()
+            if re.match(r"stand\s*:", h_text, re.IGNORECASE):
+                sm = re.search(r"stand\s*:\s*(.+)$", h_text, re.IGNORECASE)
+                if sm:
+                    result["stand"] = sm.group(1).strip()
+                continue
             dm = re.search(r"(\d{2})\.(\d{2})\.(\d{4})", h_text)
             if not dm:
                 continue
@@ -777,7 +793,11 @@ def parse_substitutions(html: str) -> dict[str, Any]:
             rest = _strip_date_kw(h_text, dm)
             if rest:
                 day_entry["entries"].append(_day_info_entry(rest))
-        date_sections = re.split(r'<div[^>]*class="[^"]*list[^"]*"[^>]*>', html, flags=re.IGNORECASE)
+        date_sections = re.split(
+            r'<div[^>]*class="[^"]*list[^"]*"[^>]*>(?=\s*(?!stand\b)(?:[A-Za-z]{2,3}\.?[\s,]*)?\d{2}\.\d{2}\.\d{4})',
+            html,
+            flags=re.IGNORECASE,
+        )
         for section in date_sections[1:]:
             m = re.search(r"(\d{2})\.(\d{2})\.(\d{4})", section)
             if not m:
@@ -788,11 +808,20 @@ def parse_substitutions(html: str) -> dict[str, Any]:
             first_table = re.search(r"<table[^>]*>", section, re.IGNORECASE)
             pre = section[: first_table.start()] if first_table else section
             for div_m in re.finditer(r"<div[^>]*>(.*?)</div>", pre, re.DOTALL | re.IGNORECASE):
-                div_text = _html_unescape(re.sub(r"<[^>]+>", " ", div_m.group(1))).replace(" ", " ").strip()
+                div_raw = _html_unescape(re.sub(r"<br\s*/?>", "\n", div_m.group(1), flags=re.IGNORECASE))
+                div_text = re.sub(r"<[^>]+>", " ", div_raw).replace("\xa0", " ").strip()
                 if div_text and not re.search(r"\d{2}\.\d{2}\.\d{4}", div_text):
-                    day_entry["entries"].append(_day_info_entry(div_text))
-            rows = re.findall(r"(<tr[^>]*>.*?</tr>)", section, re.DOTALL | re.IGNORECASE)
+                    for line in div_text.split("\n"):
+                        line = line.strip()
+                        if line:
+                            day_entry["entries"].append(_day_info_entry(line))
+            tables = re.findall(r"(<table[^>]*>.*?</table>)", section, re.DOTALL | re.IGNORECASE)
+            vp_tables = [t for t in tables if "vp_plan_head" in t.lower()]
+            use_tables = vp_tables or tables[:1]
             col_map: dict[str, int] = {}
+            rows: list[str] = []
+            for tbl in use_tables:
+                rows.extend(re.findall(r"(<tr[^>]*>.*?</tr>)", tbl, re.DOTALL | re.IGNORECASE))
             for row in rows:
                 if "vp_plan_head" in row.lower():
                     head_tds = re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", row, re.DOTALL | re.IGNORECASE)
@@ -802,9 +831,12 @@ def parse_substitutions(html: str) -> dict[str, Any]:
                     continue
                 tds = re.findall(r"<td[^>]*>(.*?)</td>", row, re.DOTALL | re.IGNORECASE)
                 if len(tds) < 4:
-                    row_text = _html_unescape(re.sub(r"<[^>]+>", " ", row)).replace(" ", " ").strip()
-                    if row_text:
-                        day_entry["entries"].append(_day_info_entry(row_text))
+                    row_text = _html_unescape(re.sub(r"<br\s*/?>", "\n", row, flags=re.IGNORECASE))
+                    row_text = re.sub(r"<[^>]+>", " ", row_text).replace("\xa0", " ").strip()
+                    for line in row_text.split("\n"):
+                        line = line.strip()
+                        if line:
+                            day_entry["entries"].append(_day_info_entry(line))
                     continue
                 texts: list[str] = []
                 struck: list[str] = []
@@ -812,7 +844,7 @@ def parse_substitutions(html: str) -> dict[str, Any]:
                 for t in tds:
                     struck += [re.sub(r"<[^>]+>", " ", s).strip() for s in struck_re.findall(t)]
                     t = struck_re.sub(" ", t)
-                    texts.append(_html_unescape(re.sub(r"<[^>]+>", " ", t)).replace(" ", " ").strip())
+                    texts.append(_html_unescape(re.sub(r"<[^>]+>", " ", t)).replace("\xa0", " ").strip())
                 e = substitution_entry_from_cells(texts, col_map or None, struck)
                 if e is not None:
                     day_entry["entries"].append(e)

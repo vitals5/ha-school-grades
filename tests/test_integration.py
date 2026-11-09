@@ -2283,6 +2283,65 @@ class TestSubstitutionKindDetection(unittest.TestCase):
         self.assertEqual(sk({"substitute": "", "subject": "D", "room": "R205", "info": "Raumänderung"}), "raum")
 
 
+class TestRealWorldVertretungsplan(unittest.TestCase):
+    """Real-world Eltern-Portal page (Gymnasium, class 5E): 6-col header, nested comment div,
+    Stand line with class 'list', trailing class-division table."""
+
+    HTML = """
+    <div class="" id="asam_content">
+      <h2>Vertretungsplan der Klasse 5E</h2><div class="main_center"><div class="list bold full_width text_center">Mo., 09.11.2026 - KW 46</div><div class="main_center"><p class="pull-left">Klasse 7C: Zammgraufft in 323<br><br>Q12 ev. Religion:<br>Klausur findet heute bei Herrn Bazanov in R. C13 statt!<br></p></div><table class="table"><tbody><tr class="vp_plan_head"><td class="table_header text-center">Std.</td><td class="table_header text-center">Betrifft</td><td class="table_header text-center">Vertretung</td><td class="table_header text-center">Fach</td><td class="table_header text-center">Raum</td><td class="table_header text-center">Info</td></tr><tr class="liste_grau"><td class="text_center">3.</td><td class="text_center">KUB</td><td class="text_center">GAV</td><td class="text_center">M</td><td class="text_center">313</td><td class="text_center">Vertretung</td></tr></tbody></table><div class="list bold full_width text_center">Di., 10.11.2026 - KW 46</div><div class="main_center"><p class="pull-left">1. Stunde: Verfassungsviertelstunde<br><br>Klasse 7C: Zammgraufft in 323<br><br>morgen: Treffen der Bunker-Buddies um 13:45 Uhr<br>in 234!<br></p></div><table class="table"><tbody><tr class="vp_plan_head"><td class="table_header text-center">Std.</td><td class="table_header text-center">Betrifft</td><td class="table_header text-center">Vertretung</td><td class="table_header text-center">Fach</td><td class="table_header text-center">Raum</td><td class="table_header text-center">Info</td></tr><tr class="liste_grau"><td class="text_center">6.</td><td class="text_center">KUB</td><td class="text_center">TEK</td><td class="text_center">M</td><td class="text_center">313</td><td class="text_center">anstelle Klasse 7C (6. Std.)</td></tr></tbody></table><div class="list full_width">Stand:&nbsp;09.11.2026&nbsp;16:40:00</div><p class="pull-left">Der hier dargestellte Vertretungsplan ist unverbindlich.</p></div><hr><table class="" width="100%" border="0"><tbody><tr><td><b>Mitglied in Klassenteilungen</b></td></tr><tr><td valign="top">5_Eth_5CE_STX, Ethik<br>5_S_5CE_RÄD, Sport<br></td></tr></tbody></table>
+    </div>
+    """
+
+    def test_real_world_parse(self):
+        for use_bs4 in (True, False):
+            old_bs4 = portal_mod.bs4
+            portal_mod.bs4 = __import__("bs4") if use_bs4 else None
+            try:
+                r = portal_mod.parse_substitutions(self.HTML)
+            finally:
+                portal_mod.bs4 = old_bs4
+            self.assertTrue(r["available"])
+            self.assertEqual(r["stand"], "09.11.2026 16:40:00")
+            # exactly 2 days: the "Stand:" list-div must not create a bogus day
+            self.assertEqual([d["date"] for d in r["days"]], ["2026-11-09", "2026-11-10"])
+            day1 = r["days"][0]["entries"]
+            kinds = [e["kind"] for e in day1]
+            self.assertEqual(kinds.count("info"), 3)
+            self.assertEqual(kinds.count("vertretung"), 1)
+            sub = [e for e in day1 if e["kind"] == "vertretung"][0]
+            self.assertEqual(sub["lesson"], "3")
+            self.assertEqual(sub["subject"], "M")
+            self.assertEqual(sub["teacher"], "KUB")
+            self.assertEqual(sub["substitute"], "GAV")
+            self.assertEqual(sub["room"], "313")
+            # comment lines split per <br>
+            infos = [e["info"] for e in day1 if e["kind"] == "info"]
+            self.assertIn("Klasse 7C: Zammgraufft in 323", infos)
+            self.assertIn("Q12 ev. Religion:", infos)
+            self.assertIn("Klausur findet heute bei Herrn Bazanov in R. C13 statt!", infos)
+            # no leakage from the class-division table
+            all_text = " ".join(e.get("info", "") for d in r["days"] for e in d["entries"])
+            self.assertNotIn("Mitglied in Klassenteilungen", all_text)
+            self.assertNotIn("5_Eth_5CE_STX", all_text)
+            self.assertNotIn("16:40:00", all_text)
+
+    def test_real_world_class_filter(self):
+        r = portal_mod.parse_substitutions(self.HTML)
+        data = SchoolGradesData("Monika")
+        data.grade_level = "5E"
+        data._subjects = ["Mathematik", "Ethik", "Sport", "Englisch"]
+        data.subject_aliases = {"Mathematik": ["M", "Ma"]}
+        data.set_portal_substitutions(r)
+        day1 = data.portal_substitutions["days"][0]["entries"]
+        by_info = {e.get("info", ""): e.get("applies_to_child") for e in day1 if e["kind"] == "info"}
+        self.assertFalse(by_info.get("Klasse 7C: Zammgraufft in 323"))
+        self.assertFalse(by_info.get("Q12 ev. Religion:"))
+        self.assertTrue(by_info.get("Klausur findet heute bei Herrn Bazanov in R. C13 statt!"))
+        sub = [e for e in day1 if e["kind"] == "vertretung"][0]
+        self.assertTrue(sub["applies_to_child"])
+
+
 def validate_json_yaml_files():
     json_files = list(project_root.glob("**/*.json"))
     for jf in json_files:

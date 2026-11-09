@@ -262,6 +262,19 @@ class SchoolGradesData:
 
         # If no subject is mentioned at all, it's a general class event/cancellation
         if not subj_raw and not subj_res and not old_subj_raw and not old_subj_res:
+            # Day-level info comments may be addressed to a specific class/course
+            # (e.g. "Klasse 7C: ..." or "Q12 ..."); filter them by the child's grade level.
+            info_text = str(entry.get("info", ""))
+            grade = (self.grade_level or "").strip().lower()
+            if grade:
+                for m in re.finditer(r"klasse\s+([0-9]{1,2}[a-z]{0,2}|q1[12])\b", info_text, re.I):
+                    tok = m.group(1).lower()
+                    if tok != grade and not tok.startswith(grade) and not grade.startswith(tok):
+                        return False
+                for m in re.finditer(r"\b(q1[12])\b", info_text, re.I):
+                    tok = m.group(1).lower()
+                    if tok != grade and not tok.startswith(grade) and not grade.startswith(tok):
+                        return False
             return True
 
         child_subjects = [s.strip().lower() for s in (self._subjects or []) if s.strip()]
