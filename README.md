@@ -70,7 +70,9 @@ Mit dem **integrierten Sidebar-Panel** (`/schulnoten`) verwaltest du Noten, Fäc
     - Hinterlege pro Kind beliebig viele Home Assistant `notify`-Empfänger (z. B. Papa, Mama, Familien-Gruppe).
     - Wähle gezielt aus, worüber benachrichtigt werden soll: **Unterrichtsausfall (`Entfällt`)** und/oder **Vertretungen & Raumänderungen**.
     - Die Push-Nachricht listet Datum, Kind, Schulstunde, Fach, Vertretungslehrkraft, Raum und Anmerkungen übersichtlich auf.
-    - **Intelligente Duplikatsvermeidung**: Benachrichtigungen werden nur für neue oder geänderte Einträge verschickt.
+    - **Automatischer Sync**: Der Vertretungsplan wird zusätzlich zum manuellen Sync alle 15 Minuten automatisch abgerufen, damit neue Vertretungen/Entfälle zeitnah erkannt und gemeldet werden.
+    - **Intelligente Duplikatsvermeidung**: Benachrichtigungen werden nur für neue oder geänderte Einträge verschickt. Wird kein Empfänger erreicht (z. B. Tippfehler bei der Entity), bleiben die Einträge offen und werden beim nächsten Sync erneut versucht.
+    - **Robustes Parsing**: Das Vertretungsplan-Tabellenlayout unterscheidet sich je Schule (mit/ohne Fach- oder Klassenspalte) – die Spalten werden anhand der Kopfzeile erkannt.
     - **Test-Benachrichtigung**: Sofortiger Funktionstest aller hinterlegten Empfänger direkt per Klick im Modal.
 - 🌐 **Mehrsprachigkeit (Multi-Language i18n)**:
   - Vollständige Lokalisierung für alle unterstützten Ländernormen: **Deutsch 🇩🇪**, **Englisch 🇬🇧/🇺🇸**, **Französisch 🇫🇷**, **Italienisch 🇮🇹**, **Spanisch 🇪🇸**, **Niederländisch 🇳🇱**, **Polnisch 🇵🇱**, **Russisch 🇷🇺** und **Chinesisch 🇨🇳**.

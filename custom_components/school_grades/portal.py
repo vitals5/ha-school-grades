@@ -7,6 +7,11 @@ import logging
 import re
 from typing import Any
 from urllib import parse
+import html as _html_mod
+
+
+def _html_unescape(text: str) -> str:
+    return _html_mod.unescape(text)
 
 try:
     from zoneinfo import ZoneInfo
@@ -51,7 +56,7 @@ except ImportError:
 from .const import DEFAULT_SUBJECT_ALIASES, DEFAULT_TIMETABLE_SLOTS
 
 _TIME_RE = re.compile(r"(\d{1,2})[.:](\d{2})\s*-\s*(\d{1,2})[.:](\d{2})")
-_ENTFALL_RE = re.compile(r"entf[aä]ll|ausfall|f[aä]llt\s+aus|\bfrei\b|unterrichtsfrei", re.I)
+_ENTFALL_RE = re.compile(r"entf[aä]ll|ausfall|f[aä]llt\s+aus|\bfrei\b|(?:hitze|schul|unterrichts|rest)frei", re.I)
 
 WEEKDAY_MAP = {
     1: "monday",
@@ -105,7 +110,8 @@ def resolve_subject_with_index(
         return ("", None)
 
     existing = [s.strip() for s in (existing_subjects or []) if s.strip()]
-    aliases = aliases_dict if aliases_dict is not None else DEFAULT_SUBJECT_ALIASES
+    # An empty custom alias dict must not disable the built-in defaults
+    aliases = aliases_dict if aliases_dict else DEFAULT_SUBJECT_ALIASES
 
     def _resolve_single(code: str) -> str | None:
         c = code.strip()
@@ -438,6 +444,11 @@ def format_substitution_notification_message(
         for e in entries:
             kind = str(e.get("kind", "vertretung")).strip().lower()
             all_kinds.add(kind)
+            if kind == "info":
+                info_text = str(e.get("info", "")).strip()
+                if info_text:
+                    lines.append(f"ℹ️ {info_text}")
+                continue
             lesson = str(e.get("lesson", "")).strip() or "?"
             lesson_label = f"{lesson}. Std" if not lesson.endswith(".") else f"{lesson} Std"
             subj = str(e.get("subject_resolved") or e.get("subject") or "Unterricht").strip()
@@ -472,11 +483,14 @@ def format_substitution_notification_message(
 
     has_entfall = "entfall" in all_kinds
     has_vertretung = ("vertretung" in all_kinds) or ("raum" in all_kinds)
+    has_info = "info" in all_kinds
 
-    if has_entfall and not has_vertretung:
+    if has_entfall and not has_vertretung and not has_info:
         title = f"🎓 Unterrichtsausfall ({child_name})"
-    elif has_vertretung and not has_entfall:
+    elif has_vertretung and not has_entfall and not has_info:
         title = f"🔄 Vertretungsplan ({child_name})"
+    elif has_info and not has_entfall and not has_vertretung:
+        title = f"📢 Hinweis ({child_name})"
     else:
         title = f"📢 Stundenplan-Änderung ({child_name})"
 
@@ -564,15 +578,143 @@ def parse_timetable(html: str) -> list[dict[str, Any]]:
     return out
 
 
+_SUBSTITUTION_HEADER_FIELDS = (
+    ("lesson", ("std", "stunde", "zeit")),
+    ("teacher", ("betrifft", "lehrer", "bisher", "orig", "von")),
+    ("substitute", ("vertretung", "vertreter", "statt", "neu", "nach")),
+    ("subject", ("fach", "kurs", "unterricht")),
+    ("room", ("raum",)),
+    ("info", ("info", "bemerkung", "hinweis", "text", "grund")),
+    ("class", ("klasse", "kl")),
+)
+
+
+def map_substitution_columns(header_texts: list[str]) -> dict[str, int]:
+    """Map substitution table columns by header row text (layout differs between schools).
+
+    Returns a dict field -> column index. Empty if no recognizable header was found.
+    """
+    mapping: dict[str, int] = {}
+    for idx, raw in enumerate(header_texts):
+        h = re.sub(r"[^\w\s]", " ", str(raw).lower()).strip()
+        if not h:
+            continue
+        for field, needles in _SUBSTITUTION_HEADER_FIELDS:
+            if field in mapping:
+                continue
+            if any(h.startswith(n) or f" {n}" in f" {h}" for n in needles):
+                mapping[field] = idx
+                break
+    return mapping
+
+
+def _clean_lesson(raw: Any) -> str:
+    text = raw.get_text(strip=True) if hasattr(raw, "get_text") else str(raw)
+    return re.sub(r"\.(?=\s*[-–])", "", text).removesuffix(".").strip()
+
+
+def substitution_entry_from_cells(
+    texts: list[str],
+    col_map: dict[str, int] | None,
+    struck_subjects: list[str] | None = None,
+) -> dict[str, Any] | None:
+    """Build a substitution entry from raw cell texts using a column map (or legacy positions)."""
+    if len(texts) < 4:
+        return None
+
+    def cell(field: str, default_idx: int) -> str:
+        idx = col_map.get(field, default_idx) if col_map else default_idx
+        if 0 <= idx < len(texts):
+            return texts[idx].strip()
+        return ""
+
+    lesson = _clean_lesson(cell("lesson", 0))
+    teacher = cell("teacher", 1)
+    substitute = cell("substitute", 2)
+    if col_map and "subject" in col_map:
+        subject = cell("subject", 3)
+        room = cell("room", 4)
+        info = cell("info", 5)
+    elif col_map:
+        # Layout without a dedicated "Fach" column (e.g. Std. | Betrifft. | Vertretung | Raum | Info):
+        # the subject is folded into the "Betrifft." cell together with class/teacher.
+        subject = teacher
+        room = cell("room", 3)
+        info = cell("info", 4)
+    elif len(texts) >= 6:
+        subject = cell("subject", 3)
+        room = cell("room", 4)
+        info = cell("info", 5)
+    else:
+        subject = ""
+        room = cell("room", 3)
+        info = cell("info", 4)
+
+    old_subject = " ".join(s for s in (struck_subjects or []) if s).strip()
+
+    subj_pieces = [x for x in re.split(r"\s+", subject) if x]
+    if subj_pieces and len({x.lower() for x in subj_pieces}) == 1:
+        subject = subj_pieces[0]
+
+    if not lesson:
+        return None
+
+    entry: dict[str, Any] = {
+        "lesson": lesson,
+        "teacher": teacher,
+        "substitute": substitute,
+        "subject": subject,
+        "room": room,
+        "info": info,
+    }
+    if old_subject:
+        entry["old_subject"] = old_subject
+    entry["kind"] = substitution_kind(entry)
+    return entry
+
+
+def _day_info_entry(text: str) -> dict[str, Any]:
+    """Day-level comment entry (e.g. 'Allg. Schulschluss 12:00', 'Unterrichtsende nach der 6. Stunde')."""
+    return {
+        "lesson": "",
+        "teacher": "",
+        "substitute": "",
+        "subject": "",
+        "room": "",
+        "info": str(text).strip(),
+        "kind": "info",
+    }
+
+
+def _strip_date_kw(text: str, date_match: re.Match) -> str:
+    """Remove the date and calendar-week part from a day header, keep any trailing comment."""
+    rest = text[date_match.end():]
+    rest = re.sub(r"-?\s*KW\s*\d+", "", rest, flags=re.IGNORECASE)
+    return rest.strip(" ,;:-–—")
+
+
+def _table_column_map(table: Any) -> dict[str, int]:
+    """Extract the column mapping of a substitution table from its header row (tr.vp_plan_head)."""
+    head_row = table.select_one("tr.vp_plan_head")
+    if head_row is None:
+        return {}
+    headers = [c.get_text(" ", strip=True) for c in head_row.find_all(["td", "th"], recursive=False)]
+    return map_substitution_columns(headers)
+
+
 def parse_substitutions(html: str) -> dict[str, Any]:
     """Parse substitutions HTML into structured dictionary."""
     result: dict[str, Any] = {"available": False, "stand": None, "days": []}
     if not html:
         return result
 
-    stand_match = re.search(r"Stand:?\s*([\d.]+\s*[\d:]*)", html)
+    stand_match = re.search(
+        r"Stand:?(?:&nbsp;|\s)*((?:\d{2}\.){2}\d{4}(?:(?:&nbsp;|\s)+\d{1,2}:\d{2}(?::\d{2})?)?)",
+        html,
+        re.IGNORECASE,
+    )
     if stand_match:
-        result["stand"] = stand_match.group(1).strip()
+        result["stand"] = _html_unescape(stand_match.group(1)).strip()
 
     if bs4 is not None:
         soup = bs4.BeautifulSoup(html, "html.parser")
@@ -583,90 +725,133 @@ def parse_substitutions(html: str) -> dict[str, Any]:
         day: dict[str, Any] | None = None
         for tag in center.find_all(["div", "table"], recursive=False):
             if tag.name == "div" and "list" in (tag.get("class") or []):
-                if m := re.search(r"(\d{2})\.(\d{2})\.(\d{4})", tag.get_text()):
+                text = _html_unescape(tag.get_text(" ", strip=True)).replace("\xa0", " ").strip()
+                if re.match(r"stand\s*:", text, re.IGNORECASE):
+                    sm = re.search(r"stand\s*:\s*(.+)$", text, re.IGNORECASE)
+                    if sm:
+                        result["stand"] = sm.group(1).strip()
+                    continue
+                if m := re.search(r"(\d{2})\.(\d{2})\.(\d{4})", text):
                     iso = f"{m[3]}-{m[2]}-{m[1]}"
                     day = next((d for d in result["days"] if d["date"] == iso), None)
                     if day is None:
                         day = {"date": iso, "entries": []}
                         result["days"].append(day)
+                    # day-level comment in the same header (e.g. "Allg. Schulschluss 12:00")
+                    rest = _strip_date_kw(text, m)
+                    if rest:
+                        day["entries"].append(_day_info_entry(rest))
+                continue
+            if tag.name == "div" and day is not None:
+                # day-level comment block between date header and table (split per <br> line)
+                for line in tag.get_text("\n", strip=True).split("\n"):
+                    line = line.strip()
+                    if line:
+                        day["entries"].append(_day_info_entry(line))
                 continue
             if tag.name != "table" or day is None:
                 continue
+            col_map = _table_column_map(tag)
             for row in tag.select("tr"):
                 if "vp_plan_head" in (row.get("class") or []):
                     continue
-                cells = row.find_all("td", recursive=False)
-                if len(cells) < 5:
+                cells = row.find_all(["td", "th"], recursive=False)
+                if len(cells) < 4:
+                    # day-level comment row (often a single colspan cell), split per <br> line
+                    for line in row.get_text("\n", strip=True).split("\n"):
+                        line = line.strip()
+                        if line:
+                            day["entries"].append(_day_info_entry(line))
                     continue
-                lesson = re.sub(r"\.(?=\s*[-–])", "", cells[0].get_text(strip=True)).removesuffix(".")
-                teacher = cells[1].get_text(strip=True)
-                substitute = cells[2].get_text(strip=True)
-                if len(cells) >= 6:
-                    pieces = [t.strip() for t in cells[3].stripped_strings if t.strip()]
-                    if pieces and len(list(dict.fromkeys(pieces))) == 1:
-                        subject = pieces[0]
-                    else:
-                        subject = cells[3].get_text(" ", strip=True)
-                    room = cells[4].get_text(strip=True)
-                    info = cells[5].get_text(" ", strip=True)
-                else:
-                    subject = ""
-                    room = cells[3].get_text(strip=True)
-                    info = cells[4].get_text(" ", strip=True)
-                entry = {
-                    "lesson": lesson,
-                    "teacher": teacher,
-                    "substitute": substitute,
-                    "subject": subject,
-                    "room": room,
-                    "info": info,
-                }
-                entry["kind"] = substitution_kind(entry)
+                texts: list[str] = []
+                struck: list[str] = []
+                for c in cells:
+                    for st in c.find_all(["s", "del", "strike"]):
+                        struck.append(st.get_text(" ", strip=True))
+                        st.decompose()
+                    texts.append(c.get_text(" ", strip=True))
+                entry = substitution_entry_from_cells(texts, col_map or None, struck)
+                if entry is None:
+                    continue
                 day["entries"].append(entry)
     else:
         # Fallback regex parser
         result["available"] = ("#asam_content" in html) or ("main_center" in html)
-        date_sections = re.split(r'<div[^>]*class="[^"]*list[^"]*"[^>]*>', html, flags=re.IGNORECASE)
+        # day headers (div.list): date plus optional day-level comment in the same div
+        header_map: dict[str, dict[str, Any]] = {}
+        for h_m in re.finditer(r'<div[^>]*class="[^"]*list[^"]*"[^>]*>(.*?)</div>', html, re.DOTALL | re.IGNORECASE):
+            h_text = _html_unescape(re.sub(r"<[^>]+>", " ", h_m.group(1))).replace("\xa0", " ").strip()
+            if re.match(r"stand\s*:", h_text, re.IGNORECASE):
+                sm = re.search(r"stand\s*:\s*(.+)$", h_text, re.IGNORECASE)
+                if sm:
+                    result["stand"] = sm.group(1).strip()
+                continue
+            dm = re.search(r"(\d{2})\.(\d{2})\.(\d{4})", h_text)
+            if not dm:
+                continue
+            h_iso = f"{dm[3]}-{dm[2]}-{dm[1]}"
+            day_entry = header_map.setdefault(h_iso, {"date": h_iso, "entries": []})
+            rest = _strip_date_kw(h_text, dm)
+            if rest:
+                day_entry["entries"].append(_day_info_entry(rest))
+        date_sections = re.split(
+            r'<div[^>]*class="[^"]*list[^"]*"[^>]*>(?=\s*(?!stand\b)(?:[A-Za-z]{2,3}\.?[\s,]*)?\d{2}\.\d{2}\.\d{4})',
+            html,
+            flags=re.IGNORECASE,
+        )
         for section in date_sections[1:]:
             m = re.search(r"(\d{2})\.(\d{2})\.(\d{4})", section)
             if not m:
                 continue
             iso = f"{m[3]}-{m[2]}-{m[1]}"
-            day_entry: dict[str, Any] = {"date": iso, "entries": []}
-            rows = re.findall(r"<tr[^>]*>(.*?)</tr>", section, re.DOTALL | re.IGNORECASE)
+            day_entry: dict[str, Any] = header_map.pop(iso, None) or {"date": iso, "entries": []}
+            # day-level comment blocks before the first table of this section
+            first_table = re.search(r"<table[^>]*>", section, re.IGNORECASE)
+            pre = section[: first_table.start()] if first_table else section
+            for div_m in re.finditer(r"<div[^>]*>(.*?)</div>", pre, re.DOTALL | re.IGNORECASE):
+                div_raw = _html_unescape(re.sub(r"<br\s*/?>", "\n", div_m.group(1), flags=re.IGNORECASE))
+                div_text = re.sub(r"<[^>]+>", " ", div_raw).replace("\xa0", " ").strip()
+                if div_text and not re.search(r"\d{2}\.\d{2}\.\d{4}", div_text):
+                    for line in div_text.split("\n"):
+                        line = line.strip()
+                        if line:
+                            day_entry["entries"].append(_day_info_entry(line))
+            tables = re.findall(r"(<table[^>]*>.*?</table>)", section, re.DOTALL | re.IGNORECASE)
+            vp_tables = [t for t in tables if "vp_plan_head" in t.lower()]
+            use_tables = vp_tables or tables[:1]
+            col_map: dict[str, int] = {}
+            rows: list[str] = []
+            for tbl in use_tables:
+                rows.extend(re.findall(r"(<tr[^>]*>.*?</tr>)", tbl, re.DOTALL | re.IGNORECASE))
             for row in rows:
                 if "vp_plan_head" in row.lower():
+                    head_tds = re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", row, re.DOTALL | re.IGNORECASE)
+                    col_map = map_substitution_columns(
+                        [_html_unescape(re.sub(r"<[^>]+>", " ", t)).strip() for t in head_tds]
+                    )
                     continue
                 tds = re.findall(r"<td[^>]*>(.*?)</td>", row, re.DOTALL | re.IGNORECASE)
-                if len(tds) < 5:
+                if len(tds) < 4:
+                    row_text = _html_unescape(re.sub(r"<br\s*/?>", "\n", row, flags=re.IGNORECASE))
+                    row_text = re.sub(r"<[^>]+>", " ", row_text).replace("\xa0", " ").strip()
+                    for line in row_text.split("\n"):
+                        line = line.strip()
+                        if line:
+                            day_entry["entries"].append(_day_info_entry(line))
                     continue
-                texts = [re.sub(r"<[^>]+>", "", t).strip() for t in tds]
-                lesson = re.sub(r"\.(?=\s*[-–])", "", texts[0]).removesuffix(".")
-                teacher = texts[1]
-                substitute = texts[2]
-                if len(tds) >= 6:
-                    raw_subj = texts[3]
-                    pieces = [t.strip() for t in re.split(r"[\s\n\r]+", raw_subj) if t.strip()]
-                    if pieces and len(list(dict.fromkeys(pieces))) == 1:
-                        subject = pieces[0]
-                    else:
-                        subject = raw_subj
-                    room = texts[4]
-                    info = texts[5]
-                else:
-                    subject = ""
-                    room = texts[3]
-                    info = texts[4]
-                e = {
-                    "lesson": lesson,
-                    "teacher": teacher,
-                    "substitute": substitute,
-                    "subject": subject,
-                    "room": room,
-                    "info": info,
-                }
-                e["kind"] = substitution_kind(e)
-                day_entry["entries"].append(e)
+                texts: list[str] = []
+                struck: list[str] = []
+                struck_re = re.compile(r"<(?:s|del|strike)[^>]*>(.*?)</(?:s|del|strike)>", re.DOTALL | re.IGNORECASE)
+                for t in tds:
+                    struck += [re.sub(r"<[^>]+>", " ", s).strip() for s in struck_re.findall(t)]
+                    t = struck_re.sub(" ", t)
+                    texts.append(_html_unescape(re.sub(r"<[^>]+>", " ", t)).replace("\xa0", " ").strip())
+                e = substitution_entry_from_cells(texts, col_map or None, struck)
+                if e is not None:
+                    day_entry["entries"].append(e)
+            result["days"].append(day_entry)
+        # days that only had a header (no table) still get appended
+        for day_entry in header_map.values():
             result["days"].append(day_entry)
 
     return result

@@ -262,6 +262,19 @@ class SchoolGradesData:
 
         # If no subject is mentioned at all, it's a general class event/cancellation
         if not subj_raw and not subj_res and not old_subj_raw and not old_subj_res:
+            # Day-level info comments may be addressed to a specific class/course
+            # (e.g. "Klasse 7C: ..." or "Q12 ..."); filter them by the child's grade level.
+            info_text = str(entry.get("info", ""))
+            grade = (self.grade_level or "").strip().lower()
+            if grade:
+                for m in re.finditer(r"klasse\s+([0-9]{1,2}[a-z]{0,2}|q1[12])\b", info_text, re.I):
+                    tok = m.group(1).lower()
+                    if tok != grade and not tok.startswith(grade) and not grade.startswith(tok):
+                        return False
+                for m in re.finditer(r"\b(q1[12])\b", info_text, re.I):
+                    tok = m.group(1).lower()
+                    if tok != grade and not tok.startswith(grade) and not grade.startswith(tok):
+                        return False
             return True
 
         child_subjects = [s.strip().lower() for s in (self._subjects or []) if s.strip()]
@@ -483,14 +496,13 @@ class SchoolGradesData:
         """Return new relevant substitutions grouped by date that have not been notified yet."""
         if not self.notify_entities:
             return {}
-        if not self.notify_on_entfall and not self.notify_on_vertretung:
-            return {}
         if not self.portal_substitutions or not isinstance(self.portal_substitutions, dict):
             return {}
 
         today_iso = dt_date.today().isoformat()
         notified_set = set(self.notified_substitutions)
         grouped: dict[str, list[dict[str, Any]]] = {}
+        stats = {"past": 0, "not_relevant": 0, "kind_filtered": 0, "already_notified": 0, "new": 0}
 
         for day in self.portal_substitutions.get("days", []):
             if not isinstance(day, dict):
@@ -500,6 +512,7 @@ class SchoolGradesData:
                 continue
             # Only notify for today or future dates
             if day_date < today_iso:
+                stats["past"] += len(day.get("entries", []) or [])
                 continue
 
             for entry in day.get("entries", []):
@@ -507,28 +520,49 @@ class SchoolGradesData:
                     continue
                 # Only entries applying to this child
                 if not entry.get("applies_to_child", True):
+                    stats["not_relevant"] += 1
                     continue
 
                 kind = str(entry.get("kind", "")).strip().lower()
-                if kind == "entfall":
+                if kind == "info":
+                    # day-level hints (e.g. "Allg. Schulschluss") are always included
+                    pass
+                elif kind == "entfall":
                     if not self.notify_on_entfall:
+                        stats["kind_filtered"] += 1
                         continue
                 elif kind in ("vertretung", "raum"):
                     if not self.notify_on_vertretung:
+                        stats["kind_filtered"] += 1
                         continue
                 else:
                     if not self.notify_on_vertretung:
+                        stats["kind_filtered"] += 1
                         continue
 
                 sig = self.compute_substitution_signature(day_date, entry)
                 if sig in notified_set:
+                    stats["already_notified"] += 1
                     continue
 
+                stats["new"] += 1
                 if day_date not in grouped:
                     grouped[day_date] = []
                 entry_copy = dict(entry)
                 entry_copy["_signature"] = sig
                 grouped[day_date].append(entry_copy)
+
+        if stats["new"] or any(v for k, v in stats.items() if k != "new"):
+            _LOGGER.debug(
+                "get_new_substitutions_to_notify(%s): new=%d already_notified=%d kind_filtered=%d "
+                "not_relevant=%d past=%d",
+                self.child_name,
+                stats["new"],
+                stats["already_notified"],
+                stats["kind_filtered"],
+                stats["not_relevant"],
+                stats["past"],
+            )
 
         return grouped
 

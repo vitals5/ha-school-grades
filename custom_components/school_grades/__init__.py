@@ -72,6 +72,7 @@ from .const import (
     SERVICE_REMOVE_GRADE,
     SERVICE_REMOVE_SUBJECT,
     SERVICE_SEND_TEST_NOTIFICATION,
+    SERVICE_RESET_NOTIFIED_SUBSTITUTIONS,
     SERVICE_SET_CALENDAR,
     SERVICE_SET_HOMEWORK_DONE,
     SERVICE_SET_PREPARATION_DONE,
@@ -96,6 +97,9 @@ from .portal import (
 from .storage import SchoolGradesStorage
 
 _LOGGER = logging.getLogger(__name__)
+
+# Interval for the automatic Eltern-Portal sync (substitution notifications rely on it)
+PORTAL_AUTO_SYNC_INTERVAL_MINUTES = 15
 
 PLATFORMS = ["sensor", "binary_sensor"]
 
@@ -189,6 +193,11 @@ SCHEMA_SEND_TEST_NOTIFICATION = vol.Schema(
         vol.Optional(CONF_CHILD_NAME): cv.string,
         vol.Optional(CONF_NOTIFY_ENTITIES): vol.All(cv.ensure_list, [cv.string]),
         vol.Optional("message"): cv.string,
+    }
+)
+SCHEMA_RESET_NOTIFIED_SUBSTITUTIONS = vol.Schema(
+    {
+        vol.Optional(CONF_CHILD_NAME): cv.string,
     }
 )
 
@@ -326,6 +335,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Register services once if first entry
     _register_services(hass)
 
+    # Automatic periodic Eltern-Portal sync so that new substitutions/cancellations
+    # are detected (and notified) without a manual sync. Manual sync stays possible.
+    auto_sync_action = hass.data.get(f"{DOMAIN}_auto_sync_action")
+    if auto_sync_action and not hass.data.get(f"{DOMAIN}_auto_sync_registered"):
+        hass.data[f"{DOMAIN}_auto_sync_registered"] = True
+        from datetime import timedelta
+
+        from homeassistant.helpers.event import async_track_time_interval
+
+        hass.data[f"{DOMAIN}_auto_sync_unsub"] = async_track_time_interval(
+            hass,
+            auto_sync_action,
+            timedelta(minutes=PORTAL_AUTO_SYNC_INTERVAL_MINUTES),
+        )
+
     return True
 
 
@@ -339,7 +363,7 @@ async def _async_setup_frontend(hass: HomeAssistant) -> None:
     else:
         hass.http.register_static_path(URL_BASE, FRONTEND_DIR, cache_headers=False)
 
-    version_str = "1.2.19"
+    version_str = "1.2.20"
     try:
         js_file = os.path.join(FRONTEND_DIR, "school-grades-panel.js")
         if os.path.exists(js_file):
@@ -372,6 +396,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data[DOMAIN].pop(entry.entry_id, None)
         if not hass.data[DOMAIN]:
             _unregister_services(hass)
+            unsub = hass.data.pop(f"{DOMAIN}_auto_sync_unsub", None)
+            if unsub:
+                unsub()
+            hass.data.pop(f"{DOMAIN}_auto_sync_registered", None)
             if hass.data.get(f"{DOMAIN}_panel_registered"):
                 try:
                     frontend.async_remove_panel(hass, "schulnoten")
@@ -853,8 +881,8 @@ def _register_services(hass: HomeAssistant) -> None:
         data = storage.data
         if not data.notify_entities:
             return 0
-        if not data.notify_on_entfall and not data.notify_on_vertretung:
-            return 0
+        # kind filtering (entfall/vertretung) happens in get_new_substitutions_to_notify;
+        # day-level hints (kind="info") are always included when entities are configured.
 
         grouped = data.get_new_substitutions_to_notify()
         if not grouped:
@@ -877,6 +905,19 @@ def _register_services(hass: HomeAssistant) -> None:
                 if "_signature" in e:
                     signatures.append(e["_signature"])
 
+        if sent <= 0:
+            # Do NOT mark as notified: none of the configured notify entities could be
+            # reached (typo, missing integration, ...). Otherwise these substitutions
+            # would never be notified at all. Retry on next sync instead.
+            _LOGGER.warning(
+                "Substitution notification for %s could not be delivered to any of %d configured "
+                "notify entities (%d entries) - keeping them pending, will retry on next sync",
+                data.child_name,
+                len(data.notify_entities),
+                len(signatures),
+            )
+            return 0
+
         data.mark_substitutions_notified(signatures)
         await storage.async_save()
         _LOGGER.info(
@@ -886,6 +927,22 @@ def _register_services(hass: HomeAssistant) -> None:
             sent,
         )
         return len(signatures)
+
+    async def _async_auto_portal_sync(now: Any = None) -> None:
+        """Periodically sync all children with an enabled Eltern-Portal connection."""
+        for storage in list(hass.data.get(DOMAIN, {}).values()):
+            if not isinstance(storage, SchoolGradesStorage):
+                continue
+            if not storage.data.portal_enabled:
+                continue
+            try:
+                await _async_sync_child_portal(storage)
+            except Exception as err:
+                _LOGGER.warning(
+                    "Auto-Sync Eltern-Portal für %s fehlgeschlagen: %s", storage.data.child_name, err
+                )
+
+    hass.data[f"{DOMAIN}_auto_sync_action"] = _async_auto_portal_sync
 
     async def _async_sync_child_portal(
         storage: SchoolGradesStorage,
@@ -955,11 +1012,31 @@ def _register_services(hass: HomeAssistant) -> None:
         # Update substitutions if fetched
         notified_subst_count = 0
         if sync_subst and "substitutions" in res:
-            data.set_portal_substitutions(res["substitutions"])
-            try:
-                notified_subst_count = await _async_notify_substitutions(storage)
-            except Exception as notify_err:
-                _LOGGER.error("Error sending substitution notifications for %s: %s", data.child_name, notify_err)
+            subst_res = res["substitutions"]
+            if isinstance(subst_res, dict) and not subst_res.get("available", True):
+                # Parsing failed or page unreachable: keep previous data instead of wiping it
+                _LOGGER.warning(
+                    "Vertretungsplan für %s nicht auswertbar (available=False) - behalte bisherige Daten",
+                    data.child_name,
+                )
+            else:
+                entry_count = sum(
+                    len(d.get("entries", []))
+                    for d in (subst_res.get("days", []) if isinstance(subst_res, dict) else [])
+                    if isinstance(d, dict)
+                )
+                _LOGGER.debug(
+                    "Vertretungsplan für %s: %d Tag(e), %d Eintrag(e) geparst (Stand: %s)",
+                    data.child_name,
+                    len(subst_res.get("days", [])) if isinstance(subst_res, dict) else 0,
+                    entry_count,
+                    subst_res.get("stand") if isinstance(subst_res, dict) else None,
+                )
+                data.set_portal_substitutions(subst_res)
+                try:
+                    notified_subst_count = await _async_notify_substitutions(storage)
+                except Exception as notify_err:
+                    _LOGGER.error("Error sending substitution notifications for %s: %s", data.child_name, notify_err)
 
         # Update timetable if requested
         if sync_tt and "timetable" in res and res["timetable"]:
@@ -1190,6 +1267,58 @@ def _register_services(hass: HomeAssistant) -> None:
                 "yaml": storage.data.get_subject_aliases_yaml(),
             },
         )
+
+    @websocket_api.websocket_command(
+        {
+            vol.Required("type"): "school_grades/reset_notified_substitutions",
+            vol.Optional("child_name"): str,
+        }
+    )
+    @websocket_api.async_response
+    async def ws_reset_notified_substitutions(
+        hass_inner: HomeAssistant,
+        connection: websocket_api.ActiveConnection,
+        msg: dict[str, Any],
+    ) -> None:
+        """Clear the notified-substitutions memory (e.g. after fixing notify entities).
+
+        Entries are then treated as new again on the next sync and notified once more.
+        """
+        child_name = msg.get("child_name")
+        if child_name:
+            st = _get_storage(hass, child_name)
+            targets = [st] if st else []
+        else:
+            targets = [
+                s for s in hass.data.get(DOMAIN, {}).values() if isinstance(s, SchoolGradesStorage)
+            ]
+        cleared = 0
+        for st in targets:
+            cleared += len(st.data.notified_substitutions)
+            st.data.notified_substitutions = []
+            await st.async_save()
+            async_dispatcher_send(hass, SIGNAL_UPDATE_GRADES.format(entry_id=st.entry_id))
+        _LOGGER.info("Cleared %d notified substitution signatures (%d children)", cleared, len(targets))
+        connection.send_result(msg["id"], {"success": True, "cleared": cleared, "children": len(targets)})
+
+    async def handle_reset_notified_substitutions(call: ServiceCall) -> dict[str, Any]:
+        """Clear the notified-substitutions memory so entries are notified again on next sync."""
+        child_name = call.data.get(CONF_CHILD_NAME)
+        if child_name:
+            st = _get_storage(hass, child_name)
+            targets = [st] if st else []
+        else:
+            targets = [
+                s for s in hass.data.get(DOMAIN, {}).values() if isinstance(s, SchoolGradesStorage)
+            ]
+        cleared = 0
+        for st in targets:
+            cleared += len(st.data.notified_substitutions)
+            st.data.notified_substitutions = []
+            await st.async_save()
+            async_dispatcher_send(hass, SIGNAL_UPDATE_GRADES.format(entry_id=st.entry_id))
+        _LOGGER.info("Cleared %d notified substitution signatures (%d children)", cleared, len(targets))
+        return {"success": True, "cleared": cleared, "children": len(targets)}
 
     async def handle_send_test_notification(call: ServiceCall) -> dict[str, Any]:
         """Send a test notification to configured or given notify entities."""
@@ -1929,11 +2058,19 @@ def _register_services(hass: HomeAssistant) -> None:
         schema=SCHEMA_SEND_TEST_NOTIFICATION,
         supports_response=SupportsResponse.OPTIONAL,
     )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_RESET_NOTIFIED_SUBSTITUTIONS,
+        handle_reset_notified_substitutions,
+        schema=SCHEMA_RESET_NOTIFIED_SUBSTITUTIONS,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
     websocket_api.async_register_command(hass, ws_test_elternportal)
     websocket_api.async_register_command(hass, ws_sync_elternportal)
     websocket_api.async_register_command(hass, ws_import_portal_timetable)
     websocket_api.async_register_command(hass, ws_import_portal_exams)
     websocket_api.async_register_command(hass, ws_update_subject_aliases)
+    websocket_api.async_register_command(hass, ws_reset_notified_substitutions)
     websocket_api.async_register_command(hass, ws_get_sibling_portal_credentials)
     websocket_api.async_register_command(hass, ws_send_test_notification)
 
@@ -1961,5 +2098,6 @@ def _unregister_services(hass: HomeAssistant) -> None:
     hass.services.async_remove(DOMAIN, SERVICE_IMPORT_PORTAL_EXAMS)
     hass.services.async_remove(DOMAIN, SERVICE_UPDATE_SUBJECT_ALIASES)
     hass.services.async_remove(DOMAIN, SERVICE_SEND_TEST_NOTIFICATION)
+    hass.services.async_remove(DOMAIN, SERVICE_RESET_NOTIFIED_SUBSTITUTIONS)
 
 

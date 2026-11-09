@@ -3516,15 +3516,15 @@ Natur und Technik:
                               ${hasContent ? `
                                 <div class="cell-subject" style="${isEntfall ? 'text-decoration: line-through; opacity: 0.6;' : ''}">${this._escapeHtml(displaySubject) || `<span style="font-style: italic; opacity: 0.6;">${this._t('free_period_label')}</span>`}</div>
                                 ${isAlternating && activeCell.otherSubject ? `
-                                  <div style="font-size: 10px; color: var(--secondary-text-color, rgba(255, 255, 255, 0.45)); font-style: italic; margin-top: -1px; margin-bottom: 2px;" title="${this._t('alt_wechsel_prefix')} ${activeCell.otherSubject}">
-                                    ${this._t('alt_wechsel_prefix')} ${activeCell.otherSubject}
+                                  <div style="font-size: 10px; color: var(--secondary-text-color, rgba(255, 255, 255, 0.45)); font-style: italic; margin-top: -1px; margin-bottom: 2px;" title="${this._t('alt_wechsel_prefix')} ${this._escapeHtml(activeCell.otherSubject)}">
+                                    ${this._t('alt_wechsel_prefix')} ${this._escapeHtml(activeCell.otherSubject)}
                                   </div>
                                 ` : ''}
                                 <div class="cell-details">
                                   ${displayRoom ? `<span class="cell-room" style="${isRaum ? 'color: #fde047; font-weight: 600;' : ''}">📍 ${this._escapeHtml(displayRoom)}</span>` : ''}
                                   ${displayTeacher ? `<span class="cell-teacher" style="${isVertretung ? 'color: #93c5fd; font-weight: 600;' : ''}">👨‍🏫 ${this._escapeHtml(displayTeacher)}</span>` : ''}
                                 </div>
-                                ${subst && subst.info ? `<div style="font-size: 10px; color: var(--secondary-text-color, rgba(255,255,255,0.65)); margin-top: 2px;">ℹ️ ${subst.info}</div>` : ''}
+                                ${subst && subst.info ? `<div style="font-size: 10px; color: var(--secondary-text-color, rgba(255,255,255,0.65)); margin-top: 2px;">ℹ️ ${this._escapeHtml(subst.info)}</div>` : ''}
                               ` : `
                                 <div class="cell-empty-trigger">
                                   <span class="add-icon">+</span>
@@ -3879,7 +3879,7 @@ Natur und Technik:
 
                 <div class="form-group" style="margin-bottom: 16px;">
                   <label style="display: block; margin-bottom: 6px; font-weight: 500;">🎒 ${this._t('grade_level_label')}</label>
-                  <input type="text" id="settings-grade-level-input" placeholder="${this._t('grade_level_placeholder')}" value="${currentChild.gradeLevel || ''}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: var(--card-background-color, rgba(0,0,0,0.25)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 13px; box-sizing: border-box;">
+                  <input type="text" id="settings-grade-level-input" placeholder="${this._t('grade_level_placeholder')}" value="${this._escapeHtml(currentChild.gradeLevel || '')}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: var(--card-background-color, rgba(0,0,0,0.25)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 13px; box-sizing: border-box;">
                 </div>
 
                 <div class="form-group" style="margin-bottom: 16px;">
@@ -3984,8 +3984,8 @@ Natur und Technik:
                         <div style="font-size: 12px; font-weight: 600; color: #93c5fd; margin-bottom: 6px;">👥 ${this._t('portal_copy_from')}</div>
                         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                           ${siblingPortals.map(s => `
-                            <button type="button" class="sibling-portal-copy-btn" data-child="${s.name}" data-school="${s.portalSchool}" data-user="${s.portalUsername}" style="font-size: 12px; padding: 4px 10px; border-radius: 6px; background: rgba(59,130,246,0.25); border: 1px solid #3b82f6; color: var(--primary-text-color, #fff); cursor: pointer; transition: background 0.2s;">
-                              📋 ${s.name} (${s.portalSchool})
+                            <button type="button" class="sibling-portal-copy-btn" data-child="${this._escapeHtml(s.name)}" data-school="${this._escapeHtml(s.portalSchool)}" data-user="${this._escapeHtml(s.portalUsername)}" style="font-size: 12px; padding: 4px 10px; border-radius: 6px; background: rgba(59,130,246,0.25); border: 1px solid #3b82f6; color: var(--primary-text-color, #fff); cursor: pointer; transition: background 0.2s;">
+                              📋 ${this._escapeHtml(s.name)} (${this._escapeHtml(s.portalSchool)})
                             </button>
                           `).join('')}
                         </div>
@@ -3995,18 +3995,18 @@ Natur und Technik:
 
                   <div class="form-group" style="margin-bottom: 14px;">
                     <label style="display: block; margin-bottom: 6px; font-weight: 500; font-size: 13px;">🏫 ${this._t('portal_school')}</label>
-                    <input type="text" id="settings-portal-school" placeholder="${this._t('portal_school_placeholder')}" value="${this._portalFormSchool !== undefined ? this._portalFormSchool : (currentChild.portalSchool || '')}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: var(--card-background-color, rgba(0,0,0,0.25)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 13px; box-sizing: border-box;">
+                    <input type="text" id="settings-portal-school" placeholder="${this._t('portal_school_placeholder')}" value="${this._escapeHtml(this._portalFormSchool !== undefined ? this._portalFormSchool : (currentChild.portalSchool || ''))}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: var(--card-background-color, rgba(0,0,0,0.25)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 13px; box-sizing: border-box;">
                     <div style="font-size: 11px; color: var(--secondary-text-color, rgba(255,255,255,0.5)); margin-top: 4px;">${this._t('portal_school_help')}</div>
                   </div>
 
                   <div class="form-group" style="margin-bottom: 14px;">
                     <label style="display: block; margin-bottom: 6px; font-weight: 500; font-size: 13px;">👤 ${this._t('portal_username')}</label>
-                    <input type="text" id="settings-portal-username" placeholder="name@beispiel.de" value="${this._portalFormUsername !== undefined ? this._portalFormUsername : (currentChild.portalUsername || '')}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: var(--card-background-color, rgba(0,0,0,0.25)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 13px; box-sizing: border-box;">
+                    <input type="text" id="settings-portal-username" placeholder="name@beispiel.de" value="${this._escapeHtml(this._portalFormUsername !== undefined ? this._portalFormUsername : (currentChild.portalUsername || ''))}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: var(--card-background-color, rgba(0,0,0,0.25)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 13px; box-sizing: border-box;">
                   </div>
 
                   <div class="form-group" style="margin-bottom: 16px;">
                     <label style="display: block; margin-bottom: 6px; font-weight: 500; font-size: 13px;">🔒 ${this._t('portal_password')}</label>
-                    <input type="password" id="settings-portal-password" placeholder="${currentChild.portalHasPassword ? this._t('portal_password_stored') : '••••••••'}" value="${this._portalFormPassword !== undefined ? this._portalFormPassword : ''}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: var(--card-background-color, rgba(0,0,0,0.25)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 13px; box-sizing: border-box;">
+                    <input type="password" id="settings-portal-password" placeholder="${currentChild.portalHasPassword || this._portalCopySibling ? this._t('portal_password_stored') : '••••••••'}" value="${this._escapeHtml(this._portalFormPassword !== undefined ? this._portalFormPassword : '')}" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: var(--card-background-color, rgba(0,0,0,0.25)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); font-size: 13px; box-sizing: border-box;">
                   </div>
 
                   <div style="margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
@@ -4039,9 +4039,9 @@ Natur und Technik:
                     </div>
                   ` : currentChild.portalStudentId ? `
                     <div style="background: rgba(255,255,255,0.05); border: 1px solid var(--divider-color, rgba(255,255,255,0.12)); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; font-size: 13px;">
-                      👤 <strong>Verknüpftes Kind im Portal:</strong> <span style="color: #60a5fa;">${currentChild.portalStudentName || currentChild.portalStudentId}</span>
-                      <input type="hidden" id="settings-portal-student-id-hidden" value="${currentChild.portalStudentId}">
-                      <input type="hidden" id="settings-portal-student-name-hidden" value="${currentChild.portalStudentName || ''}">
+                      👤 <strong>Verknüpftes Kind im Portal:</strong> <span style="color: #60a5fa;">${this._escapeHtml(currentChild.portalStudentName || currentChild.portalStudentId)}</span>
+                      <input type="hidden" id="settings-portal-student-id-hidden" value="${this._escapeHtml(currentChild.portalStudentId)}">
+                      <input type="hidden" id="settings-portal-student-name-hidden" value="${this._escapeHtml(currentChild.portalStudentName || '')}">
                     </div>
                   ` : ''}
 
@@ -4136,7 +4136,7 @@ Natur und Technik:
                     <div style="font-size: 11px; color: #93c5fd; background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.3); border-radius: 6px; padding: 6px 10px; margin-bottom: 8px; line-height: 1.35;">
                       ${this._t('portal_aliases_slash_tip')}
                     </div>
-                    <textarea id="settings-portal-aliases-textarea" rows="6" style="font-family: monospace; font-size: 12px; line-height: 1.4; resize: vertical; tab-size: 2; width: 100%; box-sizing: border-box; background: var(--card-background-color, rgba(0,0,0,0.3)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); border-radius: 8px; padding: 10px;">${this._aliasesToYaml((currentChild && currentChild.subjectAliases) || {})}</textarea>
+                    <textarea id="settings-portal-aliases-textarea" rows="6" style="font-family: monospace; font-size: 12px; line-height: 1.4; resize: vertical; tab-size: 2; width: 100%; box-sizing: border-box; background: var(--card-background-color, rgba(0,0,0,0.3)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); border-radius: 8px; padding: 10px;">${this._escapeHtml(this._aliasesToYaml((currentChild && currentChild.subjectAliases) || {}))}</textarea>
                     <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
                       <button type="button" id="settings-portal-aliases-save-btn" class="submit-btn secondary" style="width: auto; padding: 6px 14px; font-size: 12px;">
                         ${this._t('portal_aliases_save_btn')}
@@ -4266,7 +4266,7 @@ Natur und Technik:
                 <form id="settings-yaml-import-form">
                   <div class="form-group" style="margin-bottom: 16px;">
                     <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 13px; color: var(--primary-text-color, #fff);">${this._t('yaml_textarea_label', { child: this._selectedChild })}</label>
-                    <textarea id="settings-yaml-textarea" rows="10" style="font-family: monospace; font-size: 12px; line-height: 1.4; resize: vertical; tab-size: 2; width: 100%; box-sizing: border-box; background: var(--card-background-color, rgba(0,0,0,0.3)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); border-radius: 8px; padding: 10px;">${this._timetableToYaml(timetable)}</textarea>
+                    <textarea id="settings-yaml-textarea" rows="10" style="font-family: monospace; font-size: 12px; line-height: 1.4; resize: vertical; tab-size: 2; width: 100%; box-sizing: border-box; background: var(--card-background-color, rgba(0,0,0,0.3)); color: var(--primary-text-color, #fff); border: 1px solid var(--divider-color, rgba(255,255,255,0.15)); border-radius: 8px; padding: 10px;">${this._escapeHtml(this._timetableToYaml(timetable))}</textarea>
                   </div>
 
                   <div class="modal-actions" style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">

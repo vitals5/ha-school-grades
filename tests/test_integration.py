@@ -2071,6 +2071,277 @@ class TestNotificationServicesAndFormatting(unittest.TestCase):
         self.assertIn("2. Std: Physik — Vertretung (durch Hr. Meyer, in Phy-Saal)", body)
 
 
+class TestSubstitutionPlanParsingLayouts(unittest.TestCase):
+    """Tests for header-based column mapping of the substitution plan (layout differs per school)."""
+
+    HTML_6COL = """
+    <div id="asam_content"><div class="main_center">
+      <div class="list bold full_width text_center">Mo., 09.11.2026 - KW 46</div>
+      <table class="table">
+        <tr class="vp_plan_head"><td class="table_header">Std.</td><td class="table_header">Betrifft.</td><td class="table_header">Vertretung</td><td class="table_header">Fach</td><td class="table_header">Raum</td><td class="table_header">Info</td></tr>
+        <tr class="liste_grau"><td>1.</td><td>abc</td><td>xyz</td><td><s>M</s> D</td><td>R102</td><td>Stillarbeit</td></tr>
+        <tr class="liste_weiss"><td>2.</td><td>def</td><td>&nbsp;</td><td>Geo</td><td>1</td><td>entfällt</td></tr>
+      </table>
+    </div></div>
+    """
+
+    HTML_5COL = """
+    <div id="asam_content"><div class="main_center">
+      <div class="list bold full_width text_center">Di., 10.11.2026 - KW 46</div>
+      <table class="table">
+        <tr class="vp_plan_head"><td class="table_header">Std.</td><td class="table_header">Betrifft.</td><td class="table_header">Vertretung</td><td class="table_header">Raum</td><td class="table_header">Info</td></tr>
+        <tr><td>3.</td><td>5a M</td><td>Fr. Schmidt</td><td>R205</td><td>Aufgaben</td></tr>
+      </table>
+    </div></div>
+    """
+
+    HTML_LEGACY_NOHEAD = """
+    <div id="asam_content"><div class="main_center">
+      <div class="list">Mi, 11.11.2026</div>
+      <table class="table-striped">
+        <tr><td>5</td><td>LehrerA</td><td>VertretungB</td><td><span>Sm</span> <span>Sm</span></td><td>TH1</td><td>Vertretung</td></tr>
+      </table>
+    </div></div>
+    """
+
+    def test_map_substitution_columns(self):
+        m = portal_mod.map_substitution_columns(["Std.", "Betrifft.", "Vertretung", "Fach", "Raum", "Info"])
+        self.assertEqual(m.get("lesson"), 0)
+        self.assertEqual(m.get("teacher"), 1)
+        self.assertEqual(m.get("substitute"), 2)
+        self.assertEqual(m.get("subject"), 3)
+        self.assertEqual(m.get("room"), 4)
+        self.assertEqual(m.get("info"), 5)
+
+        m5 = portal_mod.map_substitution_columns(["Std.", "Betrifft.", "Vertretung", "Raum", "Info"])
+        self.assertNotIn("subject", m5)
+        self.assertEqual(m5.get("room"), 3)
+        self.assertEqual(m5.get("info"), 4)
+
+    def test_parse_6col_layout_with_struck_subject(self):
+        for use_bs4 in (True, False):
+            old_bs4 = portal_mod.bs4
+            portal_mod.bs4 = __import__("bs4") if use_bs4 else None
+            try:
+                r = portal_mod.parse_substitutions(self.HTML_6COL)
+            finally:
+                portal_mod.bs4 = old_bs4
+            self.assertTrue(r["available"])
+            entries = r["days"][0]["entries"]
+            self.assertEqual(len(entries), 2)  # header row must be skipped
+            e1, e2 = entries
+            self.assertEqual(e1["lesson"], "1")
+            self.assertEqual(e1["subject"], "D")  # struck-through old subject removed
+            self.assertEqual(e1.get("old_subject"), "M")
+            self.assertEqual(e1["kind"], "vertretung")
+            self.assertEqual(e2["kind"], "entfall")  # "entfällt" in info
+            self.assertEqual(e2["substitute"], "")  # &nbsp; normalized to empty
+
+    def test_parse_5col_layout_subject_from_betrifft(self):
+        r = portal_mod.parse_substitutions(self.HTML_5COL)
+        self.assertTrue(r["available"])
+        entries = r["days"][0]["entries"]
+        self.assertEqual(len(entries), 1)
+        e = entries[0]
+        self.assertEqual(e["lesson"], "3")
+        # No dedicated Fach column: subject folded into Betrifft cell
+        self.assertEqual(e["subject"], "5a M")
+        self.assertEqual(e["room"], "R205")
+        self.assertEqual(e["info"], "Aufgaben")
+
+    def test_parse_legacy_layout_without_header(self):
+        r = portal_mod.parse_substitutions(self.HTML_LEGACY_NOHEAD)
+        self.assertTrue(r["available"])
+        entries = r["days"][0]["entries"]
+        self.assertEqual(len(entries), 1)
+        e = entries[0]
+        self.assertEqual(e["lesson"], "5")
+        self.assertEqual(e["subject"], "Sm")  # duplicate spans deduped
+        self.assertEqual(e["room"], "TH1")
+
+    def test_relevance_with_subject_from_betrifft(self):
+        child = SchoolGradesData("Felix")
+        child._subjects = ["Mathematik", "Deutsch", "Sport"]
+        child.subject_aliases = {"Mathematik": ["M", "Ma"]}
+        # subject "5a M" comes from a Betrifft cell: token "M" must match the alias
+        self.assertTrue(child.is_substitution_relevant_for_child({"subject": "5a M", "lesson": "3"}))
+        self.assertFalse(child.is_substitution_relevant_for_child({"subject": "5a F", "lesson": "3"}))
+
+    def test_notification_flow_with_parsed_5col(self):
+        """End-to-end: parse 5-col HTML, store, and expect a pending notification."""
+        from datetime import date as dt_date, timedelta
+        today_iso = dt_date.today().isoformat()
+        html = self.HTML_5COL.replace("Di., 10.11.2026", "X., " + dt_date.today().strftime("%d.%m.%Y"))
+        r = portal_mod.parse_substitutions(html)
+        data = SchoolGradesData("Emma")
+        data._subjects = ["Mathematik"]
+        data.subject_aliases = {"Mathematik": ["M"]}
+        data.notify_entities = ["notify.mobile_app_mama"]
+        data.notify_on_entfall = True
+        data.notify_on_vertretung = True
+        data.set_portal_substitutions(r)
+        entries = data.get_substitutions_for_date(today_iso)
+        self.assertEqual(len(entries), 1)
+        self.assertTrue(entries[0]["applies_to_child"])
+        grouped = data.get_new_substitutions_to_notify()
+        self.assertIn(today_iso, grouped)
+        self.assertEqual(len(grouped[today_iso]), 1)
+
+
+class TestDayLevelSubstitutionComments(unittest.TestCase):
+    """Day-level comments like 'Allg. Schulschluss' / 'Unterrichtsende' must be captured as kind='info'."""
+
+    HTML_DAY_COMMENTS = """
+    <div id="asam_content"><div class="main_center">
+      <div class="list bold full_width text_center">Mo., 09.11.2026 - KW 46, Allg. Schulschluss 12:00 Uhr</div>
+      <div class="info">Unterrichtsende nach der 6. Stunde</div>
+      <table class="table">
+        <tr class="vp_plan_head"><td class="table_header">Std.</td><td class="table_header">Betrifft.</td><td class="table_header">Vertretung</td><td class="table_header">Fach</td><td class="table_header">Raum</td><td class="table_header">Info</td></tr>
+        <tr><td colspan="6" class="text_center">Elternsprechstunde entfällt heute</td></tr>
+        <tr class="liste_grau"><td>1.</td><td>abc</td><td>xyz</td><td>D</td><td>R102</td><td>Stillarbeit</td></tr>
+      </table>
+    </div></div>
+    """
+
+    def test_day_comments_captured_as_info(self):
+        for use_bs4 in (True, False):
+            old_bs4 = portal_mod.bs4
+            portal_mod.bs4 = __import__("bs4") if use_bs4 else None
+            try:
+                r = portal_mod.parse_substitutions(self.HTML_DAY_COMMENTS)
+            finally:
+                portal_mod.bs4 = old_bs4
+            self.assertTrue(r["available"])
+            entries = r["days"][0]["entries"]
+            infos = [e for e in entries if e.get("kind") == "info"]
+            infos_text = " | ".join(e.get("info", "") for e in infos)
+            self.assertIn("Allg. Schulschluss 12:00 Uhr", infos_text)
+            self.assertIn("Unterrichtsende nach der 6. Stunde", infos_text)
+            self.assertIn("Elternsprechstunde entfällt heute", infos_text)
+            for e in infos:
+                self.assertEqual(e["lesson"], "")
+            # the real substitution row is still parsed
+            rows = [e for e in entries if e.get("kind") != "info"]
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["lesson"], "1")
+            self.assertEqual(rows[0]["subject"], "D")
+
+    def test_info_included_even_when_both_switches_off(self):
+        from datetime import date as dt_date
+        today_iso = dt_date.today().isoformat()
+        html = self.HTML_DAY_COMMENTS.replace("Mo., 09.11.2026", "X., " + dt_date.today().strftime("%d.%m.%Y"))
+        r = portal_mod.parse_substitutions(html)
+        data = SchoolGradesData("Emma")
+        data._subjects = ["Deutsch"]
+        data.subject_aliases = {"Deutsch": ["D"]}
+        data.notify_entities = ["notify.mobile_app_mama"]
+        data.notify_on_entfall = False
+        data.notify_on_vertretung = False  # both off: only info entries should remain
+        data.set_portal_substitutions(r)
+        grouped = data.get_new_substitutions_to_notify()
+        self.assertIn(today_iso, grouped)
+        kinds = [e["kind"] for e in grouped[today_iso]]
+        self.assertTrue(kinds)
+        self.assertTrue(all(k == "info" for k in kinds))
+
+    def test_info_in_notification_message(self):
+        from datetime import date as dt_date
+        today_iso = dt_date.today().isoformat()
+        grouped = {
+            today_iso: [
+                {"lesson": "", "kind": "info", "info": "Allg. Schulschluss 12:00 Uhr"},
+            ]
+        }
+        title, body = portal_mod.format_substitution_notification_message("Max", grouped)
+        self.assertIn("Hinweis (Max)", title)
+        self.assertIn("ℹ️ Allg. Schulschluss 12:00 Uhr", body)
+        self.assertNotIn("Std:", body)
+
+        # mixed: info + entfall -> combined title, info line without lesson
+        grouped2 = {
+            today_iso: [
+                {"lesson": "", "kind": "info", "info": "Unterrichtsende nach der 6. Stunde"},
+                {"lesson": "2", "subject": "Mathematik", "kind": "entfall", "info": "Krank"},
+            ]
+        }
+        title2, body2 = portal_mod.format_substitution_notification_message("Max", grouped2)
+        self.assertIn("Stundenplan-Änderung (Max)", title2)
+        self.assertIn("ℹ️ Unterrichtsende nach der 6. Stunde", body2)
+        self.assertIn("2. Std: Mathematik — Entfällt (Krank)", body2)
+
+
+class TestSubstitutionKindDetection(unittest.TestCase):
+    """kind detection: 'Hitzefrei'/'Schulfrei' count as entfall, day comments as info."""
+
+    def test_kind_detection(self):
+        sk = portal_mod.substitution_kind
+        self.assertEqual(sk({"substitute": "", "subject": "M", "room": "", "info": "entfällt"}), "entfall")
+        self.assertEqual(sk({"substitute": "", "subject": "M", "room": "", "info": "Hitzefrei"}), "entfall")
+        self.assertEqual(sk({"substitute": "", "subject": "M", "room": "", "info": "Schulfrei ab 10 Uhr"}), "entfall")
+        self.assertEqual(sk({"substitute": "---", "subject": "M", "room": "", "info": ""}), "entfall")
+        self.assertEqual(sk({"substitute": "xyz", "subject": "D", "room": "R102", "info": "Stillarbeit"}), "vertretung")
+        self.assertEqual(sk({"substitute": "", "subject": "D", "room": "R205", "info": "Raumänderung"}), "raum")
+
+
+class TestRealWorldVertretungsplan(unittest.TestCase):
+    """Real-world Eltern-Portal page (Gymnasium, class 5E): 6-col header, nested comment div,
+    Stand line with class 'list', trailing class-division table."""
+
+    HTML = """
+    <div class="" id="asam_content">
+      <h2>Vertretungsplan der Klasse 5E</h2><div class="main_center"><div class="list bold full_width text_center">Mo., 09.11.2026 - KW 46</div><div class="main_center"><p class="pull-left">Klasse 7C: Zammgraufft in 323<br><br>Q12 ev. Religion:<br>Klausur findet heute bei Herrn Bazanov in R. C13 statt!<br></p></div><table class="table"><tbody><tr class="vp_plan_head"><td class="table_header text-center">Std.</td><td class="table_header text-center">Betrifft</td><td class="table_header text-center">Vertretung</td><td class="table_header text-center">Fach</td><td class="table_header text-center">Raum</td><td class="table_header text-center">Info</td></tr><tr class="liste_grau"><td class="text_center">3.</td><td class="text_center">KUB</td><td class="text_center">GAV</td><td class="text_center">M</td><td class="text_center">313</td><td class="text_center">Vertretung</td></tr></tbody></table><div class="list bold full_width text_center">Di., 10.11.2026 - KW 46</div><div class="main_center"><p class="pull-left">1. Stunde: Verfassungsviertelstunde<br><br>Klasse 7C: Zammgraufft in 323<br><br>morgen: Treffen der Bunker-Buddies um 13:45 Uhr<br>in 234!<br></p></div><table class="table"><tbody><tr class="vp_plan_head"><td class="table_header text-center">Std.</td><td class="table_header text-center">Betrifft</td><td class="table_header text-center">Vertretung</td><td class="table_header text-center">Fach</td><td class="table_header text-center">Raum</td><td class="table_header text-center">Info</td></tr><tr class="liste_grau"><td class="text_center">6.</td><td class="text_center">KUB</td><td class="text_center">TEK</td><td class="text_center">M</td><td class="text_center">313</td><td class="text_center">anstelle Klasse 7C (6. Std.)</td></tr></tbody></table><div class="list full_width">Stand:&nbsp;09.11.2026&nbsp;16:40:00</div><p class="pull-left">Der hier dargestellte Vertretungsplan ist unverbindlich.</p></div><hr><table class="" width="100%" border="0"><tbody><tr><td><b>Mitglied in Klassenteilungen</b></td></tr><tr><td valign="top">5_Eth_5CE_STX, Ethik<br>5_S_5CE_RÄD, Sport<br></td></tr></tbody></table>
+    </div>
+    """
+
+    def test_real_world_parse(self):
+        for use_bs4 in (True, False):
+            old_bs4 = portal_mod.bs4
+            portal_mod.bs4 = __import__("bs4") if use_bs4 else None
+            try:
+                r = portal_mod.parse_substitutions(self.HTML)
+            finally:
+                portal_mod.bs4 = old_bs4
+            self.assertTrue(r["available"])
+            self.assertEqual(r["stand"], "09.11.2026 16:40:00")
+            # exactly 2 days: the "Stand:" list-div must not create a bogus day
+            self.assertEqual([d["date"] for d in r["days"]], ["2026-11-09", "2026-11-10"])
+            day1 = r["days"][0]["entries"]
+            kinds = [e["kind"] for e in day1]
+            self.assertEqual(kinds.count("info"), 3)
+            self.assertEqual(kinds.count("vertretung"), 1)
+            sub = [e for e in day1 if e["kind"] == "vertretung"][0]
+            self.assertEqual(sub["lesson"], "3")
+            self.assertEqual(sub["subject"], "M")
+            self.assertEqual(sub["teacher"], "KUB")
+            self.assertEqual(sub["substitute"], "GAV")
+            self.assertEqual(sub["room"], "313")
+            # comment lines split per <br>
+            infos = [e["info"] for e in day1 if e["kind"] == "info"]
+            self.assertIn("Klasse 7C: Zammgraufft in 323", infos)
+            self.assertIn("Q12 ev. Religion:", infos)
+            self.assertIn("Klausur findet heute bei Herrn Bazanov in R. C13 statt!", infos)
+            # no leakage from the class-division table
+            all_text = " ".join(e.get("info", "") for d in r["days"] for e in d["entries"])
+            self.assertNotIn("Mitglied in Klassenteilungen", all_text)
+            self.assertNotIn("5_Eth_5CE_STX", all_text)
+            self.assertNotIn("16:40:00", all_text)
+
+    def test_real_world_class_filter(self):
+        r = portal_mod.parse_substitutions(self.HTML)
+        data = SchoolGradesData("Monika")
+        data.grade_level = "5E"
+        data._subjects = ["Mathematik", "Ethik", "Sport", "Englisch"]
+        data.subject_aliases = {"Mathematik": ["M", "Ma"]}
+        data.set_portal_substitutions(r)
+        day1 = data.portal_substitutions["days"][0]["entries"]
+        by_info = {e.get("info", ""): e.get("applies_to_child") for e in day1 if e["kind"] == "info"}
+        self.assertFalse(by_info.get("Klasse 7C: Zammgraufft in 323"))
+        self.assertFalse(by_info.get("Q12 ev. Religion:"))
+        self.assertTrue(by_info.get("Klausur findet heute bei Herrn Bazanov in R. C13 statt!"))
+        sub = [e for e in day1 if e["kind"] == "vertretung"][0]
+        self.assertTrue(sub["applies_to_child"])
+
+
 def validate_json_yaml_files():
     json_files = list(project_root.glob("**/*.json"))
     for jf in json_files:

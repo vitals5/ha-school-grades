@@ -723,3 +723,14 @@ send_test_notification:
 
 
 
+reset_notified_substitutions:
+  name: "Benachrichtigungs-Speicher zurücksetzen"
+  description: "Leert die gemerkten Vertretungs-Signaturen (z. B. nach Korrektur der Notify-Entitäten). Betroffene Vertretungen/Entfälle werden beim nächsten Sync erneut als neu benachrichtigt."
+  fields:
+    child_name:
+      name: "Name des Kindes"
+      description: "Name des Kindes (optional, sonst alle Kinder)."
+      example: "Max"
+      selector:
+        text:
+

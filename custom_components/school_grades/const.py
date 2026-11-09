@@ -217,6 +217,7 @@ SERVICE_IMPORT_PORTAL_TIMETABLE = "import_portal_timetable"
 SERVICE_IMPORT_PORTAL_EXAMS = "import_portal_exams"
 SERVICE_UPDATE_SUBJECT_ALIASES = "update_subject_aliases"
 SERVICE_SEND_TEST_NOTIFICATION = "send_test_notification"
+SERVICE_RESET_NOTIFIED_SUBSTITUTIONS = "reset_notified_substitutions"
 
 # Standard-Zeitraster für Schulstunden und Pausen
 DEFAULT_TIMETABLE_SLOTS: list[dict[str, Any]] = [
