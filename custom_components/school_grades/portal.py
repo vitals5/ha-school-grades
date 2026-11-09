@@ -110,7 +110,8 @@ def resolve_subject_with_index(
         return ("", None)
 
     existing = [s.strip() for s in (existing_subjects or []) if s.strip()]
-    aliases = aliases_dict if aliases_dict is not None else DEFAULT_SUBJECT_ALIASES
+    # An empty custom alias dict must not disable the built-in defaults
+    aliases = aliases_dict if aliases_dict else DEFAULT_SUBJECT_ALIASES
 
     def _resolve_single(code: str) -> str | None:
         c = code.strip()
