@@ -72,6 +72,7 @@ from .const import (
     SERVICE_REMOVE_GRADE,
     SERVICE_REMOVE_SUBJECT,
     SERVICE_SEND_TEST_NOTIFICATION,
+    SERVICE_RESET_NOTIFIED_SUBSTITUTIONS,
     SERVICE_SET_CALENDAR,
     SERVICE_SET_HOMEWORK_DONE,
     SERVICE_SET_PREPARATION_DONE,
@@ -192,6 +193,11 @@ SCHEMA_SEND_TEST_NOTIFICATION = vol.Schema(
         vol.Optional(CONF_CHILD_NAME): cv.string,
         vol.Optional(CONF_NOTIFY_ENTITIES): vol.All(cv.ensure_list, [cv.string]),
         vol.Optional("message"): cv.string,
+    }
+)
+SCHEMA_RESET_NOTIFIED_SUBSTITUTIONS = vol.Schema(
+    {
+        vol.Optional(CONF_CHILD_NAME): cv.string,
     }
 )
 
@@ -1295,6 +1301,25 @@ def _register_services(hass: HomeAssistant) -> None:
         _LOGGER.info("Cleared %d notified substitution signatures (%d children)", cleared, len(targets))
         connection.send_result(msg["id"], {"success": True, "cleared": cleared, "children": len(targets)})
 
+    async def handle_reset_notified_substitutions(call: ServiceCall) -> dict[str, Any]:
+        """Clear the notified-substitutions memory so entries are notified again on next sync."""
+        child_name = call.data.get(CONF_CHILD_NAME)
+        if child_name:
+            st = _get_storage(hass, child_name)
+            targets = [st] if st else []
+        else:
+            targets = [
+                s for s in hass.data.get(DOMAIN, {}).values() if isinstance(s, SchoolGradesStorage)
+            ]
+        cleared = 0
+        for st in targets:
+            cleared += len(st.data.notified_substitutions)
+            st.data.notified_substitutions = []
+            await st.async_save()
+            async_dispatcher_send(hass, SIGNAL_UPDATE_GRADES.format(entry_id=st.entry_id))
+        _LOGGER.info("Cleared %d notified substitution signatures (%d children)", cleared, len(targets))
+        return {"success": True, "cleared": cleared, "children": len(targets)}
+
     async def handle_send_test_notification(call: ServiceCall) -> dict[str, Any]:
         """Send a test notification to configured or given notify entities."""
         child_name = call.data.get(CONF_CHILD_NAME)
@@ -2033,6 +2058,13 @@ def _register_services(hass: HomeAssistant) -> None:
         schema=SCHEMA_SEND_TEST_NOTIFICATION,
         supports_response=SupportsResponse.OPTIONAL,
     )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_RESET_NOTIFIED_SUBSTITUTIONS,
+        handle_reset_notified_substitutions,
+        schema=SCHEMA_RESET_NOTIFIED_SUBSTITUTIONS,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
     websocket_api.async_register_command(hass, ws_test_elternportal)
     websocket_api.async_register_command(hass, ws_sync_elternportal)
     websocket_api.async_register_command(hass, ws_import_portal_timetable)
@@ -2066,5 +2098,6 @@ def _unregister_services(hass: HomeAssistant) -> None:
     hass.services.async_remove(DOMAIN, SERVICE_IMPORT_PORTAL_EXAMS)
     hass.services.async_remove(DOMAIN, SERVICE_UPDATE_SUBJECT_ALIASES)
     hass.services.async_remove(DOMAIN, SERVICE_SEND_TEST_NOTIFICATION)
+    hass.services.async_remove(DOMAIN, SERVICE_RESET_NOTIFIED_SUBSTITUTIONS)
 
 
