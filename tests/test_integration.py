@@ -2270,6 +2270,19 @@ class TestDayLevelSubstitutionComments(unittest.TestCase):
         self.assertIn("2. Std: Mathematik — Entfällt (Krank)", body2)
 
 
+class TestSubstitutionKindDetection(unittest.TestCase):
+    """kind detection: 'Hitzefrei'/'Schulfrei' count as entfall, day comments as info."""
+
+    def test_kind_detection(self):
+        sk = portal_mod.substitution_kind
+        self.assertEqual(sk({"substitute": "", "subject": "M", "room": "", "info": "entfällt"}), "entfall")
+        self.assertEqual(sk({"substitute": "", "subject": "M", "room": "", "info": "Hitzefrei"}), "entfall")
+        self.assertEqual(sk({"substitute": "", "subject": "M", "room": "", "info": "Schulfrei ab 10 Uhr"}), "entfall")
+        self.assertEqual(sk({"substitute": "---", "subject": "M", "room": "", "info": ""}), "entfall")
+        self.assertEqual(sk({"substitute": "xyz", "subject": "D", "room": "R102", "info": "Stillarbeit"}), "vertretung")
+        self.assertEqual(sk({"substitute": "", "subject": "D", "room": "R205", "info": "Raumänderung"}), "raum")
+
+
 def validate_json_yaml_files():
     json_files = list(project_root.glob("**/*.json"))
     for jf in json_files:

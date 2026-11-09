@@ -56,7 +56,7 @@ except ImportError:
 from .const import DEFAULT_SUBJECT_ALIASES, DEFAULT_TIMETABLE_SLOTS
 
 _TIME_RE = re.compile(r"(\d{1,2})[.:](\d{2})\s*-\s*(\d{1,2})[.:](\d{2})")
-_ENTFALL_RE = re.compile(r"entf[aä]ll|ausfall|f[aä]llt\s+aus|\bfrei\b|unterrichtsfrei", re.I)
+_ENTFALL_RE = re.compile(r"entf[aä]ll|ausfall|f[aä]llt\s+aus|\bfrei\b|(?:hitze|schul|unterrichts|rest)frei", re.I)
 
 WEEKDAY_MAP = {
     1: "monday",
